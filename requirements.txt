@@ -1,0 +1,20 @@
+# ── Required ──────────────────────────────────────────────────────────────────
+aiohttp>=3.9.0
+
+# ── Optional: WAF/Cloudflare bypass (Twitter, Instagram, TikTok, Patreon) ────
+# pip install curl-cffi
+# curl-cffi>=0.6.2
+
+# ── Optional: Avatar perceptual hash matching ─────────────────────────────────
+# pip install imagehash Pillow
+# imagehash>=4.3.1
+# Pillow>=10.0.0
+
+# ── Optional: Deep email scanning (120+ platforms) ────────────────────────────
+# pip install holehe
+# holehe>=1.4.4
+
+# ── Optional: AI verification — choose one or more ───────────────────────────
+# Claude (Anthropic):   pip install anthropic    → set ANTHROPIC_API_KEY
+# OpenRouter (free):    pip install openai        → set OPENROUTER_API_KEY
+# NVIDIA NIM (free):    pip install openai        → set NVIDIA_API_KEY
