@@ -141,7 +141,7 @@ async def fetch_maigret_platforms(timeout: int = 30) -> Dict[str, dict]:
     return platforms
 
 
-async def load_with_fallback(timeout: int = 30) -> Dict[str, dict]:
+async def load_with_fallback(timeout: int = 30, include_nsfw: bool = False) -> Dict[str, dict]:
     cached = _load_cache()
     if cached:
         age = int(time.time() - _CACHE_FILE.stat().st_mtime)

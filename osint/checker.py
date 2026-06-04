@@ -34,6 +34,7 @@ def _headers() -> dict:
     }
 
 TIMEOUT     = aiohttp.ClientTimeout(total=14, connect=7)
+_MAX_BODY_BYTES = 512 * 1024  # 512KB cap — prevents memory exhaustion (#14)
 MAX_RETRIES = 2
 
 
@@ -153,10 +154,11 @@ async def check_platform(session, name: str, platform: dict,
                     # Increase read_bufsize to handle large headers (fixes Twitter 8190-byte error)
                     async with session.get(
                         probe_url, headers=_headers(), timeout=TIMEOUT,
-                        allow_redirects=True, ssl=False,
+                        allow_redirects=True, ssl=True,
                         read_bufsize=2**16,
                     ) as r:
-                        text = await r.text(errors="ignore")
+                        raw_bytes = await r.content.read(_MAX_BODY_BYTES)
+                        text = raw_bytes.decode("utf-8", errors="ignore")
                         await _apply(result, platform, username, r.status, text, str(r.url), probe_url)
                 result["status_code"] = result.get("status_code")
                 break
@@ -168,6 +170,8 @@ async def check_platform(session, name: str, platform: dict,
                 result["error"] = "connection_error"; break
             except aiohttp.ClientError as e:
                 result["error"] = str(e)[:80]; break
+            except KeyboardInterrupt:
+                raise
             except Exception as e:
                 result["error"] = f"unexpected: {str(e)[:60]}"; break
 
@@ -282,7 +286,7 @@ async def check_username(username: str, platforms: dict = None, progress_cb=None
 
 async def check_email(email: str, progress_cb=None) -> list:
     normalized  = email.strip().lower()
-    email_hash  = hashlib.md5(normalized.encode()).hexdigest()
+    email_hash  = hashlib.sha256(normalized.encode()).hexdigest()  # #4 SHA256 not MD5
     results     = []
 
     checks = [{
@@ -302,7 +306,7 @@ async def check_email(email: str, progress_cb=None) -> list:
             }
             try:
                 async with session.get(chk["probe"], headers=_headers(),
-                                       timeout=TIMEOUT, ssl=False) as resp:
+                                       timeout=TIMEOUT, ssl=True) as resp:
                     r["found"] = resp.status == 200
             except Exception as e:
                 r["error"] = str(e)[:60]

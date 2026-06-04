@@ -1,3 +1,4 @@
+import html as _html_esc
 """
 Helix v3 — PDF Investigation Report Generator
 Generates a clean, shareable PDF report using weasyprint (optional)
@@ -51,12 +52,14 @@ def _build_html(username: str, results: List[Dict],
     for cat, items in sorted(by_cat.items()):
         rows += f'<tr><td colspan="4" style="background:#111827;color:#6b7280;font-size:10px;padding:6px 12px;letter-spacing:2px;text-transform:uppercase">{cat}</td></tr>\n'
         for r in items:
-            og = f'<br><span style="color:#a78bfa;font-size:10px;font-style:italic">{r.get("og_title","")[:60]}</span>' if r.get("og_title") else ""
+            _og = _html_esc.escape(str(r.get('og_title','') or '')[:60])
+            og = f'<br><span style="color:#a78bfa;font-size:10px;font-style:italic">{_og}</span>' if _og else ""
+            _pn=_html_esc.escape(str(r['platform'])); _pu=_html_esc.escape(str(r['url']))
             rows += f"""<tr>
-<td style="padding:8px 12px;font-weight:500;color:#e5e7eb">{r['platform']}</td>
+<td style="padding:8px 12px;font-weight:500;color:#e5e7eb">{_pn}</td>
 <td style="padding:8px 12px">{_confidence_badge(r.get('confidence','low'))}</td>
 <td style="padding:8px 12px">{_source_badge(r.get('source','builtin'))}</td>
-<td style="padding:8px 12px;font-size:10px;color:#60a5fa;word-break:break-all"><a href="{r['url']}" style="color:#60a5fa">{r['url']}</a>{og}</td>
+<td style="padding:8px 12px;font-size:10px;color:#60a5fa;word-break:break-all"><a href="{_pu}" style="color:#60a5fa">{_pu}</a>{og}</td>
 </tr>\n"""
 
     # Wayback section

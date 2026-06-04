@@ -198,6 +198,85 @@ _GATE_BLOCKED_HOSTS = {
     "truelancer.com",          # false positive for all usernames
     "exploretalent.com",       # false positive
     "freelancebay.com",        # false positive
+    # Russian/obscure forums — status_code only, always 200 regardless of user
+    "forum24.ru",              # alabay, kuban, jer, microcap, uaksu, volkodavcaoko
+    "borda.ru",                # rodgersforum, starsonice, terminatorium
+    "forum.rzn.info",          # Russian city forum
+    "doublecmd.h1n.ru",        # small Russian forum
+    "induste.com",             # status_code FP
+    "moto-arena.ru",           # Russian moto forum
+    "siava.ru",                # Russian forum
+    "chelfishing.ru",          # Russian fishing forum
+    "moto26.ru",               # Russian moto forum
+    "mitsubishi-asx.net",      # Russian car forum
+    "fkclub.ru",               # Russian forum
+    "forum.palemoon.org",      # open registration, username = 200 even if absent
+    "forums.scummvm.org",      # same
+    "onanizm.club",            # adult Russian forum
+    "forum.ignitioncasino.eu", # casino forum login gate
+    "indiatv-forum.ru",        # Russian TV forum
+    "syberpussy.com",          # adult, login gate
+    "mailpass.site",           # credential leak site, always 200
+    "forum.rastrnet.ru",       # Russian ISP forum
+    "awd.ru",                  # search page — not a profile URL
+    "astro-talks.ru",          # search page — not a profile URL
+    "forum-ukraina.net",       # Ukrainian forum, status_code FP
+    "politforums.net",         # Russian politics, param-based not a profile
+    "xss.is",                  # hacker forum, login required to view profiles
+    "forums.drom.ru",          # Russian car forum
+    "forumsdrom.ru",           # same
+    "l2bz.ru",                 # Russian gaming forum
+    "kashanya.com",            # Russian site, status_code FP
+    "rcprim.ru",               # Russian RC forum
+    "radioskot.ru",            # Russian electronics forum
+    "stalker-zone.info",       # Russian gaming, status_code FP
+    "porevo.site",             # adult site
+    "allmy.link",              # link-in-bio service, FP for all
+    "bigo.tv",                 # login gate for profiles
+    "chitalnya.ru",            # Russian literature, status_code FP
+    "viddler.com",             # dead/legacy platform
+    "ulub.pl",                 # Polish video, status_code FP
+    "nokia-love.ru",           # dead Russian Nokia forum
+    "elektrik-avto.ru",        # Russian EV forum
+    "en.brickimedia.org",      # wiki — any username creates a page
+    "milliarderr.com",         # Russian finance, status_code FP
+    "ucozon.ru",               # Russian, status_code FP
+    "vilinburg.net",           # Russian, status_code FP
+    "aquamen.ru",              # Russian, status_code FP
+    "tavr-obrazovanie.ru",     # Russian education, status_code FP
+    "specchiasol.ru",          # Russian, status_code FP
+    "teplohorosho.ru",         # Russian, status_code FP
+    "dumskaya.net",            # Ukrainian news forum
+    "maga-chat.com",           # political chat, login gate
+    "iknifecollector.com",     # param-based URL, not a real profile
+    "gta-multiplayer.cz",      # gaming, status_code FP
+    "honda.org.ua",            # Ukrainian Honda forum
+    "flashflashrevolution.com",# gaming, status_code FP
+    "fotki.com",               # dead/legacy photo platform
+    "gurushots.com",           # login gate for profiles
+    "hackingwithswift.com",    # forum profile, status_code FP
+    "forums.grandstream.com",  # VoIP forum, status_code FP
+    "dlive.tv",                # streaming, login gate
+    "beatstars.com",           # music, login gate for profiles
+    "funnyjunk.com",           # meme site, status_code FP
+    "lesswrong.com",           # rationalist forum, status_code FP
+    "planetaexcel.ru",         # Russian Excel forum, param-based
+    "tbank.ru",                # Russian bank invest social, login gate
+    "pravda.me",               # Mastodon-like, status_code FP
+    "social.bund.de",          # German govt Mastodon, status_code FP
+    "hey.xyz",                 # web3 social, status_code FP
+    "quitter.pl",              # GNU social, login gate
+    "hackernoon.com",          # status_code FP for all usernames
+    "refsheet.net",            # furry art, status_code FP
+    "zmey.ru",                 # Russian, status_code FP
+    "russian.fi",              # Russian community Finland, status_code FP
+    "artstation.com",          # dots invalid in username (format mismatch)
+    "ebay.com",                # JS soft-404
+    "minecraftlist.com",       # player not found as 200
+    "learn.microsoft.com",     # Microsoft Learn, status_code FP
+    "yandex.ru",               # Yandex API endpoints
+    "wego.social",             # parked/dead
+    "ultrasdiary.pl",          # dead
     "guru.com",                # freelancer search, not profile
     "livetrack24.com",         # login gate
     "sports-tracker.com",      # login gate

@@ -16,7 +16,6 @@ def _check_deps():
     try: import aiohttp
     except ImportError:
         print("\n[!] Missing: aiohttp  →  pip install -r requirements.txt\n"); sys.exit(1)
-_check_deps()
 
 from osint.checker      import check_username, check_email, validate_username, validate_email, HAS_CURL_CFFI
 from osint.graph        import generate_graph
@@ -39,7 +38,7 @@ BANNER = f"""{C}{B}
   ██║  ██║███████╗███████╗██║██╔╝ ██╗
   ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═╝{RST}
   {DIM}Decode the digital DNA of any identity{RST}
-  {DIM}v3.3 · @thalha-a9 · github.com/thalha-a9/helix{RST}
+  {DIM}v3.4 · @thalha-a9 · github.com/thalha-a9/helix{RST}
 """
 
 def banner():
@@ -125,7 +124,7 @@ async def run(args):
     if args.wmn:
         print(f"  {C}[*]{RST} Fetching WhatsMyName database…")
         from osint.adapters.wmn_adapter import load_with_fallback as wmn_load
-        wmn  = await wmn_load(timeout=args.wmn_timeout)
+        wmn  = await wmn_load(timeout=args.wmn_timeout, include_nsfw=getattr(args,"nsfw",False))
         added = sum(1 for k in wmn if k not in platform_map)
         platform_map.update({k:v for k,v in wmn.items() if k not in platform_map})
         print(f"  {G}[+]{RST} WhatsMyName: +{added} → total {len(platform_map)}\n")
@@ -143,13 +142,20 @@ async def run(args):
     if args.maigret:
         print(f"  {C}[*]{RST} Fetching Maigret database…")
         from osint.adapters.maigret_adapter import load_with_fallback as mg_load
-        mg   = await mg_load(timeout=args.maigret_timeout)
+        mg   = await mg_load(timeout=args.maigret_timeout, include_nsfw=getattr(args,"nsfw",False))
         added = sum(1 for k in mg if k not in platform_map)
         platform_map.update({k:v for k,v in mg.items() if k not in platform_map})
         print(f"  {G}[+]{RST} Maigret: +{added} → total {len(platform_map)}\n")
 
-    label = username or email.replace("@","_at_").replace(".","_")
-    out   = args.output or os.path.join("results", label)
+    # Strip leading dots/underscores so output dir isn't hidden on Linux
+    # e.g. .rxzikhx. → rxzikhx_ 
+    _raw_label = username or email.replace("@","_at_").replace(".","_")
+    label = _raw_label.lstrip("._") or _raw_label.replace(".","_").replace("-","_") or "scan"
+    _raw_out = args.output or os.path.join("results", label)
+    out = os.path.realpath(_raw_out)
+    _cwd = os.path.realpath(os.getcwd())
+    if args.output and not out.startswith(_cwd):
+        print(f"{R}[!] --output path must be within current directory{RST}"); import sys; sys.exit(1)
     os.makedirs(out, exist_ok=True)
 
     targets = []
@@ -445,9 +451,10 @@ async def run(args):
 
 
 def main():
+    _check_deps()  # check at CLI entry, not import time
     p = argparse.ArgumentParser(
         prog="helix",
-        description="Helix v3.3 — OSINT Identity Mapper",
+        description="Helix v3.4 — OSINT Identity Mapper",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 AI Providers (--ai):
@@ -501,7 +508,8 @@ Examples:
                    help="Generate likely email permutations from username + check with holehe")
     p.add_argument("--output",    default=None)
     p.add_argument("--no-browser",action="store_true", dest="no_browser")
-    p.add_argument("--version",   action="version", version="Helix v3.3.0")
+    p.add_argument("--nsfw",      action="store_true", help="Include adult/NSFW platforms from WMN/Maigret (excluded by default)")
+    p.add_argument("--version",   action="version", version="Helix v3.4.0")
 
     args = p.parse_args()
     args.pivot_depth = min(max(getattr(args,"pivot_depth",3),1),4)

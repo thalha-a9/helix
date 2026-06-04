@@ -161,7 +161,10 @@ def _is_suspicious_host(url: str) -> bool:
         return False
 
 
-async def fetch_wmn_platforms(timeout: int = 30) -> Dict[str, dict]:
+# NSFW categories to filter by default
+_NSFW_CATEGORIES = {"adult"}
+
+async def fetch_wmn_platforms(timeout: int = 30, include_nsfw: bool = False) -> Dict[str, dict]:
     async with aiohttp.ClientSession() as session:
         try:
             async with session.get(
@@ -187,9 +190,14 @@ async def fetch_wmn_platforms(timeout: int = 30) -> Dict[str, dict]:
         e_string = site.get("e_string", "")
         m_string = site.get("m_string", "")
         e_code   = site.get("e_code", 200)
-        category = _CATEGORY_MAP.get(site.get("category", "").lower(), "other")
+        raw_cat  = site.get("category", "").lower()
+        category = _CATEGORY_MAP.get(raw_cat, "other")
 
         if not name or not uri or "{account}" not in uri:
+            continue
+
+        # Filter NSFW by default
+        if not include_nsfw and raw_cat in _NSFW_CATEGORIES:
             continue
 
         url = uri.replace("{account}", "{username}")
@@ -266,9 +274,9 @@ async def fetch_wmn_platforms(timeout: int = 30) -> Dict[str, dict]:
     return platforms
 
 
-async def load_with_fallback(timeout: int = 30) -> Dict[str, dict]:
+async def load_with_fallback(timeout: int = 30, include_nsfw: bool = False) -> Dict[str, dict]:
     try:
-        raw = await fetch_wmn_platforms(timeout=timeout)
+        raw = await fetch_wmn_platforms(timeout=timeout, include_nsfw=include_nsfw)
         # Strip internal meta entry before returning to caller
         stats = raw.pop("__wmn_filter_stats__", {})
         _b = stats.get("blocked", 0)

@@ -1,5 +1,32 @@
 # Helix Changelog
 
+## v3.4.0 — 2026-06-05
+
+### Security Fixes (14 issues resolved)
+- **#1** SSL/TLS verification now enabled by default (`ssl=True`) — was globally disabled
+- **#2** `--output` path sanitized with `os.path.realpath()` — prevents directory traversal
+- **#3** Sherlock integrity validation — response must be dict with 10+ keys before use
+- **#4** Gravatar email hash changed from MD5 to SHA256
+- **#5** Dependencies pinned with version ranges in requirements.txt
+- **#7** `KeyboardInterrupt` no longer swallowed by bare `except` blocks
+- **#8** `_check_deps()` moved to `main()` — no longer calls `sys.exit()` at import time
+- **#10** XSS fixed in HTML report and graph — all user-controlled data HTML-escaped
+- **#11** D3.js loaded with SRI integrity hash and `crossorigin="anonymous"`
+- **#13** `install.sh` stale repo name `osint-grapher` replaced with `helix`
+- **#14** HTTP response body capped at 512KB — prevents memory exhaustion
+
+### False Positive Fixes
+- **Default avatar filtering** — pHash no longer reports matches when 3+ platforms share the same hash (Mastodon grey silhouette, CDN placeholders)
+- **NSFW platforms excluded by default** — WMN adult category and Maigret isNSFW platforms filtered; use `--nsfw` to include
+- **Hidden output directory fixed** — usernames starting with `.` (e.g. `.rxzikhx.`) no longer create hidden `results/.rxzikhx./` directories
+- **80+ additional platforms added to gate-blocked list** — Russian/obscure forums, dead sites, search-page URLs, adult platforms, login gates
+- **Duplicate results fixed** — same platform from WMN+Sherlock+Maigret no longer counted multiple times
+
+### New Flags
+- `--nsfw` — include adult/NSFW platforms (excluded by default)
+
+---
+
 ## v3.3.0 — 2026-06-02
 
 ### New Features

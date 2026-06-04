@@ -1,20 +1,23 @@
 # ── Required ──────────────────────────────────────────────────────────────────
-aiohttp>=3.9.0
+aiohttp>=3.9.0,<4.0.0
 
-# ── Optional: WAF/Cloudflare bypass (Twitter, Instagram, TikTok, Patreon) ────
+# ── Optional: WAF/Cloudflare bypass ──────────────────────────────────────────
 # pip install curl-cffi
-# curl-cffi>=0.6.2
+# curl-cffi>=0.6.2,<1.0.0
 
 # ── Optional: Avatar perceptual hash matching ─────────────────────────────────
 # pip install imagehash Pillow
-# imagehash>=4.3.1
-# Pillow>=10.0.0
+# imagehash>=4.3.1,<5.0.0
+# Pillow>=10.0.0,<12.0.0
 
-# ── Optional: Deep email scanning (120+ platforms) ────────────────────────────
+# ── Optional: Deep email scanning ────────────────────────────────────────────
 # pip install holehe
 # holehe>=1.4.4
 
-# ── Optional: AI verification — choose one or more ───────────────────────────
-# Claude (Anthropic):   pip install anthropic    → set ANTHROPIC_API_KEY
-# OpenRouter (free):    pip install openai        → set OPENROUTER_API_KEY
-# NVIDIA NIM (free):    pip install openai        → set NVIDIA_API_KEY
+# ── Optional: PDF report generation ──────────────────────────────────────────
+# pip install weasyprint
+# weasyprint>=60.0
+
+# ── Optional: AI verification ────────────────────────────────────────────────
+# pip install anthropic>=0.20.0    → set ANTHROPIC_API_KEY
+# pip install openai>=1.0.0        → set OPENROUTER_API_KEY or NVIDIA_API_KEY

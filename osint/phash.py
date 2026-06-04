@@ -1,140 +1,115 @@
 """
-Helix — Perceptual Hash Avatar Matcher  v3.2
-Re-fetches profile pages when og:image not stored, so pHash works on
-platforms that don't expose avatars via og:image (uses _AVATAR_PATTERNS).
-Requires: pip install imagehash Pillow
+Helix — Perceptual Avatar Hash Matching
+Fix: default avatar filtering — if 3+ platforms share the same hash,
+it's a CDN default/placeholder (Mastodon grey silhouette, etc.) and
+must NOT be reported as a match.
 """
-import asyncio, aiohttp, io, re
-from typing import Dict, List, Optional
+import asyncio
+import aiohttp
+import io
 
 try:
-    from PIL import Image
     import imagehash
+    from PIL import Image
     HAS_PHASH = True
 except ImportError:
     HAS_PHASH = False
 
-PHASH_MATCH   = 8
-PHASH_NEAR    = 15
+TIMEOUT = aiohttp.ClientTimeout(total=10)
 
-_AVATAR_PATTERNS = [
-    r'<meta[^>]+property=["\']og:image["\']\s+content=["\']([^"\']+)["\']',
-    r'<meta[^>]+content=["\']([^"\']+)["\']\s+property=["\']og:image["\']',
-    r'"avatar_url"\s*:\s*"([^"]+)"',
-    r'"profile_image_url"\s*:\s*"([^"]+)"',
-    r'"profile_image_url_https"\s*:\s*"([^"]+)"',
-    r'src=["\']([^"\']*(?:avatar|profile|photo)[^"\']*\.(jpg|jpeg|png|webp))["\']',
-]
-
-_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; Helix-OSINT/3.0)"}
-
-
-def _extract_avatar_url(html: str) -> Optional[str]:
-    for pat in _AVATAR_PATTERNS:
-        m = re.search(pat, html, re.IGNORECASE)
-        if m:
-            url = m.group(1)
-            if url.startswith("http"):
-                return url
+async def _fetch_image(session, url: str) -> bytes | None:
+    try:
+        async with session.get(url, timeout=TIMEOUT, ssl=False) as r:
+            if r.status == 200:
+                return await r.read()
+    except Exception:
+        pass
     return None
 
-
-async def _fetch_page_avatar(session: aiohttp.ClientSession, profile_url: str) -> Optional[str]:
-    """Re-fetch profile page and extract avatar URL from HTML."""
-    if not profile_url:
-        return None
-    try:
-        async with session.get(
-            profile_url, headers=_HEADERS,
-            timeout=aiohttp.ClientTimeout(total=12), ssl=False,
-            allow_redirects=True,
-        ) as resp:
-            if resp.status != 200:
-                return None
-            html = await resp.text(errors="ignore")
-            return _extract_avatar_url(html)
-    except Exception:
-        return None
-
-
-async def _hash_image(session: aiohttp.ClientSession, url: str) -> Optional[str]:
-    if not HAS_PHASH or not url:
-        return None
-    try:
-        async with session.get(
-            url, headers=_HEADERS,
-            timeout=aiohttp.ClientTimeout(total=10), ssl=False,
-        ) as resp:
-            if resp.status != 200: return None
-            ct = resp.headers.get("Content-Type","")
-            if "image" not in ct and "octet" not in ct: return None
-            data = await resp.read()
-        img   = Image.open(io.BytesIO(data)).convert("RGB")
-        return str(imagehash.phash(img))
-    except Exception:
-        return None
-
-
-def _hamming(h1: str, h2: str) -> int:
-    try:
-        return imagehash.hex_to_hash(h1) - imagehash.hex_to_hash(h2)
-    except Exception:
-        return 999
-
-
-async def hash_all_avatars(results: List[dict]) -> Dict[str, str]:
-    """
-    Hash avatars for all found results.
-    Uses stored og:image first; re-fetches profile page if not available.
-    """
+async def hash_all_avatars(found: list) -> dict:
+    """Download and pHash all avatar URLs. Returns {platform: hash_str}."""
     if not HAS_PHASH:
         return {}
 
-    hashes    = {}
-    sem       = asyncio.Semaphore(5)
-    connector = aiohttp.TCPConnector(limit=8, force_close=True)
+    urls = {
+        r["platform"]: r.get("avatar_url", "")
+        for r in found
+        if r.get("avatar_url", "").startswith("http")
+    }
+    if not urls:
+        return {}
 
+    hashes = {}
+    connector = aiohttp.TCPConnector(limit=20, force_close=True)
     async with aiohttp.ClientSession(connector=connector) as session:
-
-        async def process(r):
-            async with sem:
-                avatar_url = r.get("avatar_url","")
-
-                # If not stored, re-fetch profile page to extract it
-                if not avatar_url:
-                    avatar_url = await _fetch_page_avatar(session, r.get("url",""))
-                    if avatar_url:
-                        r["avatar_url"] = avatar_url   # cache for report
-
-                if avatar_url:
-                    h = await _hash_image(session, avatar_url)
-                    if h:
-                        hashes[r["platform"]] = h
-
-        await asyncio.gather(*[process(r) for r in results if r.get("found")])
-
+        tasks = {plat: _fetch_image(session, url) for plat, url in urls.items()}
+        results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+        for plat, data in zip(tasks.keys(), results):
+            if isinstance(data, bytes) and data:
+                try:
+                    img  = Image.open(io.BytesIO(data)).convert("RGB")
+                    phash = str(imagehash.phash(img))
+                    hashes[plat] = phash
+                except Exception:
+                    pass
     return hashes
 
 
-def find_matches(hashes: Dict[str, str]) -> List[dict]:
+def find_matches(hashes: dict, threshold: int = 10) -> list:
+    """
+    Find similar avatar hashes.
+    CRITICAL FIX: any hash shared by 3+ platforms is a default/placeholder
+    avatar (Mastodon grey silhouette, CDN placeholder, etc.) — skip entirely.
+    Real profile pictures appear on 1-2 platforms at most.
+    """
+    if not HAS_PHASH or not hashes:
+        return []
+
     platforms = list(hashes.keys())
-    matches   = []
-    for i in range(len(platforms)):
-        for j in range(i+1, len(platforms)):
-            p1, p2 = platforms[i], platforms[j]
-            dist   = _hamming(hashes[p1], hashes[p2])
-            if dist <= PHASH_MATCH:
-                matches.append({
-                    "platform_a": p1, "platform_b": p2,
-                    "distance":   dist,
-                    "confidence": "99%" if dist==0 else f"{max(70,99-dist*5)}%",
-                    "match_type": "exact" if dist==0 else "near",
-                })
-            elif dist <= PHASH_NEAR:
-                matches.append({
-                    "platform_a": p1, "platform_b": p2,
-                    "distance":   dist,
-                    "confidence": f"{max(50,80-dist*3)}%",
-                    "match_type": "possible",
-                })
+    hash_objs = {}
+    for p, h in hashes.items():
+        try:
+            hash_objs[p] = imagehash.hex_to_hash(h)
+        except Exception:
+            pass
+
+    # Count how many platforms share each hash value (exact match)
+    from collections import Counter
+    hash_counts = Counter(hashes.values())
+
+    # Any hash appearing 3+ times is a default avatar — exclude all platforms with it
+    default_hashes = {h for h, count in hash_counts.items() if count >= 3}
+
+    matches = []
+    seen = set()
+
+    for i, pa in enumerate(platforms):
+        if pa not in hash_objs:
+            continue
+        # Skip if this platform has a default avatar hash
+        if hashes[pa] in default_hashes:
+            continue
+        for pb in platforms[i+1:]:
+            if pb not in hash_objs:
+                continue
+            if hashes[pb] in default_hashes:
+                continue
+            pair = tuple(sorted([pa, pb]))
+            if pair in seen:
+                continue
+            seen.add(pair)
+            try:
+                dist = hash_objs[pa] - hash_objs[pb]
+                if dist <= threshold:
+                    conf = "99%" if dist == 0 else f"{max(0,100-dist*10)}%"
+                    matches.append({
+                        "platform_a":  pa,
+                        "platform_b":  pb,
+                        "distance":    int(dist),
+                        "confidence":  conf,
+                        "match_type":  "exact" if dist == 0 else "similar",
+                    })
+            except Exception:
+                pass
+
     return sorted(matches, key=lambda x: x["distance"])

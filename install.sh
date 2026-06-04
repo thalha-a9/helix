@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# OSINT Grapher — One-Click Installer
-# curl -sSL https://raw.githubusercontent.com/thalha-a9/osint-grapher/main/install.sh | bash
+# Helix — One-Click Installer
+# curl -sSL https://raw.githubusercontent.com/thalha-a9/helix/main/install.sh | bash
 
 set -e
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -11,7 +11,7 @@ err()  { echo -e "${RED}[!]${NC} $1"; exit 1; }
 
 echo ""
 echo -e "${CYAN}╔══════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║   OSINT Grapher — Installer              ║${NC}"
+echo -e "${CYAN}║   Helix — Installer              ║${NC}"
 echo -e "${CYAN}║   github.com/thalha-a9/helix     ║${NC}"
 echo -e "${CYAN}╚══════════════════════════════════════════╝${NC}"
 echo ""
@@ -44,7 +44,7 @@ if [ -d "$REPO_DIR" ]; then
     warn "Directory exists — pulling latest..."
     cd "$REPO_DIR" && git pull && cd ..
 else
-    info "Cloning osint-grapher..."
+    info "Cloning helix..."
     git clone https://github.com/thalha-a9/helix.git
 fi
 ok "Repo ready at ./$REPO_DIR"
@@ -58,7 +58,7 @@ ok "Dependencies installed"
 
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║   Done! Run OSINT Grapher:               ║${NC}"
+echo -e "${GREEN}║   Done! Run Helix:               ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${CYAN}cd helix${NC}"
