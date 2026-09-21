@@ -20,11 +20,18 @@ classifiers = [
 dependencies = ["aiohttp>=3.9.0"]
 
 [project.optional-dependencies]
+socks = ["aiohttp-socks>=0.8.4"]
+dev   = ["pytest>=8", "pytest-asyncio>=0.23", "aiohttp-socks>=0.8.4"]
 tls   = ["curl-cffi>=0.6.2"]
 phash = ["imagehash>=4.3.1","Pillow>=10.0.0"]
 email = ["holehe>=1.4.4"]
 ai    = ["anthropic>=0.25.0","openai>=1.0.0"]
-full  = ["curl-cffi","imagehash","Pillow","holehe","anthropic","openai","weasyprint"]
+full  = ["curl-cffi","imagehash","Pillow","holehe","anthropic","openai","weasyprint","aiohttp-socks"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"
 
 [project.urls]
 Homepage   = "https://github.com/thalha-a9/helix"

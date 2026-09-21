@@ -6,6 +6,7 @@ Uses XposedOrNot (free, no key) — returns breach metadata ONLY
 import aiohttp
 import hashlib
 from typing import List, Dict
+from osint import netconfig
 
 # XposedOrNot: free public API, returns only breach metadata
 XON_URL  = "https://api.xposedornot.com/v1/check-email/{email}"
@@ -29,7 +30,7 @@ async def check_breaches(email: str) -> Dict:
 
     headers = {"User-Agent": "Helix-OSINT/3.0 (security research)"}
 
-    async with aiohttp.ClientSession() as session:
+    async with netconfig.new_session() as session:
         try:
             url = XON_URL.format(email=email)
             async with session.get(

@@ -5,6 +5,7 @@ Cache: ~/.cache/helix/sherlock_data.json — avoids re-downloading on every run.
 import aiohttp, json, time
 from pathlib import Path
 from typing import Dict, Optional
+from osint import netconfig
 
 # Multiple fallback URLs — Sherlock relocated data.json across releases
 SHERLOCK_URLS = [
@@ -55,7 +56,7 @@ async def fetch_sherlock_platforms(timeout: int = 30) -> Dict[str, dict]:
     # ── Fetch from GitHub (try each URL in order) ─────────────────────────────
     raw = None
     last_error = None
-    async with aiohttp.ClientSession() as session:
+    async with netconfig.new_session() as session:
         for url in SHERLOCK_URLS:
             try:
                 async with session.get(

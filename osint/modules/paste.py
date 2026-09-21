@@ -6,6 +6,7 @@ public pastes without authentication.
 """
 import asyncio, aiohttp
 from typing import Dict, List
+from osint import netconfig
 
 _HEADERS = {
     "User-Agent": "Helix-OSINT/3.0 (security research)",
@@ -73,8 +74,8 @@ async def run(username: str, email: str = None) -> Dict:
         "total":           0,
     }
 
-    connector = aiohttp.TCPConnector(limit=4, force_close=True)
-    async with aiohttp.ClientSession(connector=connector) as session:
+    connector = netconfig.build_connector(limit=4, force_close=True)
+    async with netconfig.new_session(connector=connector) as session:
         tasks = [
             _gists(session, username),
             _psbdmp(session, username),

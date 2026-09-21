@@ -6,6 +6,7 @@ Falls back gracefully if holehe is not installed.
 """
 
 from typing import List
+from osint import netconfig
 
 HOLEHE_AVAILABLE = False
 try:
@@ -55,8 +56,8 @@ async def run_holehe(email: str, progress_cb=None) -> List[dict]:
     done     = 0
     total    = len(modules)
 
-    connector = aiohttp.TCPConnector(ssl=False)
-    async with aiohttp.ClientSession(connector=connector) as client:
+    connector = netconfig.build_connector(ssl=False)
+    async with netconfig.new_session(connector=connector) as client:
         for module in modules:
             out = []
             try:

@@ -179,6 +179,55 @@ python helix.py --providers
 
 ---
 
+## 🕶 Operational Security
+
+> **By default every probe leaves from your real IP.** A scan opens dozens of
+> near-simultaneous connections to the same username across many platforms —
+> a distinctive, easily-logged pattern. A subject who monitors their own
+> profile access logs, or who runs a honeypot account on a self-hosted
+> instance, can see and attribute the reconnaissance directly to you.
+> Route your traffic before scanning anyone real.
+
+```bash
+# Route every probe over a local Tor SOCKS port
+python helix.py -u johndoe --tor
+
+# Any HTTP/HTTPS/SOCKS4/SOCKS5 proxy
+python helix.py -u johndoe --proxy socks5://127.0.0.1:1080
+python helix.py -u johndoe --proxy http://user:pass@10.0.0.5:3128
+
+# HTTP_PROXY / HTTPS_PROXY environment variables are honoured as a fallback
+HTTPS_PROXY=http://10.0.0.5:3128 python helix.py -u johndoe
+```
+
+SOCKS proxies need `aiohttp-socks`:
+
+```bash
+pip install aiohttp-socks
+```
+
+The proxy covers the whole engine — the username checker, the email checker,
+avatar hashing, every intelligence module, and the Sherlock / WhatsMyName /
+Maigret / holehe adapters. Helix prints its egress on every run, and warns
+when traffic is going out direct. Proxy credentials are redacted from all
+output and never written to a report.
+
+### Known subject location
+
+When you already know where the subject is, pass it. Candidate profiles that
+*state* a conflicting location are flagged loudly before you confirm them —
+the single most common source of mistaken-identity findings.
+
+```bash
+python helix.py -u johndoe --location "Wellington, New Zealand"
+```
+
+Location is optional and never required. A profile with no stated location is
+never penalised, and a conflicting profile is flagged rather than discarded —
+the judgement stays yours.
+
+---
+
 ## 🤖 AI Verification
 
 Helix has a two-layer false-positive filter:

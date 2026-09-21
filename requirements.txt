@@ -1,6 +1,10 @@
 # ── Required ──────────────────────────────────────────────────────────────────
 aiohttp>=3.9.0,<4.0.0
 
+# ── Optional: SOCKS / Tor proxy support (--proxy socks5://…, --tor) ──────────
+# pip install aiohttp-socks
+# aiohttp-socks>=0.8.4,<1.0.0
+
 # ── Optional: WAF/Cloudflare bypass ──────────────────────────────────────────
 # pip install curl-cffi
 # curl-cffi>=0.6.2,<1.0.0

@@ -17,7 +17,9 @@ def _check_deps():
     except ImportError:
         print("\n[!] Missing: aiohttp  →  pip install -r requirements.txt\n"); sys.exit(1)
 
+from osint              import netconfig
 from osint.checker      import check_username, check_email, validate_username, validate_email, HAS_CURL_CFFI
+from osint.location     import annotate_locations, flag_conflicts, describe_subject_location
 from osint.graph        import generate_graph
 from osint.report       import save_json, save_csv, save_txt
 from osint.platforms    import PLATFORMS, CATEGORY_META
@@ -70,6 +72,8 @@ def _sanitize(results: list) -> list:
         "found":False,"error":None,"confidence":"low","bio_links":{},
         "target_type":"username","source":"builtin","status_code":None,
         "og_title":"","avatar_url":"","phash":"","final_url":"",
+        "location_hints":[],"location_countries":[],
+        "location_conflict":False,"location_note":"",
     }
     safe = []
     for r in results:
@@ -96,7 +100,8 @@ def _print_found(found, note=""):
         ph  = f" {M}≅{RST}" if r.get("phash")              else ""
         src = {"sherlock":f" {DIM}[S]{RST}","wmn":f" {DIM}[W]{RST}",
                "holehe":f" {M}[H]{RST}"}.get(r.get("source",""),"")
-        print(f"  {G}[+]{RST} {r['platform']:<24}{DIM}{r['url']}{RST}{cf}{xl}{ph}{src}")
+        lc  = f" {R}⚑ location conflict{RST}" if r.get("location_conflict") else ""
+        print(f"  {G}[+]{RST} {r['platform']:<24}{DIM}{r['url']}{RST}{cf}{xl}{ph}{src}{lc}")
 
 
 async def run(args):
@@ -165,9 +170,18 @@ async def run(args):
     print(f"  {DIM}Platforms:{RST} {len(platform_map)}")
     ver_str = f"{G}Local heuristics{RST}"
     if args.ai: ver_str += f" + {C}AI ({args.ai}){RST}"
-    print(f"  {DIM}Verifier :{RST} {ver_str}\n")
+    print(f"  {DIM}Verifier :{RST} {ver_str}")
+    if args.location:
+        print(f"  {DIM}Location :{RST} {C}{describe_subject_location(args.location)}{RST}")
+    egress = netconfig.describe()
+    if netconfig.get_proxy():
+        print(f"  {DIM}Network  :{RST} {G}{egress}{RST}\n")
+    else:
+        print(f"  {DIM}Network  :{RST} {Y}{egress}{RST}")
+        print(f"  {DIM}           every probed platform logs your IP — "
+              f"use --tor or --proxy for real investigations{RST}\n")
 
-    results=[];  email_results=[];  pivot_data={};  phash_matches=[]
+    results=[];  email_results=[];  pivot_data={};  phash_matches=[]; loc_conflicts=[]
     wayback_data={}; crt_data={}; paste_data={}; github_intel={}
 
     # ── Username scan ─────────────────────────────────────────────────────────
@@ -197,8 +211,11 @@ async def run(args):
         prog = Progress(len(platform_map))
         _scan_start = time.time()
         print(f"  {DIM}Scanning @{username} across {len(platform_map)} platforms…{RST}\n")
-        results = _sanitize(await check_username(username,platforms=platform_map,
-                                                  progress_cb=prog.update))
+        raw_results = await check_username(username,platforms=platform_map,
+                                           progress_cb=prog.update)
+        # Runs before _sanitize strips the raw page text it reads from.
+        annotate_locations(raw_results)
+        results = _sanitize(raw_results)
         prog.finish()
 
         # ── Local heuristic verifier ─────────────────────────────────────────
@@ -221,6 +238,22 @@ async def run(args):
                 results = apply_verdict(results, verdict)
                 ai_n    = len(verdict.get("purged",[]))
                 print(f"  {G}[+]{RST} AI ({verdict.get('model','?')}): {ai_n} additional purged")
+
+        # ── Location conflict check ───────────────────────────────────────────
+        loc_conflicts = flag_conflicts(results, args.location) if args.location else []
+        if loc_conflicts:
+            print(f"\n  {R}{B}{'!'*54}{RST}")
+            print(f"  {R}{B}  LOCATION CONFLICT — {len(loc_conflicts)} candidate(s) "
+                  f"contradict the known subject location{RST}")
+            print(f"  {R}{B}{'!'*54}{RST}")
+            for c in loc_conflicts:
+                print(f"  {R}[✗]{RST} {B}{c['platform']}{RST} {DIM}{c['url']}{RST}")
+                print(f"      {Y}states{RST} {', '.join(c['stated'])}  "
+                      f"{DIM}·{RST}  {Y}expected{RST} {', '.join(c['expected'])}")
+                if c["hints"]:
+                    print(f"      {DIM}evidence: {' | '.join(c['hints'][:3])}{RST}")
+            print(f"  {DIM}  Verify these before confirming — a conflicting location "
+                  f"often means a different person.{RST}\n")
 
         found_u  = [r for r in results if r.get("found")]
         xlinks   = sum(1 for r in found_u if r.get("bio_links"))
@@ -440,6 +473,10 @@ async def run(args):
         "github_deep": github_intel,
         "crt":         {k: v for k, v in crt_data.items() if k != "all_domains"},
         "paste":       paste_data,
+        "location":    {
+            "subject":   args.location or "",
+            "conflicts": loc_conflicts,
+        },
     }
     if fmt in ("json","all"): print(f"  {G}[✓]{RST} JSON     → {save_json(label, all_r, out, extra=intel_bundle)}")
     if fmt in ("csv", "all"): print(f"  {G}[✓]{RST} CSV      → {save_csv(label, all_r, out)}")
@@ -471,6 +508,11 @@ Examples:
   python helix.py -u johndoe --wmn --sherlock --wayback --crt --paste --pivot --phash --format all
   python helix.py -u johndoe --report              # PDF/HTML investigation report
   python helix.py -u johndoe --email-permute       # generate likely emails + check with holehe
+
+Operational security:
+  python helix.py -u johndoe --tor                 # route every probe over local Tor
+  python helix.py -u johndoe --proxy socks5://127.0.0.1:1080
+  python helix.py -u johndoe --location "Wellington, New Zealand"
         """
     )
     p.add_argument("-u","--username",    default=None)
@@ -502,6 +544,16 @@ Examples:
         choices=["claude","openrouter","nvidia"],metavar="PROVIDER",
         help="AI false-positive filter: claude | openrouter | nvidia  (case-insensitive)")
 
+    g4 = p.add_argument_group("operational security")
+    g4.add_argument("--proxy", default=None, metavar="URL",
+        help="Route every probe through a proxy "
+             "(http://, https://, socks4://, socks5:// — socks needs aiohttp-socks)")
+    g4.add_argument("--tor", action="store_true",
+        help=f"Shorthand for --proxy {netconfig.TOR_PROXY} (local Tor SOCKS port)")
+    g4.add_argument("--location", default=None, metavar="PLACE",
+        help="Known subject location (e.g. \"Wellington, New Zealand\") — "
+             "candidate profiles stating a conflicting location are flagged before confirmation")
+
     p.add_argument("--format",    default="json", choices=["json","csv","txt","all"])
     p.add_argument("--report",    action="store_true", help="Generate PDF/HTML investigation report")
     p.add_argument("--email-permute", action="store_true", dest="email_permute",
@@ -513,6 +565,13 @@ Examples:
 
     args = p.parse_args()
     args.pivot_depth = min(max(getattr(args,"pivot_depth",3),1),4)
+
+    if args.tor and args.proxy:
+        print(f"{R}[!] Use either --tor or --proxy, not both{RST}\n"); sys.exit(1)
+    try:
+        netconfig.set_proxy(netconfig.TOR_PROXY if args.tor else args.proxy)
+    except ValueError as e:
+        print(f"{R}[!] {e}{RST}\n"); sys.exit(1)
 
     try:
         asyncio.run(run(args))

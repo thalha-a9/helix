@@ -5,6 +5,7 @@ Finds domains owned by target that never appeared in any bio.
 """
 import aiohttp, re
 from typing import Dict, List, Set
+from osint import netconfig
 
 CRT_URL = "https://crt.sh/"
 
@@ -62,8 +63,8 @@ async def run(username: str, email: str = None) -> Dict:
     results = {"by_username": {}, "by_email": {}, "all_domains": set()}
 
     import asyncio
-    connector = aiohttp.TCPConnector(limit=4, force_close=True)
-    async with aiohttp.ClientSession(connector=connector) as session:
+    connector = netconfig.build_connector(limit=4, force_close=True)
+    async with netconfig.new_session(connector=connector) as session:
         tasks = [_query_crt(session, f"%{username}%")]
         if email:
             tasks.append(_query_crt(session, email))

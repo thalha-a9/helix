@@ -7,6 +7,7 @@ to surface old usernames, past email addresses, and bio evolution.
 import asyncio, aiohttp, re
 from datetime import datetime
 from typing import Dict, List, Optional
+from osint import netconfig
 
 CDX_API    = "https://web.archive.org/cdx/search/cdx"
 WB_BASE    = "https://web.archive.org/web"
@@ -78,9 +79,9 @@ async def check_profiles(found_results: List[Dict]) -> Dict[str, Dict]:
 
     results = {}
     sem     = asyncio.Semaphore(2)   # gentle on Archive.org
-    connector = aiohttp.TCPConnector(limit=4, force_close=True)
+    connector = netconfig.build_connector(limit=4, force_close=True)
 
-    async with aiohttp.ClientSession(connector=connector, headers=_HEADERS) as session:
+    async with netconfig.new_session(connector=connector, headers=_HEADERS) as session:
 
         async def process(r):
             url = r.get("url","")

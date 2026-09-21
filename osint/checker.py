@@ -9,6 +9,7 @@ import re
 import random
 from typing import Optional
 from osint.platforms import PLATFORMS
+from osint import netconfig
 
 try:
     from curl_cffi.requests import AsyncSession as CurlSession
@@ -148,14 +149,15 @@ async def check_platform(session, name: str, platform: dict,
             try:
                 if HAS_CURL_CFFI and platform.get("tls_impersonate"):
                     async with CurlSession(impersonate="chrome120") as curl:
-                        r   = await curl.get(probe_url, headers=_headers(), timeout=14, allow_redirects=True)
+                        r   = await curl.get(probe_url, headers=_headers(), timeout=14,
+                                             allow_redirects=True, **netconfig.curl_kwargs())
                         await _apply(result, platform, username, r.status_code, r.text, str(r.url), probe_url)
                 else:
                     # Increase read_bufsize to handle large headers (fixes Twitter 8190-byte error)
                     async with session.get(
                         probe_url, headers=_headers(), timeout=TIMEOUT,
                         allow_redirects=True, ssl=True,
-                        read_bufsize=2**16,
+                        read_bufsize=2**16, **netconfig.request_kwargs(),
                     ) as r:
                         raw_bytes = await r.content.read(_MAX_BODY_BYTES)
                         text = raw_bytes.decode("utf-8", errors="ignore")
@@ -268,10 +270,10 @@ async def check_username(username: str, platforms: dict = None, progress_cb=None
     results   = []
     done      = 0
 
-    connector = aiohttp.TCPConnector(
+    connector = netconfig.build_connector(
         limit=_dynamic_concurrency(n), force_close=True, enable_cleanup_closed=True
     )
-    async with aiohttp.ClientSession(connector=connector) as session:
+    async with netconfig.new_session(connector=connector) as session:
         tasks = [
             check_platform(session, name, plat, username, semaphore)
             for name, plat in plat_map.items()
@@ -295,8 +297,8 @@ async def check_email(email: str, progress_cb=None) -> list:
         "display":  f"https://en.gravatar.com/{email_hash}",
     }]
 
-    connector = aiohttp.TCPConnector(limit=10, force_close=True)
-    async with aiohttp.ClientSession(connector=connector) as session:
+    connector = netconfig.build_connector(limit=10, force_close=True)
+    async with netconfig.new_session(connector=connector) as session:
         for i, chk in enumerate(checks):
             r = {
                 "platform": chk["platform"], "url": chk["display"],

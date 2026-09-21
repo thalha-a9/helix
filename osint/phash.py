@@ -7,6 +7,7 @@ must NOT be reported as a match.
 import asyncio
 import aiohttp
 import io
+from osint import netconfig
 
 try:
     import imagehash
@@ -40,8 +41,8 @@ async def hash_all_avatars(found: list) -> dict:
         return {}
 
     hashes = {}
-    connector = aiohttp.TCPConnector(limit=20, force_close=True)
-    async with aiohttp.ClientSession(connector=connector) as session:
+    connector = netconfig.build_connector(limit=20, force_close=True)
+    async with netconfig.new_session(connector=connector) as session:
         tasks = {plat: _fetch_image(session, url) for plat, url in urls.items()}
         results = await asyncio.gather(*tasks.values(), return_exceptions=True)
         for plat, data in zip(tasks.keys(), results):

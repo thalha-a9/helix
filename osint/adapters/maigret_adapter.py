@@ -8,6 +8,7 @@ github.com/soxoj/maigret
 import aiohttp, json, time
 from pathlib import Path
 from typing import Dict, Optional
+from osint import netconfig
 
 MAIGRET_URL = (
     "https://raw.githubusercontent.com/soxoj/maigret/"
@@ -106,7 +107,7 @@ async def fetch_maigret_platforms(timeout: int = 30) -> Dict[str, dict]:
     if cached:
         return cached
 
-    async with aiohttp.ClientSession() as session:
+    async with netconfig.new_session() as session:
         try:
             async with session.get(
                 MAIGRET_URL,

@@ -8,6 +8,7 @@ import asyncio, aiohttp, os, re
 from datetime import datetime, timezone
 from collections import Counter
 from typing import Dict, List, Optional, Set
+from osint import netconfig
 
 API = "https://api.github.com"
 
@@ -96,8 +97,8 @@ async def run(username: str) -> Dict:
     emails:     Set[str]      = set()
     timestamps: List[datetime] = []
 
-    connector = aiohttp.TCPConnector(limit=6, force_close=True)
-    async with aiohttp.ClientSession(connector=connector) as session:
+    connector = netconfig.build_connector(limit=6, force_close=True)
+    async with netconfig.new_session(connector=connector) as session:
 
         # ── 1. Profile ────────────────────────────────────────────────────────
         profile = await _get(session, f"{API}/users/{username}")

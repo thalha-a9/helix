@@ -14,6 +14,7 @@ import re
 import aiohttp
 from typing import Dict
 from urllib.parse import urlparse
+from osint import netconfig
 
 WMN_URL = (
     "https://raw.githubusercontent.com/WebBreacher/WhatsMyName/"
@@ -165,7 +166,7 @@ def _is_suspicious_host(url: str) -> bool:
 _NSFW_CATEGORIES = {"adult"}
 
 async def fetch_wmn_platforms(timeout: int = 30, include_nsfw: bool = False) -> Dict[str, dict]:
-    async with aiohttp.ClientSession() as session:
+    async with netconfig.new_session() as session:
         try:
             async with session.get(
                 WMN_URL, timeout=aiohttp.ClientTimeout(total=timeout)
