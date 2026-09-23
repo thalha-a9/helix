@@ -68,6 +68,23 @@ def test_extract_bio_links_finds_handles():
     assert out == {"github": "janeroe", "twitter": "janeroe_"}
 
 
+def test_extract_bio_links_ignores_markup_and_cdn_hosts():
+    """Regression: the og: namespace in <html prefix> was reported as a user's website."""
+    from osint.platforms import _BIO_PATTERNS_DEVELOPER
+    html = ('<html prefix="og: http://ogp.me/ns#">'
+            '<link rel="dns-prefetch" href="https://github.githubassets.com">'
+            '<link href="https://fonts.googleapis.com/css?family=x">'
+            '<a href="https://janeroe.dev">site</a></html>')
+    assert checker._extract_bio_links(html, {"website": _BIO_PATTERNS_DEVELOPER["website"]}) \
+        == {"website": "https://janeroe.dev"}
+
+
+def test_extract_bio_links_returns_nothing_when_only_noise():
+    from osint.platforms import _BIO_PATTERNS_DEVELOPER
+    html = '<html prefix="og: http://ogp.me/ns#"><link href="https://schema.org/Person"></html>'
+    assert checker._extract_bio_links(html, {"website": _BIO_PATTERNS_DEVELOPER["website"]}) == {}
+
+
 def test_extract_bio_links_skips_missing_patterns():
     assert checker._extract_bio_links("<html></html>", {"github": r"github\.com/(\w+)"}) == {}
 

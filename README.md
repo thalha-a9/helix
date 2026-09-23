@@ -70,6 +70,7 @@ python helix.py -u johndoe --wayback --crt --paste --pivot --phash
 |---|---|
 | `--wmn` | Loads WhatsMyName database at runtime — **700+ platforms**, community-maintained |
 | `--maigret` | Loads **Maigret** database at runtime — sophisticated detection with `presenceStrs`/`absenceStrs`, 24h cached |
+| `--maigret-engine` | Runs the installed **Maigret engine** (`pip install maigret`) as a lead source — every hit is re-fetched and verified by Helix before it is reported. `--maigret-top N` sets how many sites it checks (default 500) |
 | `--sherlock` | Loads Sherlock's database at runtime — **400+ platforms**, cached 24h locally |
 | `--pivot` | **Recursive bio pivot** — finds aliases in bios and auto-scans them, up to 4 hops deep |
 | `--phash` | **Perceptual avatar hash** — downloads profile pics, hashes them, cross-matches across platforms. Finds the same person even if they changed their username |
@@ -295,6 +296,31 @@ Helix uses the right detection method per platform instead of naive HTTP 200 che
 | GitHub | `og:title` parsed + validated against known error strings | Server-side rendered, reliable |
 | Medium | `og:title` rejects homepage redirect string | Catches "Where good ideas find you" |
 | Twitter/X | `curl_cffi` TLS impersonation | Skipped gracefully without it |
+
+---
+
+## 🎯 Identity Confidence
+
+Finding an account proves the account exists. It does not prove it belongs to
+your subject. Every finding gets a separate identity grade built only from
+independent evidence that agrees:
+
+| Selector | Evidence |
+|---|---|
+| username | same username — every finding has this, so on its own it is weak |
+| avatar | perceptual-hash match with another found profile (`--phash`) |
+| cross_link | the profile's bio links to another found profile, or vice versa |
+| email | the same platform was also confirmed from the subject's email (`-e … --holehe`) |
+| real_name | the page names the real name extracted from a *different* profile |
+| location | the stated location agrees with `--location` |
+
+- **LOW** — username only. Treat as a lead, not a finding.
+- **MEDIUM** — two selectors.
+- **HIGH** — three selectors, or two where one is avatar, cross-link or email.
+
+A single selector is never HIGH, status-code-only detection caps at MEDIUM, and
+a location conflict caps at LOW. The supporting evidence is listed next to
+every grade in the console and in all reports.
 
 ---
 

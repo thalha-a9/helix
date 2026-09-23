@@ -112,10 +112,13 @@ PLATFORMS = {
         "bio_extract": True, "bio_patterns": _BIO_PATTERNS_DEVELOPER,
     },
     "GitLab": {
+        # Groups share the user URL space (gitlab.com/torvalds is a group), so
+        # the profile page cannot tell them apart. The users API only returns
+        # real user accounts — a group or a missing name returns [].
         "url": "https://gitlab.com/{username}",
-        "method": "og_meta", "og_not_found": ["404", "Not Found"],
+        "check_url": "https://gitlab.com/api/v4/users?username={username}",
+        "method": "text_present", "found_text": '"username":"{username}"',
         "category": "dev", "color": "#FC6D26",
-        "bio_extract": True, "bio_patterns": _BIO_PATTERNS_DEVELOPER,
     },
     "HackerNews": {
         "url": "https://news.ycombinator.com/user?id={username}",

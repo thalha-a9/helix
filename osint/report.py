@@ -31,10 +31,12 @@ def save_json(username: str, results: list, output_dir: str, extra: dict = None)
 
 def save_csv(username: str, results: list, output_dir: str) -> str:
     path   = os.path.join(output_dir, f"{username}_{_ts()}.csv")
-    fields = ["platform","found","url","category","confidence","source","error","status_code"]
+    fields = ["platform","found","url","category","confidence","identity_confidence",
+              "evidence","source","error","status_code"]
+    rows = [{**r, "evidence": "; ".join(r.get("evidence") or [])} for r in results]
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
-        w.writeheader(); w.writerows(results)
+        w.writeheader(); w.writerows(rows)
     return path
 
 def save_txt(username: str, results: list, output_dir: str) -> str:
@@ -52,7 +54,10 @@ def save_txt(username: str, results: list, output_dir: str) -> str:
             cur_cat = r["category"]
             lines.append(f"\n  [{cur_cat.upper()}]")
         cf = " ●" if r.get("confidence")=="high" else ""
-        lines.append(f"  [+] {r['platform']:<22} {r['url']}{cf}")
+        ic = f"[{r['identity_confidence']}] " if r.get("identity_confidence") else ""
+        lines.append(f"  [+] {ic}{r['platform']:<22} {r['url']}{cf}")
+        if r.get("evidence"):
+            lines.append(f"        evidence: {'; '.join(r['evidence'])}")
     if errors:
         lines += ["", "-"*60, "  ERRORS", "-"*60]
         for r in errors:

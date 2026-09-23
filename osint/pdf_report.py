@@ -21,6 +21,17 @@ def _confidence_badge(conf: str) -> str:
     return f'<span style="background:{c}22;color:{c};border:1px solid {c}55;border-radius:3px;padding:1px 6px;font-size:10px">{conf}</span>'
 
 
+def _identity_cell(r: Dict) -> str:
+    grade = r.get("identity_confidence") or ""
+    if not grade:
+        return '<span style="color:#4b5563;font-size:10px">—</span>'
+    c = {"HIGH": "#00ff88", "MEDIUM": "#60a5fa", "LOW": "#6b7280"}.get(grade, "#6b7280")
+    badge = (f'<span style="background:{c}22;color:{c};border:1px solid {c}55;'
+             f'border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600">{grade}</span>')
+    ev = "<br>".join(_html_esc.escape(str(e)) for e in (r.get("evidence") or []))
+    return f'{badge}<br><span style="color:#9ca3af;font-size:9px">{ev}</span>' if ev else badge
+
+
 def _source_badge(src: str) -> str:
     colors = {"builtin": "#a78bfa", "wmn": "#38bdf8", "sherlock": "#fb923c", "maigret": "#f472b6"}
     c = colors.get(src, "#6b7280")
@@ -50,7 +61,7 @@ def _build_html(username: str, results: List[Dict],
     # Build found table rows
     rows = ""
     for cat, items in sorted(by_cat.items()):
-        rows += f'<tr><td colspan="4" style="background:#111827;color:#6b7280;font-size:10px;padding:6px 12px;letter-spacing:2px;text-transform:uppercase">{cat}</td></tr>\n'
+        rows += f'<tr><td colspan="5" style="background:#111827;color:#6b7280;font-size:10px;padding:6px 12px;letter-spacing:2px;text-transform:uppercase">{cat}</td></tr>\n'
         for r in items:
             _og = _html_esc.escape(str(r.get('og_title','') or '')[:60])
             og = f'<br><span style="color:#a78bfa;font-size:10px;font-style:italic">{_og}</span>' if _og else ""
@@ -58,6 +69,7 @@ def _build_html(username: str, results: List[Dict],
             rows += f"""<tr>
 <td style="padding:8px 12px;font-weight:500;color:#e5e7eb">{_pn}</td>
 <td style="padding:8px 12px">{_confidence_badge(r.get('confidence','low'))}</td>
+<td style="padding:8px 12px">{_identity_cell(r)}</td>
 <td style="padding:8px 12px">{_source_badge(r.get('source','builtin'))}</td>
 <td style="padding:8px 12px;font-size:10px;color:#60a5fa;word-break:break-all"><a href="{_pu}" style="color:#60a5fa">{_pu}</a>{og}</td>
 </tr>\n"""
@@ -165,7 +177,7 @@ def _build_html(username: str, results: List[Dict],
 <div class="section">
   <div class="section-title">✓ Confirmed Profiles ({len(found)})</div>
   <table class="data-table">
-    <tr><th>Platform</th><th>Confidence</th><th>Source</th><th>URL</th></tr>
+    <tr><th>Platform</th><th>Detection</th><th>Identity</th><th>Source</th><th>URL</th></tr>
     {rows}
   </table>
 </div>

@@ -114,13 +114,30 @@ def _extract_og_tag(html: str, prop: str) -> Optional[str]:
         if m: return m.group(1).strip()
     return None
 
+# Markup namespaces, CDNs and trackers that appear in page source but are
+# never a link the account holder posted.
+_BIO_NOISE = (
+    "ogp.me", "opengraphprotocol.org", "schema.org", "w3.org", "purl.org",
+    "xmlns.com", "gmpg.org", "fonts.googleapis.com", "fonts.gstatic.com",
+    "gstatic.com", "googletagmanager.com", "google-analytics.com",
+    "githubassets.com", "gitlab-static.net", "cloudflareinsights.com",
+    "cdnjs.cloudflare.com", "jsdelivr.net", "unpkg.com", "gravatar.com/avatar",
+)
+
+
+def _is_bio_noise(value: str) -> bool:
+    v = value.lower()
+    return any(n in v for n in _BIO_NOISE)
+
+
 def _extract_bio_links(html: str, patterns: dict) -> dict:
     out = {}
     for key, pat in patterns.items():
-        m = re.search(pat, html, re.IGNORECASE)
-        if m:
+        for m in re.finditer(pat, html, re.IGNORECASE):
             handle = m.group(1).rstrip("/").strip()
-            if handle: out[key] = handle
+            if handle and not _is_bio_noise(handle):
+                out[key] = handle
+                break
     return out
 
 

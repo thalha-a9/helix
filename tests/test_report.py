@@ -75,6 +75,31 @@ def test_reports_written_inside_requested_directory(tmp_path, results):
         assert os.path.realpath(path).startswith(os.path.realpath(str(tmp_path)))
 
 
+def test_identity_confidence_in_csv_and_txt(tmp_path, results):
+    results[0]["identity_confidence"] = "HIGH"
+    results[0]["evidence"] = ["same username", "same avatar as Twitter/X"]
+
+    path = save_csv("janeroe", results, str(tmp_path))
+    with open(path, newline="", encoding="utf-8") as f:
+        row = next(csv.DictReader(f))
+    assert row["identity_confidence"] == "HIGH"
+    assert row["evidence"] == "same username; same avatar as Twitter/X"
+
+    text = open(save_txt("janeroe", results, str(tmp_path)), encoding="utf-8").read()
+    assert "[HIGH] GitHub" in text
+    assert "evidence: same username; same avatar as Twitter/X" in text
+
+
+def test_html_report_shows_identity_and_escapes_evidence(tmp_path, results):
+    from osint.pdf_report import _build_html
+    results[0]["identity_confidence"] = "MEDIUM"
+    results[0]["evidence"] = ["names '<script>x</script>'"]
+    html = _build_html("janeroe", results)
+    assert ">MEDIUM<" in html
+    assert "<script>x</script>" not in html
+    assert "&lt;script&gt;" in html
+
+
 def test_empty_results_do_not_crash(tmp_path):
     for saver in (save_json, save_csv, save_txt):
         assert os.path.exists(saver("nobody", [], str(tmp_path)))

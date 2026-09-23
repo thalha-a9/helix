@@ -19,7 +19,8 @@ def _check_deps():
 
 from osint              import netconfig
 from osint.checker      import check_username, check_email, validate_username, validate_email, HAS_CURL_CFFI
-from osint.location     import annotate_locations, flag_conflicts, describe_subject_location
+from osint.location     import annotate_locations, flag_conflicts, describe_subject_location, resolve_countries
+from osint.confidence   import score_identity
 from osint.graph        import generate_graph
 from osint.report       import save_json, save_csv, save_txt
 from osint.platforms    import PLATFORMS, CATEGORY_META
@@ -74,6 +75,7 @@ def _sanitize(results: list) -> list:
         "og_title":"","avatar_url":"","phash":"","final_url":"",
         "location_hints":[],"location_countries":[],
         "location_conflict":False,"location_note":"",
+        "identity_confidence":"","selectors":[],"evidence":[],
     }
     safe = []
     for r in results:
@@ -99,6 +101,7 @@ def _print_found(found, note=""):
         xl  = f" {C}↔{RST}" if r.get("bio_links")          else ""
         ph  = f" {M}≅{RST}" if r.get("phash")              else ""
         src = {"sherlock":f" {DIM}[S]{RST}","wmn":f" {DIM}[W]{RST}",
+               "maigret":f" {DIM}[M]{RST}","maigret_engine":f" {DIM}[M]{RST}",
                "holehe":f" {M}[H]{RST}"}.get(r.get("source",""),"")
         lc  = f" {R}⚑ location conflict{RST}" if r.get("location_conflict") else ""
         print(f"  {G}[+]{RST} {r['platform']:<24}{DIM}{r['url']}{RST}{cf}{xl}{ph}{src}{lc}")
@@ -182,6 +185,7 @@ async def run(args):
               f"use --tor or --proxy for real investigations{RST}\n")
 
     results=[];  email_results=[];  pivot_data={};  phash_matches=[]; loc_conflicts=[]
+    real_name="";  real_name_source="";  identity_counts={}
     wayback_data={}; crt_data={}; paste_data={}; github_intel={}
 
     # ── Username scan ─────────────────────────────────────────────────────────
@@ -227,6 +231,27 @@ async def run(args):
             if len(purge_log) > 5:
                 print(f"  {DIM}  … +{len(purge_log)-5} more{RST}")
 
+        # ── Maigret engine (leads only — verified by Helix) ──────────────────
+        if args.maigret_engine:
+            from osint.adapters.maigret_engine import run_engine
+            print(f"\n  {C}[*]{RST} Maigret engine (top {args.maigret_top} sites)…")
+            eng = await run_engine(username, known_platforms=platform_map.keys(),
+                                   timeout=args.maigret_timeout, top_sites=args.maigret_top)
+            if eng["error"]:
+                print(f"  {Y}[!]{RST} {eng['error']}")
+            else:
+                annotate_locations(eng["results"])
+                eng_results, eng_purged = run_local_verifier(_sanitize(eng["results"]), username)
+                results.extend(eng_results)
+                kept = sum(1 for r in eng_results if r.get("found"))
+                failed = len(eng_results) - kept - len(eng_purged)
+                print(f"  {G}[+]{RST} Maigret: {eng['leads']} leads · "
+                      f"{eng['skipped_known']} already checked by Helix · "
+                      f"{G}{kept} verified{RST} · {Y}{len(eng_purged)} purged{RST} · "
+                      f"{DIM}{failed} unreachable on re-check{RST}")
+                for p in eng_purged[:5]:
+                    print(f"  {DIM}  ✗ {p['platform']}: {p['reason'][:70]}{RST}")
+
         # ── AI verifier ───────────────────────────────────────────────────────
         if args.ai:
             from osint.adapters.ai_verifier import verify_with_ai, apply_verdict
@@ -259,7 +284,6 @@ async def run(args):
         xlinks   = sum(1 for r in found_u if r.get("bio_links"))
 
         # ── Real name extraction from OG-verified profiles ────────────────
-        real_name = ""
         for r in found_u:
             og = r.get("og_title","") or ""
             if og and r.get("confidence") == "high":
@@ -270,6 +294,7 @@ async def run(args):
                     x in clean.lower() for x in ['http','www','.com',username.lower()]
                 ):
                     real_name = clean
+                    real_name_source = r["platform"]
                     break
         if real_name:
             print(f"  {G}[+]{RST} Real name extracted: {C}{real_name}{RST}")
@@ -438,6 +463,31 @@ async def run(args):
                 print(f"  {R}[!]{RST} Found in {bd['count']} breach(es):")
             for line in lines: print(line)
 
+    # ── Identity confidence ──────────────────────────────────────────────────
+    if username:
+        identity_counts = score_identity(
+            results, username,
+            phash_matches=phash_matches, email_results=email_results,
+            real_name=real_name, real_name_source=real_name_source,
+            subject_countries=resolve_countries(args.location or ""),
+        )
+        scored = [r for r in results if r.get("identity_confidence")]
+        if scored:
+            print(f"  {B}Identity confidence{RST}  "
+                  f"{G}HIGH {identity_counts['HIGH']}{RST}  "
+                  f"{C}MEDIUM {identity_counts['MEDIUM']}{RST}  "
+                  f"{DIM}LOW {identity_counts['LOW']}{RST}")
+            colour = {"HIGH": G, "MEDIUM": C, "LOW": DIM}
+            order  = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+            for r in sorted(scored, key=lambda x: (order[x["identity_confidence"]], x["platform"])):
+                g = r["identity_confidence"]
+                print(f"  {colour[g]}[{g:<6}]{RST} {r['platform']:<22}"
+                      f"{DIM}{'; '.join(r['evidence'])}{RST}")
+            if identity_counts["LOW"] and not (identity_counts["HIGH"] or identity_counts["MEDIUM"]):
+                print(f"  {DIM}  A username match alone does not show these accounts are "
+                      f"one person — add --phash, -e EMAIL or --location to corroborate.{RST}")
+            print()
+
     # ── PDF/HTML Report ──────────────────────────────────────────────────────
     if getattr(args,'report',False):
         _st = _scan_start if '_scan_start' in dir() else time.time()
@@ -477,6 +527,7 @@ async def run(args):
             "subject":   args.location or "",
             "conflicts": loc_conflicts,
         },
+        "identity_confidence": identity_counts,
     }
     if fmt in ("json","all"): print(f"  {G}[✓]{RST} JSON     → {save_json(label, all_r, out, extra=intel_bundle)}")
     if fmt in ("csv", "all"): print(f"  {G}[✓]{RST} CSV      → {save_csv(label, all_r, out)}")
@@ -526,6 +577,11 @@ Operational security:
     g.add_argument("--sherlock-timeout",type=int,default=30,  dest="sherlock_timeout")
     g.add_argument("--maigret",         action="store_true",  help="Load Maigret database (github.com/soxoj/maigret)")
     g.add_argument("--maigret-timeout", type=int,default=30,  dest="maigret_timeout")
+    g.add_argument("--maigret-engine",  action="store_true",  dest="maigret_engine",
+        help="Run the installed Maigret engine as a lead source — every hit is "
+             "re-fetched and verified by Helix before it is reported (pip install maigret)")
+    g.add_argument("--maigret-top",     type=int,default=500, dest="maigret_top",
+        help="Sites the Maigret engine checks, by popularity rank (default 500)")
 
     g2 = p.add_argument_group("intelligence modules")
     g2.add_argument("--wayback",        action="store_true",  help="Wayback Machine — profile history + archived bios")

@@ -33,6 +33,9 @@ _SCORE_EXT_SOURCE       = 8
 _SCORE_NO_TITLE_WMN     = 50    # no og:title + WMN/Sherlock source = very suspicious
 _SCORE_API_URL_LOW      = 35    # API URL with confidence=low (body not validated)
 
+# Leads from external engines/databases get the same extra scrutiny.
+_EXTERNAL_SOURCES = ("sherlock", "wmn", "maigret_engine")
+
 # ── Layer 1: WAF / CAPTCHA signatures ────────────────────────────────────────
 _WAF_SIGNATURES = [
     "just a moment...", "checking your browser",
@@ -467,6 +470,24 @@ def _username_valid_for_platform(username: str, platform_name: str) -> Tuple[boo
     return False, f"username '{username}' violates {platform_name} format rules — result impossible"
 
 
+_HOMEPAGE_PATHS = {"", "/", "/home", "/index", "/index.html", "/index.php", "/en", "/en-us"}
+
+
+def _is_homepage_only(url: str, username: str) -> bool:
+    """A site root that never mentions the username cannot be anyone's profile."""
+    if not url or not username:
+        return False
+    try:
+        p = urlparse(url)
+    except Exception:
+        return False
+    if not p.netloc:
+        return False
+    if p.path.rstrip("/").lower() not in _HOMEPAGE_PATHS and p.path.lower() not in _HOMEPAGE_PATHS:
+        return False
+    return username.lower() not in url.lower()
+
+
 def _is_homepage_redirect(req: str, final: str) -> bool:
     if not final or not req or final == req:
         return False
@@ -507,6 +528,13 @@ def _compute_score(og_title: str, url: str, final_url: str,
             f"not that a profile exists ({url[:80]})"
         )
         return score, reasons
+
+    # ── Layer 2b: Homepage-only "hit" ─────────────────────────────────────────
+    for candidate in (url, final_url):
+        if _is_homepage_only(candidate, username):
+            score += _SCORE_DEAD_SITE
+            reasons.append(f"homepage-only hit — no profile for this username ({candidate[:80]})")
+            return score, reasons
 
     # ── Layer 3: Soft-404 content ─────────────────────────────────────────────
     if page_text and _has_soft_404_content(page_text):
@@ -565,10 +593,10 @@ def _compute_score(og_title: str, url: str, final_url: str,
         score += _SCORE_ERROR
         reasons.append(f"redirected to homepage: {final_url[:60]}")
 
-    if source in ("sherlock", "wmn") and confidence == "low":
+    if source in _EXTERNAL_SOURCES and confidence == "low":
         score += _SCORE_EXT_SOURCE
 
-    if not og_title and source in ("sherlock", "wmn"):
+    if not og_title and source in _EXTERNAL_SOURCES:
         score += _SCORE_NO_TITLE_WMN
         if not skip_missing_title:
             reasons.append("no og:title on WMN/Sherlock result (likely API or dead page)")

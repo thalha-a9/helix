@@ -1,5 +1,23 @@
 # Helix Changelog
 
+## Unreleased
+
+### Operational Security
+- **#12** `--proxy` (http/https/socks4/socks5) and `--tor` route every probe — checker, email checker, modules and all adapters. `HTTP(S)_PROXY` honoured as a fallback. The CLI prints its egress and warns when traffic goes out direct. Proxy credentials are redacted from all output.
+
+### Accuracy
+- **#24** Identity confidence (HIGH / MEDIUM / LOW) on every finding, computed from independent selectors — avatar match, bio cross-link, email confirmation, real name, location — with the supporting evidence listed. A username match alone is never above LOW; a single selector is never HIGH. Shown in the console and in JSON, CSV, TXT and HTML reports.
+- **#17** `--location` flags candidates whose profile states a conflicting location, loudly, before confirmation. Conflicts are downgraded, never purged.
+- **#18** `--maigret-engine` runs the installed Maigret engine as a lead source. Every hit is re-fetched and verified by Helix before it can reach a report; platforms Helix already checks keep Helix's own definition.
+- New verifier layer: a homepage-only "hit" (a site root that never mentions the username, e.g. Maigret reporting Discord's homepage) is always purged, for every source.
+- **GitLab false positive fixed** — groups share the user URL space (`gitlab.com/torvalds` is a group), so a group was reported as the user's account. GitLab is now checked through the users API, which only returns real users.
+- **Bio link false positives fixed** — the Open Graph namespace (`http://ogp.me/ns#`) and asset CDNs in page source were reported as the user's website and counted as cross-links.
+
+### Testing
+- **#9** Test suite (870 tests) and CI on Python 3.9 / 3.11 / 3.12, including a false-positive harness that feeds a "user does not exist" response for every platform through detection and the verifier.
+
+---
+
 ## v3.4.0 — 2026-06-05
 
 ### Security Fixes (14 issues resolved)
