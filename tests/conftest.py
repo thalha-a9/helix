@@ -1,3 +1,5 @@
+import asyncio
+import inspect
 import os
 import sys
 
@@ -6,6 +8,24 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from osint import netconfig
+
+
+# Fallback for environments without pytest-asyncio (e.g. system Python on Kali,
+# where PEP 668 blocks pip): run coroutine tests directly instead of failing them.
+def pytest_configure(config):
+    if not config.pluginmanager.hasplugin("asyncio"):
+        config.addinivalue_line("markers", "asyncio: coroutine test (built-in fallback runner)")
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_pyfunc_call(pyfuncitem):
+    if pyfuncitem.config.pluginmanager.hasplugin("asyncio"):
+        return None
+    if not inspect.iscoroutinefunction(pyfuncitem.obj):
+        return None
+    kwargs = {name: pyfuncitem.funcargs[name] for name in pyfuncitem._fixtureinfo.argnames}
+    asyncio.run(pyfuncitem.obj(**kwargs))
+    return True
 
 
 @pytest.fixture(autouse=True)

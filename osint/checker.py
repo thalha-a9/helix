@@ -200,6 +200,7 @@ async def check_platform(session, name: str, platform: dict,
 async def _apply(result: dict, platform: dict, username: str,
                  status: int, text: str, final_url: str, probe_url: str = ""):
     result["final_url"] = final_url
+    result["probe_url"] = probe_url or result.get("url", "")
 
     # WAF detection — catches Cloudflare/bot-check 200s before any method logic
     if text and _is_waf_page(text):

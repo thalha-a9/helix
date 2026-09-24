@@ -95,6 +95,56 @@ def test_username_violating_platform_rules_is_purged():
     assert results[0]["found"] is False
 
 
+# ── Redirect handling — regressions from a live scan ─────────────────────────
+
+import pytest
+
+
+@pytest.mark.parametrize("platform,url,probe,final", [
+    # API-probed: the redirect check must compare against the API URL we hit.
+    ("Chess.com", "https://www.chess.com/member/torvalds",
+     "https://api.chess.com/pub/player/torvalds", "https://api.chess.com/pub/player/torvalds"),
+    ("Bluesky", "https://bsky.app/profile/torvalds.bsky.social",
+     "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=torvalds.bsky.social",
+     "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=torvalds.bsky.social"),
+    # Same site, different subdomain, username kept.
+    ("Gravatar", "https://en.gravatar.com/torvalds", "https://en.gravatar.com/torvalds",
+     "https://gravatar.com/torvalds"),
+    ("Tumblr", "https://torvalds.tumblr.com/", "https://torvalds.tumblr.com/",
+     "https://www.tumblr.com/@torvalds"),
+])
+def test_legitimate_redirects_are_not_purged(platform, url, probe, final):
+    r = result(platform=platform, url=url, probe_url=probe, final_url=final,
+               og_title="", confidence="medium", _page_text='{"username":"torvalds"}')
+    results, purged = run_local_verifier([r], "torvalds")
+    assert results[0]["found"] is True, purged
+
+
+@pytest.mark.parametrize("final", [
+    "https://www.tumblr.com/login",          # same site, but a login wall
+    "https://www.tumblr.com/",               # same site, homepage, no username
+    "https://www.tumblr.com/explore",        # same site, username dropped
+    "https://evil.example/torvalds",         # different site keeping the username
+])
+def test_suspicious_redirects_are_still_purged(final):
+    r = result(platform="Tumblr", url="https://torvalds.tumblr.com/",
+               probe_url="https://torvalds.tumblr.com/", final_url=final,
+               og_title="", confidence="medium", _page_text="<html>x</html>")
+    results, _ = run_local_verifier([r], "torvalds")
+    assert results[0]["found"] is False
+
+
+def test_probe_url_recorded_by_checker():
+    import asyncio
+    from osint import checker
+    r = {"url": "https://www.chess.com/member/x", "confidence": "low", "found": False,
+         "bio_links": {}, "og_title": ""}
+    asyncio.run(checker._apply(r, {"method": "status_code", "found": [200]}, "x", 200, "{}",
+                               "https://api.chess.com/pub/player/x",
+                               "https://api.chess.com/pub/player/x"))
+    assert r["probe_url"] == "https://api.chess.com/pub/player/x"
+
+
 def test_not_found_results_are_left_alone():
     results = [result(found=False, _page_text="<h1>User not found</h1>")]
     results, purged = run_local_verifier(results, "janeroe")

@@ -431,7 +431,25 @@ def _is_dead_site(text: str) -> bool:
     return any(m in t for m in _DEAD_SITE_MARKERS)
 
 
-def _is_bad_redirect(original_url: str, final_url: str) -> bool:
+_MULTI_PART_SLD = {"co", "com", "org", "net", "ac", "gov", "edu"}
+
+
+def _site(netloc: str) -> str:
+    """Registrable domain, roughly: www.tumblr.com and x.tumblr.com → tumblr.com."""
+    host = netloc.split("@")[-1].split(":")[0].lower().rstrip(".")
+    labels = host.split(".")
+    if len(labels) >= 3 and len(labels[-1]) == 2 and labels[-2] in _MULTI_PART_SLD:
+        return ".".join(labels[-3:])
+    return ".".join(labels[-2:])
+
+
+def _same_site_move(r, f, final_url: str, username: str) -> bool:
+    """A subdomain change within one site that still names the user (en.gravatar.com → gravatar.com/jane)."""
+    return bool(username) and _site(r.netloc) == _site(f.netloc) \
+        and username.lower() in final_url.lower()
+
+
+def _is_bad_redirect(original_url: str, final_url: str, username: str = "") -> bool:
     """Return True if the final URL after redirect landed on a known bad path."""
     if not final_url or not original_url or final_url == original_url:
         return False
@@ -443,7 +461,8 @@ def _is_bad_redirect(original_url: str, final_url: str) -> bool:
             # Exception: CDN redirects for confirmed profiles (e.g. Instagram CDN)
             if "cdninstagram" in f.netloc or "fbcdn" in f.netloc:
                 return False
-            return True
+            if not _same_site_move(r, f, final_url, username):
+                return True
         path = f.path.rstrip("/").lower() or "/"
         # Exact bad path match
         if path in _BAD_REDIRECT_PATHS:
@@ -488,12 +507,12 @@ def _is_homepage_only(url: str, username: str) -> bool:
     return username.lower() not in url.lower()
 
 
-def _is_homepage_redirect(req: str, final: str) -> bool:
+def _is_homepage_redirect(req: str, final: str, username: str = "") -> bool:
     if not final or not req or final == req:
         return False
     try:
         r = urlparse(req); f = urlparse(final)
-        if r.netloc != f.netloc:
+        if r.netloc != f.netloc and not _same_site_move(r, f, final, username):
             return True
         home = {"", "/", "/home", "/index", "/index.html",
                 "/login", "/signin", "/signup", "/register", "/join"}
@@ -507,8 +526,12 @@ def _is_homepage_redirect(req: str, final: str) -> bool:
 def _compute_score(og_title: str, url: str, final_url: str,
                    confidence: str, source: str, username: str,
                    page_text: str = "",
-                   skip_missing_title: bool = False) -> Tuple[int, List[str]]:
+                   skip_missing_title: bool = False,
+                   probe_url: str = "") -> Tuple[int, List[str]]:
     """Pure scoring logic. Returns (score, reasons)."""
+    # Redirects are judged against the URL actually requested — for API-probed
+    # platforms that is the API host, not the profile page shown to the user.
+    origin = probe_url or url
     score   = 0
     reasons: List[str] = []
     t = og_title.lower().strip()
@@ -543,7 +566,7 @@ def _compute_score(og_title: str, url: str, final_url: str,
         return score, reasons
 
     # ── Layer 4: Bad redirect path ────────────────────────────────────────────
-    if _is_bad_redirect(url, final_url):
+    if _is_bad_redirect(origin, final_url, username):
         score += _SCORE_BAD_REDIRECT
         reasons.append(f"redirected to bad path: {final_url[:80]}")
 
@@ -589,7 +612,7 @@ def _compute_score(og_title: str, url: str, final_url: str,
     if not skip_missing_title and t and u not in t and confidence == "low":
         score += _SCORE_USER_ABSENT
 
-    if _is_homepage_redirect(url, final_url):
+    if _is_homepage_redirect(origin, final_url, username):
         score += _SCORE_ERROR
         reasons.append(f"redirected to homepage: {final_url[:60]}")
 
@@ -622,6 +645,7 @@ def _score_result(result: dict, username: str) -> Tuple[bool, str, int]:
     source     = result.get("source",     "builtin")
     page_text  = result.get("_page_text", "")  # populated by checker when available
     platform   = result.get("platform",   "")
+    probe_url  = result.get("probe_url",  "") or ""
 
     # ── Layer 7: username format pre-validation ───────────────────────────────
     valid, fmt_reason = _username_valid_for_platform(username, platform)
@@ -633,6 +657,7 @@ def _score_result(result: dict, username: str) -> Tuple[bool, str, int]:
             og_title, url, final_url, confidence, source, username,
             page_text=page_text,
             skip_missing_title=True,
+            probe_url=probe_url,
         )
         is_fp  = score >= _THRESHOLD_HIGH
         reason = "; ".join(reasons) if reasons else ""
@@ -641,6 +666,7 @@ def _score_result(result: dict, username: str) -> Tuple[bool, str, int]:
     score, reasons = _compute_score(
         og_title, url, final_url, confidence, source, username,
         page_text=page_text,
+        probe_url=probe_url,
     )
     is_fp  = score >= _THRESHOLD_NORMAL
     reason = "; ".join(reasons) if reasons else ""

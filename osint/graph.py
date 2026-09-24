@@ -156,7 +156,7 @@ def generate_graph(username, results, output_path,
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Helix — {username}</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js" integrity="sha512-MefNfAGJ/pEy89xLOFs3V6pYPs6AmUhXOXCBDc3V7xSdX2jSCp2l0vEdBkCXSHtdMPFCMZs+8ElEMkTFVoNw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js" integrity="sha512-M7nHCiNUOwFt6Us3r8alutZLm9qMt4s9951uo8jqO4UwJ1hziseL6O3ndFyigx6+LREfZqnhHxYjKRJ8ZQ69DQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
 :root{{--bg:#050508;--panel:#0a0a0f;--panel2:#0f0f18;--border:#1a1a2e;
   --accent:#00ff88;--accent2:#f59e0b;--accent3:#a78bfa;--accent4:#f472b6;

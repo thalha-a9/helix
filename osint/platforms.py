@@ -25,7 +25,7 @@ PLATFORMS = {
 
     # ── Social ─────────────────────────────────────────────────────────────────
     "Twitter/X": {
-        "url":             "https://twitter.com/{username}",
+        "url":             "https://x.com/{username}",
         "method":          "text_not_present",
         "not_found_text":  "This account doesn\u2019t exist",
         "tls_impersonate": True,
@@ -85,7 +85,7 @@ PLATFORMS = {
         "category": "social", "color": "#0085FF",
     },
     "Threads": {
-        "url": "https://www.threads.net/@{username}",
+        "url": "https://www.threads.com/@{username}",
         "method": "text_not_present", "not_found_text": "isn\u2019t available",
         "tls_impersonate": True,
         "category": "social", "color": "#000000",
