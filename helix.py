@@ -9,7 +9,7 @@ Verification stack (runs in order on every scan):
   2. AI verifier (--ai)        — optional, multi-provider (claude/openrouter/nvidia)
 """
 
-import asyncio, argparse, os, sys, time, webbrowser
+import asyncio, argparse, logging, os, sys, time, webbrowser
 from datetime import datetime
 
 def _check_deps():
@@ -118,7 +118,19 @@ def _print_found(found, note=""):
         print(f"  {G}[+]{RST} {r['platform']:<24}{DIM}{r['url']}{RST}{cf}{xl}{ph}{src}{lc}")
 
 
+def _quiet_network_noise(loop, context):
+    """Swallow per-site network failures that asyncio would otherwise print."""
+    exc = context.get("exception")
+    if isinstance(exc, (OSError, asyncio.TimeoutError, asyncio.CancelledError)):
+        return
+    loop.default_exception_handler(context)
+
+
 async def run(args):
+    # With thousands of concurrent probes, one site's DNS or socket failure can
+    # surface as an unretrieved-exception traceback; it is already recorded
+    # as that site's error, so keep it off the terminal.
+    asyncio.get_running_loop().set_exception_handler(_quiet_network_noise)
     banner()
 
     if args.providers:
@@ -654,7 +666,11 @@ Operational security:
     try:
         asyncio.run(run(args))
     except KeyboardInterrupt:
-        print(f"\n\n  {Y}[!] Interrupted.{RST}\n"); sys.exit(0)
+        # Pending probes are torn down at exit; don't print one line per task.
+        logging.getLogger("asyncio").setLevel(logging.CRITICAL)
+        print(f"\n\n  {Y}[!] Interrupted.{RST}\n")
+        sys.stdout.flush()
+        os._exit(130)
 
 if __name__=="__main__":
     main()

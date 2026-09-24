@@ -264,8 +264,10 @@ PLATFORMS = {
 
     # ── Gaming ─────────────────────────────────────────────────────────────────
     "Steam": {
+        # Positive evidence only: rate-limit and error pages lack the not-found
+        # text too, which made a missing marker read as "found".
         "url": "https://steamcommunity.com/id/{username}",
-        "method": "text_not_present", "not_found_text": "The specified profile could not be found",
+        "method": "text_present", "found_text": "g_rgProfileData",
         "category": "gaming", "color": "#1B2838",
     },
     "Chess.com": {

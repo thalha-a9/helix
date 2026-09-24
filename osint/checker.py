@@ -37,6 +37,10 @@ def _headers() -> dict:
 TIMEOUT     = aiohttp.ClientTimeout(total=14, connect=7)
 _MAX_BODY_BYTES = 512 * 1024  # 512KB cap — prevents memory exhaustion (#14)
 MAX_RETRIES = 2
+# Large database scans: one short attempt per site. Thousands of dead hosts
+# retried with long timeouts would otherwise dominate the run time.
+FAST_TIMEOUT = aiohttp.ClientTimeout(total=10, connect=5)
+FAST_SCAN_THRESHOLD = 200
 
 
 # ── WAF / bot-check page detection ───────────────────────────────────────────
@@ -142,7 +146,8 @@ def _extract_bio_links(html: str, patterns: dict) -> dict:
 
 
 async def check_platform(session, name: str, platform: dict,
-                         username: str, semaphore: asyncio.Semaphore) -> dict:
+                         username: str, semaphore: asyncio.Semaphore,
+                         fast: bool = False) -> dict:
     display_url = platform["url"].replace("{username}", username)
     # check_url: separate probe URL (API endpoint) — falls back to display_url
     probe_url   = platform.get("check_url", platform["url"]).replace("{username}", username)
@@ -162,17 +167,19 @@ async def check_platform(session, name: str, platform: dict,
     async with semaphore:
         await asyncio.sleep(0.03 + (hash(name) % 15) * 0.01)
 
-        for attempt in range(MAX_RETRIES + 1):
+        retries = 0 if fast else MAX_RETRIES
+        timeout = FAST_TIMEOUT if fast else TIMEOUT
+        for attempt in range(retries + 1):
             try:
                 if HAS_CURL_CFFI and platform.get("tls_impersonate"):
                     async with CurlSession(impersonate="chrome120") as curl:
-                        r   = await curl.get(probe_url, headers=_headers(), timeout=14,
+                        r   = await curl.get(probe_url, headers=_headers(), timeout=timeout.total,
                                              allow_redirects=True, **netconfig.curl_kwargs())
                         await _apply(result, platform, username, r.status_code, r.text, str(r.url), probe_url)
                 else:
                     # Increase read_bufsize to handle large headers (fixes Twitter 8190-byte error)
                     async with session.get(
-                        probe_url, headers=_headers(), timeout=TIMEOUT,
+                        probe_url, headers=_headers(), timeout=timeout,
                         allow_redirects=True, ssl=True,
                         read_bufsize=2**16, **netconfig.request_kwargs(),
                     ) as r:
@@ -184,7 +191,7 @@ async def check_platform(session, name: str, platform: dict,
 
             except asyncio.TimeoutError:
                 result["error"] = "timeout"
-                if attempt < MAX_RETRIES: await asyncio.sleep(1.5 * (attempt + 1))
+                if attempt < retries: await asyncio.sleep(1.5 * (attempt + 1))
             except aiohttp.ClientConnectorError:
                 result["error"] = "connection_error"; break
             except aiohttp.ClientError as e:
@@ -332,7 +339,8 @@ async def check_username(username: str, platforms: dict = None, progress_cb=None
     )
     async with netconfig.new_session(connector=connector) as session:
         tasks = [
-            check_platform(session, name, plat, username, semaphore)
+            check_platform(session, name, plat, username, semaphore,
+                           fast=n > FAST_SCAN_THRESHOLD)
             for name, plat in plat_map.items()
         ]
         for coro in asyncio.as_completed(tasks):

@@ -120,6 +120,11 @@ def build_connector(**kwargs) -> aiohttp.BaseConnector:
     """TCPConnector, or a SOCKS-aware connector when a socks:// proxy is set."""
     if _PROXY and is_socks():
         return ProxyConnector.from_url(_PROXY, **kwargs)
+    # aiohttp silently switches to aiodns when it is installed (maigret pulls it
+    # in), and c-ares times out under thousands of concurrent lookups. The
+    # system resolver plus a DNS cache holds up at full-database scale.
+    kwargs.setdefault("resolver", aiohttp.ThreadedResolver())
+    kwargs.setdefault("ttl_dns_cache", 300)
     return aiohttp.TCPConnector(**kwargs)
 
 
