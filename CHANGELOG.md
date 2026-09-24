@@ -26,8 +26,6 @@
 
 ### Testing
 - The suite runs without `pytest-asyncio` installed (e.g. system Python on Kali, where PEP 668 blocks pip).
-
-### Testing
 - **#9** Test suite (870 tests) and CI on Python 3.9 / 3.11 / 3.12, including a false-positive harness that feeds a "user does not exist" response for every platform through detection and the verifier.
 
 ---
