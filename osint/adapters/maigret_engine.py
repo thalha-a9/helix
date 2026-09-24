@@ -9,6 +9,7 @@ material, not evidence.
 """
 
 import asyncio
+import difflib
 import json
 import os
 import re
@@ -17,7 +18,8 @@ import tempfile
 from typing import Dict, List, Optional
 
 from osint import netconfig
-from osint.checker import _extract_og_tag, _headers, _is_waf_page, _MAX_BODY_BYTES
+from osint.checker import (CONTROL_ERROR, _extract_og_tag, _headers, _is_waf_page,
+                           _MAX_BODY_BYTES, control_username)
 
 import aiohttp
 
@@ -134,14 +136,64 @@ async def _reprobe(session, lead: dict, semaphore: asyncio.Semaphore) -> dict:
     return lead
 
 
-async def reprobe_leads(leads: List[dict], concurrency: int = 10) -> List[dict]:
+def _normalise(text: str, *names: str) -> str:
+    for n in names:
+        if n:
+            text = re.sub(re.escape(n), "{u}", text, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", text)[:20000]
+
+
+def looks_same(page_a: str, page_b: str, username: str, control: str,
+               threshold: float = 0.9) -> bool:
+    """True when two pages are the same page once the usernames are masked out."""
+    a, b = _normalise(page_a, username, control), _normalise(page_b, username, control)
+    if not a or not b:
+        return False
+    m = difflib.SequenceMatcher(None, a, b, autojunk=False)
+    if m.real_quick_ratio() < threshold or m.quick_ratio() < threshold:
+        return False
+    return difflib.SequenceMatcher(None, a[:6000], b[:6000], autojunk=False).ratio() >= threshold
+
+
+async def _control_check(session, lead: dict, username: str, ctrl: str,
+                         semaphore: asyncio.Semaphore) -> None:
+    """Discard a lead whose URL serves the same page for a name that cannot exist."""
+    if username.lower() not in lead["url"].lower():
+        return  # ID-based URL — no control URL can be built
+    ctrl_url = re.sub(re.escape(username), ctrl, lead["url"], flags=re.IGNORECASE)
+    async with semaphore:
+        try:
+            async with session.get(
+                ctrl_url, headers=_headers(), allow_redirects=True,
+                timeout=aiohttp.ClientTimeout(total=14, connect=7),
+                **netconfig.request_kwargs(),
+            ) as r:
+                status = r.status
+                text = (await r.content.read(_MAX_BODY_BYTES)).decode("utf-8", errors="ignore")
+        except Exception:
+            return
+    if status == 200 and looks_same(lead.get("_page_text", ""), text[:6000], username, ctrl):
+        lead["found"] = False
+        lead["error"] = CONTROL_ERROR
+        lead["control_failed"] = True
+
+
+async def reprobe_leads(leads: List[dict], concurrency: int = 10,
+                        username: str = "", control: bool = True) -> List[dict]:
     """Fetch every lead ourselves so the verifier judges real page content."""
     if not leads:
         return []
     semaphore = asyncio.Semaphore(concurrency)
     connector = netconfig.build_connector(limit=concurrency, force_close=True)
     async with netconfig.new_session(connector=connector) as session:
-        return list(await asyncio.gather(*(_reprobe(session, l, semaphore) for l in leads)))
+        leads = list(await asyncio.gather(*(_reprobe(session, l, semaphore) for l in leads)))
+        if control and username:
+            ctrl = control_username()
+            await asyncio.gather(*(
+                _control_check(session, l, username, ctrl, semaphore)
+                for l in leads if l.get("found")
+            ))
+    return leads
 
 
 def _egress_proxy() -> Optional[str]:
@@ -151,7 +203,8 @@ def _egress_proxy() -> Optional[str]:
 
 
 async def run_engine(username: str, known_platforms=(), timeout: int = 30,
-                     top_sites: int = 500, max_runtime: int = 900) -> Dict:
+                     top_sites: int = 500, max_runtime: int = 900,
+                     control: bool = True) -> Dict:
     """
     Run Maigret and return re-probed leads for the caller to verify.
     Result: {"results": [...], "leads": int, "skipped_known": int, "error": str|None}
@@ -196,5 +249,5 @@ async def run_engine(username: str, known_platforms=(), timeout: int = 30,
     out["leads"] = len(leads)
     fresh = drop_known(leads, known_platforms)
     out["skipped_known"] = len(leads) - len(fresh)
-    out["results"] = await reprobe_leads(fresh)
+    out["results"] = await reprobe_leads(fresh, username=username, control=control)
     return out

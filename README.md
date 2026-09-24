@@ -70,6 +70,7 @@ python helix.py -u johndoe --wayback --crt --paste --pivot --phash
 |---|---|
 | `--wmn` | Loads WhatsMyName database at runtime — **700+ platforms**, community-maintained |
 | `--maigret` | Loads **Maigret** database at runtime — sophisticated detection with `presenceStrs`/`absenceStrs`, 24h cached |
+| `--all` | Full coverage in one flag — builtin + WhatsMyName + Sherlock + Maigret databases (~6,000 sites), every hit checked by the control probe |
 | `--maigret-engine` | Runs the installed **Maigret engine** (`pip install maigret`) as a lead source — every hit is re-fetched and verified by Helix before it is reported. `--maigret-top N` sets how many sites it checks (default 500) |
 | `--sherlock` | Loads Sherlock's database at runtime — **400+ platforms**, cached 24h locally |
 | `--pivot` | **Recursive bio pivot** — finds aliases in bios and auto-scans them, up to 4 hops deep |
@@ -296,6 +297,29 @@ Helix uses the right detection method per platform instead of naive HTTP 200 che
 | GitHub | `og:title` parsed + validated against known error strings | Server-side rendered, reliable |
 | Medium | `og:title` rejects homepage redirect string | Catches "Where good ideas find you" |
 | Twitter/X | `curl_cffi` TLS impersonation | Skipped gracefully without it |
+
+---
+
+## 🧪 Control Probe
+
+Big username databases are full of sites that answer "found" for **any** name:
+login walls (Facebook and Instagram when logged out), catch-all pages, sites
+whose markup changed since the database entry was written. A single site like
+that puts a fake account in every report.
+
+So every hit is checked again with a random username that cannot exist. If the
+site "finds" that one too, the hit proves nothing and is discarded — no per-site
+tuning, so it holds across all ~6,000 sites. On a live full scan of a made-up
+username it caught PyPi, Packagist and Apple Developer, and the scan reported
+nothing found.
+
+Leads from the Maigret engine get the same check by URL: the page for the real
+name is compared with the page for the random one, and near-identical pages
+are discarded. `--no-control` turns the probe off (faster, less safe).
+
+Database entries are also validated before they are scanned: a URL that is not
+a real web address, an unfilled template, or a detection rule with no evidence
+(which would match every page) is skipped and counted.
 
 ---
 

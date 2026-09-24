@@ -281,7 +281,46 @@ async def _apply(result: dict, platform: dict, username: str,
             result["bio_links"] = _extract_bio_links(text, bio_pats)
 
 
-async def check_username(username: str, platforms: dict = None, progress_cb=None) -> list:
+CONTROL_ERROR = "unverifiable: platform also reports a random nonexistent username as found"
+
+
+def control_username() -> str:
+    """A username nobody has: lowercase, starts with a letter, fits common length rules."""
+    alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+    return "x" + "".join(random.SystemRandom().choice(alphabet) for _ in range(11))
+
+
+async def _control_probe(session, results: list, plat_map: dict,
+                         semaphore: asyncio.Semaphore, username: str) -> list:
+    """
+    Re-check every hit with a username that cannot exist. A platform that
+    "finds" it too returns the same answer for any name — login walls, catch-all
+    pages, changed markup — so its hit is evidence of nothing and is discarded.
+    Returns the names of the discarded platforms.
+    """
+    hits = [r for r in results if r.get("found")]
+    if not hits:
+        return []
+    ctrl = control_username()
+    while ctrl.lower() == username.lower():
+        ctrl = control_username()
+
+    checks = await asyncio.gather(*(
+        check_platform(session, r["platform"], plat_map[r["platform"]], ctrl, semaphore)
+        for r in hits
+    ))
+    discarded = []
+    for hit, control in zip(hits, checks):
+        if control.get("found"):
+            hit["found"] = False
+            hit["error"] = CONTROL_ERROR
+            hit["control_failed"] = True
+            discarded.append(hit["platform"])
+    return discarded
+
+
+async def check_username(username: str, platforms: dict = None, progress_cb=None,
+                         control: bool = True) -> list:
     plat_map  = platforms or PLATFORMS
     n         = len(plat_map)
     semaphore = asyncio.Semaphore(_dynamic_concurrency(n))
@@ -301,6 +340,8 @@ async def check_username(username: str, platforms: dict = None, progress_cb=None
             results.append(result)
             done += 1
             if progress_cb: progress_cb(done, n)
+        if control:
+            await _control_probe(session, results, plat_map, semaphore, username)
     return results
 
 

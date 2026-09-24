@@ -21,6 +21,7 @@ from osint              import netconfig
 from osint.checker      import check_username, check_email, validate_username, validate_email, HAS_CURL_CFFI
 from osint.location     import annotate_locations, flag_conflicts, describe_subject_location, resolve_countries
 from osint.confidence   import score_identity
+from osint.platform_schema import filter_valid
 from osint.graph        import generate_graph
 from osint.report       import save_json, save_csv, save_txt
 from osint.platforms    import PLATFORMS, CATEGORY_META
@@ -88,6 +89,16 @@ def _sanitize(results: list) -> list:
     return safe
 
 
+def _merge_source(platform_map: dict, label: str, loaded: dict) -> None:
+    """Add a database's platforms, dropping definitions that cannot be scanned soundly."""
+    usable, unusable = filter_valid(loaded)
+    added = sum(1 for k in usable if k not in platform_map)
+    platform_map.update({k: v for k, v in usable.items() if k not in platform_map})
+    note = f"  {DIM}({len(unusable)} malformed entr{'y' if len(unusable) == 1 else 'ies'} skipped){RST}" \
+        if unusable else ""
+    print(f"  {G}[+]{RST} {label}: +{added} → total {len(platform_map)}{note}\n")
+
+
 def _print_found(found, note=""):
     if not found: print(f"  {DIM}None found.{RST}"); return
     if note: print(f"  {DIM}{note}{RST}")
@@ -133,27 +144,21 @@ async def run(args):
         print(f"  {C}[*]{RST} Fetching WhatsMyName database…")
         from osint.adapters.wmn_adapter import load_with_fallback as wmn_load
         wmn  = await wmn_load(timeout=args.wmn_timeout, include_nsfw=getattr(args,"nsfw",False))
-        added = sum(1 for k in wmn if k not in platform_map)
-        platform_map.update({k:v for k,v in wmn.items() if k not in platform_map})
-        print(f"  {G}[+]{RST} WhatsMyName: +{added} → total {len(platform_map)}\n")
+        _merge_source(platform_map, "WhatsMyName", wmn)
 
     # ── Sherlock ──────────────────────────────────────────────────────────────
     if args.sherlock:
         print(f"  {C}[*]{RST} Fetching Sherlock database…")
         from osint.adapters.sherlock_adapter import load_with_fallback as sh_load
         sh   = await sh_load(timeout=args.sherlock_timeout)
-        added = sum(1 for k in sh if k not in platform_map)
-        platform_map.update({k:v for k,v in sh.items() if k not in platform_map})
-        print(f"  {G}[+]{RST} Sherlock: +{added} → total {len(platform_map)}\n")
+        _merge_source(platform_map, "Sherlock", sh)
 
     # ── Maigret ───────────────────────────────────────────────────────────────
     if args.maigret:
         print(f"  {C}[*]{RST} Fetching Maigret database…")
         from osint.adapters.maigret_adapter import load_with_fallback as mg_load
         mg   = await mg_load(timeout=args.maigret_timeout, include_nsfw=getattr(args,"nsfw",False))
-        added = sum(1 for k in mg if k not in platform_map)
-        platform_map.update({k:v for k,v in mg.items() if k not in platform_map})
-        print(f"  {G}[+]{RST} Maigret: +{added} → total {len(platform_map)}\n")
+        _merge_source(platform_map, "Maigret", mg)
 
     # Strip leading dots/underscores so output dir isn't hidden on Linux
     # e.g. .rxzikhx. → rxzikhx_ 
@@ -216,11 +221,19 @@ async def run(args):
         _scan_start = time.time()
         print(f"  {DIM}Scanning @{username} across {len(platform_map)} platforms…{RST}\n")
         raw_results = await check_username(username,platforms=platform_map,
-                                           progress_cb=prog.update)
+                                           progress_cb=prog.update,
+                                           control=not args.no_control)
         # Runs before _sanitize strips the raw page text it reads from.
         annotate_locations(raw_results)
         results = _sanitize(raw_results)
         prog.finish()
+
+        ctrl_dropped = sorted(r["platform"] for r in results if r.get("control_failed"))
+        if ctrl_dropped:
+            print(f"\n  {Y}[control]{RST} Discarded {len(ctrl_dropped)} platform(s) that also "
+                  f"'find' a random nonexistent username:")
+            print(f"  {DIM}  {', '.join(ctrl_dropped[:12])}"
+                  f"{f' … +{len(ctrl_dropped)-12} more' if len(ctrl_dropped) > 12 else ''}{RST}")
 
         # ── Local heuristic verifier ─────────────────────────────────────────
         results, purge_log = run_local_verifier(results, username)
@@ -234,9 +247,11 @@ async def run(args):
         # ── Maigret engine (leads only — verified by Helix) ──────────────────
         if args.maigret_engine:
             from osint.adapters.maigret_engine import run_engine
-            print(f"\n  {C}[*]{RST} Maigret engine (top {args.maigret_top} sites)…")
+            print(f"\n  {C}[*]{RST} Maigret engine (top {args.maigret_top} sites) — "
+                  f"{DIM}this can take several minutes; lower --maigret-top to go faster{RST}")
             eng = await run_engine(username, known_platforms=platform_map.keys(),
-                                   timeout=args.maigret_timeout, top_sites=args.maigret_top)
+                                   timeout=args.maigret_timeout, top_sites=args.maigret_top,
+                                   control=not args.no_control)
             if eng["error"]:
                 print(f"  {Y}[!]{RST} {eng['error']}")
             else:
@@ -571,6 +586,11 @@ Operational security:
     p.add_argument("--providers",        action="store_true")
 
     g = p.add_argument_group("platform sources")
+    g.add_argument("--all",             action="store_true",  dest="all_sources",
+        help="Full coverage: builtin + WhatsMyName + Sherlock + Maigret databases (~3000 sites)")
+    g.add_argument("--no-control",      action="store_true",  dest="no_control",
+        help="Skip the control probe that discards platforms which also 'find' a random "
+             "nonexistent username (faster, but lets catch-all pages through)")
     g.add_argument("--wmn",             action="store_true")
     g.add_argument("--wmn-timeout",     type=int,default=30,  dest="wmn_timeout")
     g.add_argument("--sherlock",        action="store_true")
@@ -621,6 +641,8 @@ Operational security:
 
     args = p.parse_args()
     args.pivot_depth = min(max(getattr(args,"pivot_depth",3),1),4)
+    if args.all_sources:
+        args.wmn = args.sherlock = args.maigret = True
 
     if args.tor and args.proxy:
         print(f"{R}[!] Use either --tor or --proxy, not both{RST}\n"); sys.exit(1)

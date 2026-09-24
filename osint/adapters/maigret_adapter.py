@@ -5,7 +5,7 @@ Maigret has more sophisticated detection than Sherlock — uses presenceStrs,
 absenceStrs, and more platform-specific logic. Cached 24h locally.
 github.com/soxoj/maigret
 """
-import aiohttp, json, time
+import aiohttp, json, re, time
 from pathlib import Path
 from typing import Dict, Optional
 from osint import netconfig
@@ -47,6 +47,12 @@ def _translate(name: str, info: dict) -> Optional[dict]:
         if not url_main:
             return None
         url_tmpl = url_main.rstrip("/") + "/{username}"
+
+    url_tmpl = (url_tmpl.replace("{urlMain}", info.get("urlMain") or "{urlMain}")
+                        .replace("{urlSubpath}", info.get("urlSubpath") or ""))
+    # Anything still templated besides {username} cannot be requested.
+    if re.search(r"\{(?!username\})[^}]*\}", url_tmpl) or not url_tmpl.startswith("http"):
+        return None
 
     # Detection method
     presence  = info.get("presenceStrs",[])

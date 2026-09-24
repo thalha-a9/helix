@@ -14,6 +14,10 @@
 - **Bio link false positives fixed** — the Open Graph namespace (`http://ogp.me/ns#`) and asset CDNs in page source were reported as the user's website and counted as cross-links.
 - **Real accounts no longer purged by the redirect check** — redirects are now judged against the URL actually requested, so API-probed platforms (Chess.com, Bluesky) were being purged on every hit. Same-site subdomain moves that keep the username (`en.gravatar.com` → `gravatar.com/name`, `name.tumblr.com` → `www.tumblr.com/@name`) are allowed. Twitter/X and Threads now point at `x.com` and `threads.com`.
 
+- **Control probe** — every hit is re-checked with a random username that cannot exist; a platform that "finds" it too is discarded as unverifiable. Catches login walls and catch-all pages automatically — the cause of the Facebook, Instagram and Steam false positives seen on a live scan of a made-up name. On a full live scan it removed PyPi, Packagist and Apple Developer (Sherlock). Maigret engine leads get a page-similarity version of the same check. `--no-control` disables it.
+- **Database entries validated before scanning** — WhatsMyName, Sherlock and Maigret definitions (including cached copies) must have a real http(s) URL with `{username}` and no other placeholder, and non-empty evidence for their detection method. Maigret's 8 unusable entries (`{username}.com`-style domain checks, Rutracker's unfilled `{urlMain}`) are now skipped instead of requested.
+- **`--all`** — builtin + WhatsMyName + Sherlock + Maigret databases in one flag (~6,000 sites).
+
 ### Graph
 - **Graph rendered blank** — the D3 script's SRI `integrity` value was a malformed SHA-512 digest (63 bytes), so every browser refused to load D3. Now pinned to `d3@7.8.5` with its correct digest, taken from the npm registry tarball.
 
