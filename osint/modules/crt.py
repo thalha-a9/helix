@@ -23,7 +23,7 @@ async def _query_crt(session: aiohttp.ClientSession,
     try:
         async with session.get(
             CRT_URL, params={"q": query, "output": "json"},
-            timeout=aiohttp.ClientTimeout(total=timeout), ssl=False,
+            timeout=aiohttp.ClientTimeout(total=timeout),
         ) as resp:
             if resp.status != 200: return []
             return await resp.json(content_type=None) or []

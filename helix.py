@@ -21,6 +21,8 @@ from osint              import netconfig
 from osint.checker      import check_username, check_email, validate_username, validate_email, HAS_CURL_CFFI
 from osint.location     import annotate_locations, flag_conflicts, describe_subject_location, resolve_countries
 from osint.confidence   import score_identity
+from osint.relationships import annotate_relations, build_relationships, edge_line
+from osint.subject      import approved_identifiers
 from osint.platform_schema import filter_valid
 from osint.graph        import generate_graph
 from osint.report       import save_json, save_csv, save_txt
@@ -77,6 +79,7 @@ def _sanitize(results: list) -> list:
         "location_hints":[],"location_countries":[],
         "location_conflict":False,"location_note":"",
         "identity_confidence":"","selectors":[],"evidence":[],
+        "declared_bio":"",
     }
     safe = []
     for r in results:
@@ -237,6 +240,7 @@ async def run(args):
                                            control=not args.no_control)
         # Runs before _sanitize strips the raw page text it reads from.
         annotate_locations(raw_results)
+        annotate_relations(raw_results)
         results = _sanitize(raw_results)
         prog.finish()
 
@@ -268,6 +272,7 @@ async def run(args):
                 print(f"  {Y}[!]{RST} {eng['error']}")
             else:
                 annotate_locations(eng["results"])
+                annotate_relations(eng["results"])
                 eng_results, eng_purged = run_local_verifier(_sanitize(eng["results"]), username)
                 results.extend(eng_results)
                 kept = sum(1 for r in eng_results if r.get("found"))
@@ -481,15 +486,6 @@ async def run(args):
             print(f"  {Y}[tip]{RST} {DIM}--holehe checks 120+ platforms by email{RST}")
         print()
 
-        if args.breach:
-            print(f"  {C}[*]{RST} Checking breach databases for {email}…")
-            from osint.adapters.breach_adapter import check_breaches, format_breach_report
-            bd    = await check_breaches(email)
-            lines = format_breach_report(bd)
-            if bd.get("found"):
-                print(f"  {R}[!]{RST} Found in {bd['count']} breach(es):")
-            for line in lines: print(line)
-
     # ── Identity confidence ──────────────────────────────────────────────────
     if username:
         identity_counts = score_identity(
@@ -515,6 +511,68 @@ async def run(args):
                       f"one person — add --phash, -e EMAIL or --location to corroborate.{RST}")
             print()
 
+    # ── Relationship map (declared only — no extra requests) ────────────────
+    relationships = build_relationships(results, username or "", github_intel) if username else []
+    if relationships:
+        print(f"  {B}Relationships{RST}  {DIM}declared by the subject's own accounts — "
+              f"never inferred{RST}")
+        for e in relationships[:15]:
+            print(f"  {C}[↔]{RST} {edge_line(e)}")
+        if len(relationships) > 15:
+            print(f"  {DIM}  … +{len(relationships)-15} more in the report{RST}")
+        print()
+
+    # ── Breach sweep + Robin dark-web leads (approved identifiers only) ─────
+    breach_verdicts = [];  darkweb = {}
+    if args.breach or args.darkweb:
+        approved, held_back = approved_identifiers(email, username, results, github_intel,
+                                                   real_name, real_name_source)
+        for why in held_back:
+            print(f"  {DIM}  not queried: {why}{RST}")
+        if args.breach or approved["emails"]:
+            from osint.adapters.breachdb import check_identifiers, format_lines
+            if approved["emails"]:
+                print(f"  {C}[*]{RST} Breach sweep: {', '.join(approved['emails'])}…")
+                breach_verdicts = await check_identifiers(approved["emails"])
+                for v in breach_verdicts:
+                    colour = R if v["exposed"] else (G if v["exposed"] is False else Y)
+                    lines = format_lines(v)
+                    print(f"  {colour}[{'!' if v['exposed'] else '·'}]{RST} {lines[0]}")
+                    for line in lines[1:]:
+                        print(f"  {DIM}  {line}{RST}")
+                print(f"  {DIM}  Breach hits confirm an identifier leaked, not who owns it.{RST}\n")
+            elif args.breach:
+                print(f"  {Y}[!]{RST} --breach needs an email: pass -e, or confirm a GitHub "
+                      f"account that exposes one\n")
+        if args.darkweb:
+            from osint.modules.robin import run as robin_run
+            print(f"  {C}[*]{RST} Robin: Ahmia .onion search for "
+                  f"{', '.join(repr(t) for t in approved['terms'])}…")
+            darkweb = await robin_run(approved["terms"], approved["emails"],
+                                      ai_provider=args.ai, breach_verdicts=breach_verdicts)
+            for blk in darkweb["ahmia"]:
+                if blk["status"] != "ok":
+                    print(f"  {Y}[!]{RST} Ahmia '{blk['term']}': {blk['detail']} — not checked")
+                    continue
+                note = f" {DIM}({blk['dropped']} loose match(es) dropped){RST}" if blk["dropped"] else ""
+                print(f"  {M}[onion]{RST} '{blk['term']}': {len(blk['hits'])} lead(s){note}")
+                for h in blk["hits"][:5]:
+                    print(f"  {DIM}    {h['onion']}  {h['title'][:60]}"
+                          f"{'  seen ' + h['last_seen'] if h['last_seen'] else ''}{RST}")
+            an = darkweb.get("analysis")
+            if an:
+                if an.get("error"):
+                    print(f"  {Y}[!]{RST} AI analysis: {an['error']}")
+                elif an.get("findings"):
+                    print(f"  {G}[+]{RST} AI analysis ({an.get('model')}) — cited findings only:")
+                    for f in an["findings"]:
+                        print(f"  {DIM}    [{f['confidence']}] {f['statement']} "
+                              f"[{', '.join(f['sources'])}]{RST}")
+                if an.get("rejected"):
+                    print(f"  {DIM}    {an['rejected']} uncited statement(s) discarded{RST}")
+            print(f"  {DIM}  Dark-web hits are leads: a page naming a handle is not "
+                  f"proof the subject wrote it.{RST}\n")
+
     # ── PDF/HTML Report ──────────────────────────────────────────────────────
     if getattr(args,'report',False):
         _st = _scan_start if '_scan_start' in dir() else time.time()
@@ -524,6 +582,8 @@ async def run(args):
             wayback_data=wayback_data, github_intel=github_intel,
             crt_data=crt_data, paste_data=paste_data,
             phash_matches=phash_matches, pivot_data=pivot_data,
+            breach_verdicts=breach_verdicts, darkweb=darkweb,
+            relationships=relationships,
             scan_time=time.time()-_st,
         )
         print(f"  {G}[✓]{RST} {B}Report{RST}   → {rp['html']}")
@@ -538,6 +598,8 @@ async def run(args):
         username=username or "", results=results, output_path=gpath,
         email=email, email_results=email_results,
         pivot_data=pivot_data, phash_matches=phash_matches,
+        relationships=relationships, breach_verdicts=breach_verdicts,
+        darkweb=darkweb,
     )
     print(f"  {G}[✓]{RST} {B}Graph{RST}    → {gpath}")
 
@@ -555,10 +617,13 @@ async def run(args):
             "conflicts": loc_conflicts,
         },
         "identity_confidence": identity_counts,
+        "relationships": relationships,
+        "breaches":      breach_verdicts,
+        "darkweb":       darkweb,
     }
     if fmt in ("json","all"): print(f"  {G}[✓]{RST} JSON     → {save_json(label, all_r, out, extra=intel_bundle)}")
-    if fmt in ("csv", "all"): print(f"  {G}[✓]{RST} CSV      → {save_csv(label, all_r, out)}")
-    if fmt in ("txt", "all"): print(f"  {G}[✓]{RST} Text     → {save_txt(label, all_r, out)}")
+    if fmt in ("csv", "all"): print(f"  {G}[✓]{RST} CSV      → {save_csv(label, all_r, out, extra=intel_bundle)}")
+    if fmt in ("txt", "all"): print(f"  {G}[✓]{RST} Text     → {save_txt(label, all_r, out, extra=intel_bundle)}")
     print()
 
     if not args.no_browser:
@@ -619,7 +684,12 @@ Operational security:
     g2.add_argument("--wayback",        action="store_true",  help="Wayback Machine — profile history + archived bios")
     g2.add_argument("--crt",            action="store_true",  help="Certificate Transparency — find owned domains")
     g2.add_argument("--paste",          action="store_true",  help="Paste Intelligence — Gists + Pastebin mentions")
-    g2.add_argument("--breach",         action="store_true",  help="Email breach check")
+    g2.add_argument("--breach",         action="store_true",
+                    help="Breach sweep of confirmed emails — XposedOrNot, plus Have I Been Pwned "
+                         "when HIBP_API_KEY is set (metadata only)")
+    g2.add_argument("--darkweb", "--robin", action="store_true", dest="darkweb",
+                    help="Robin dark-web leads: Ahmia .onion search for the subject + breach "
+                         "sweep; with --ai, a cited analysis of the results")
     g2.add_argument("--holehe",         action="store_true",  help="Deep email scan via holehe (pip install holehe)")
 
     g3 = p.add_argument_group("advanced recon")

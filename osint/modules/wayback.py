@@ -24,8 +24,7 @@ async def _cdx_snapshots(session: aiohttp.ClientSession,
     }
     try:
         async with session.get(CDX_API, params=params,
-                               timeout=aiohttp.ClientTimeout(total=15),
-                               ssl=False) as resp:
+                               timeout=aiohttp.ClientTimeout(total=15)) as resp:
             if resp.status != 200: return []
             data = await resp.json(content_type=None)
             if not data or len(data) < 2: return []
@@ -60,7 +59,7 @@ async def _fetch_archived_html(session: aiohttp.ClientSession,
     try:
         async with session.get(wayback_url, headers=_HEADERS,
                                timeout=aiohttp.ClientTimeout(total=15),
-                               ssl=False, allow_redirects=True) as resp:
+                               allow_redirects=True) as resp:
             if resp.status == 200:
                 return await resp.text(errors="ignore")
     except Exception:

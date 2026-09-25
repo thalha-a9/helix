@@ -39,3 +39,19 @@ def test_pinned_digest_matches_d3_7_8_5():
     src = open(g.__file__, encoding="utf-8").read()
     assert "sha512-M7nHCiNUOwFt6Us3r8alutZLm9qMt4s9951uo8jqO4UwJ1hziseL6O3ndFyigx6+LREfZqnhHxYjKRJ8ZQ69DQ==" in src
     assert "d3@7.8.5" in src
+
+
+def test_profile_text_cannot_close_the_graph_script(tmp_path):
+    """og:title comes from the scanned page — it must not break out of <script>."""
+    import json as _json
+    import os as _os
+    from osint.graph import generate_graph as _gen
+    evil = "</script><script>alert(1)</script> & <!--"
+    r = [{"platform": "X", "url": "https://x.com/a", "category": "social", "color": "#fff",
+          "found": True, "og_title": evil}]
+    out = _os.path.join(tmp_path, "g.html")
+    _gen("a", r, out)
+    page = open(out).read()
+    assert "<script>alert" not in page and "<!--" not in page.split("const NODES=")[1]
+    nodes = _json.loads(page.split("const NODES=")[1].split(";\n")[0])
+    assert any(n.get("og_title") == evil for n in nodes)        # data survives intact

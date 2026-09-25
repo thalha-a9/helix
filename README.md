@@ -78,11 +78,14 @@ python helix.py -u johndoe --wayback --crt --paste --pivot --phash
 | `--wayback` | **Wayback Machine** — fetches snapshot history + parses archived HTML for old usernames, historic emails, and past bios |
 | `--crt` | **Certificate Transparency** — queries crt.sh for SSL certs containing the target's name or email. Finds personal domains that never appeared in any bio |
 | `--paste` | **Paste Intelligence** — searches GitHub Gists and public Pastebin index for mentions |
-| `--breach` | **Breach check** — queries XposedOrNot for breach metadata (names, dates, data types exposed). No credentials returned |
+| `--breach` | **Breach sweep** — every confirmed email against XposedOrNot, plus Have I Been Pwned when `HIBP_API_KEY` is set. Per-email verdict: which breaches, what was exposed, date range, which sources were checked and when (e.g. *"x@y appears in 7 breaches (2012–2024), passwords exposed in 5"*). A source that could not be reached is reported as not checked, never as clean. Metadata only — no credentials |
+| `--darkweb` / `--robin` | **Robin dark-web leads** — Ahmia .onion search for the username, confirmed emails and (when corroborated) real name; only hits that contain the exact term are kept. Includes the breach sweep. With `--ai`, the results go to the model as numbered sources and only statements that cite them are kept |
 | `--holehe` | **Deep email scan** — hands off to holehe for 120+ platform email-registration checks |
 | `--ai` | **AI false-positive filter** — second verification pass via Claude, OpenRouter (free), or NVIDIA NIM (free) |
 
 ### Auto-Triggered
+- **Relationship map** — built from what the subject's own accounts *declare*: employers and former employers ("engineer at Globex", "ex-Initech", GitHub company field), organisations (public GitHub orgs, "maintainer of …"), family members named by handle ("my wife @…") and accounts the bio mentions. Never inferred from shared surnames, followers or co-occurrence. Each edge carries its source, quote and a confidence that can never exceed the declaring account's identity confidence; two independent accounts are needed for HIGH. Shown in the console, graph, report, JSON, CSV and TXT
+- **Approved-subject gate** — breach and dark-web lookups send identifiers to third parties, so only analyst-supplied identifiers (`-u`, `-e`) and those from accounts corroborated as the subject's (identity MEDIUM/HIGH) are queried. Anything held back is listed with the reason
 - **GitHub Deep Recon** — runs automatically when a GitHub profile is found. Extracts real emails from public commits (filters noreply), org memberships, language stats, npm packages, and infers timezone from commit timestamp distribution (requires ≥15 commits for confidence)
 
 ---
@@ -156,6 +159,10 @@ python helix.py -u johndoe --wayback --crt --paste --pivot --phash
 
 # Username + email — two root nodes, cross-matched in graph
 python helix.py -u johndoe -e johndoe@gmail.com --breach --holehe
+
+# Dark-web leads + breach sweep, analysed by an LLM with cited sources only
+export HIBP_API_KEY=...        # optional — adds Have I Been Pwned to the breach sweep
+python helix.py -u johndoe -e johndoe@gmail.com --darkweb --ai claude
 
 # Massive scan — 1100+ platforms
 python helix.py -u johndoe --wmn --sherlock
@@ -263,16 +270,19 @@ helix/
 │   ├── permutations.py              ← Username variation generator
 │   ├── pivot.py                     ← Concurrent BFS alias pivot engine
 │   ├── phash.py                     ← Perceptual avatar hash matcher
+│   ├── relationships.py             ← Declared-only relationship map
+│   ├── subject.py                   ← Approved-subject identifier gate
 │   └── modules/
 │       ├── wayback.py               ← Archive.org CDX API + archived HTML parser
 │       ├── github_deep.py           ← GitHub API deep recon + timezone inference
 │       ├── crt.py                   ← Certificate transparency (crt.sh)
-│       └── paste.py                 ← Gist + Pastebin intelligence
+│       ├── paste.py                 ← Gist + Pastebin intelligence
+│       └── robin.py                 ← Dark-web leads (Ahmia) + cited AI analysis
 │   └── adapters/
 │       ├── sherlock_adapter.py      ← Sherlock data.json loader (24h cached)
 │       ├── wmn_adapter.py           ← WhatsMyName loader
 │       ├── holehe_adapter.py        ← holehe email scanner wrapper
-│       ├── breach_adapter.py        ← XposedOrNot breach metadata
+│       ├── breachdb.py              ← Breach sweep (XposedOrNot, Have I Been Pwned)
 │       └── ai_verifier.py           ← Multi-provider async AI verification
 └── results/                         ← Output (git-ignored)
     └── username/

@@ -47,6 +47,40 @@ Return ONLY valid JSON, no markdown:
  "purged":[{"platform":"...","reason":"..."}]}"""
 
 
+async def complete(provider: str, system: str, user: str, max_tokens: int = 1000) -> Dict:
+    """One chat completion → {"text", "model"} or {"error"}."""
+    cfg = PROVIDERS.get(provider)
+    if not cfg:
+        return {"error": f"Unknown provider '{provider}'. Choose: {', '.join(PROVIDERS)}"}
+    api_key = os.environ.get(cfg["env_key"], "")
+    if not api_key:
+        return {"error": f"Missing {cfg['env_key']} — {cfg['note']}"}
+    try:
+        if cfg["lib"] == "anthropic":
+            from anthropic import AsyncAnthropic
+            client = AsyncAnthropic(api_key=api_key)
+            msg = await client.messages.create(
+                model=cfg["model"], max_tokens=max_tokens, system=system,
+                messages=[{"role": "user", "content": user}],
+            )
+            text = msg.content[0].text
+        else:
+            # OpenAI-compatible (OpenRouter / NVIDIA)
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=api_key, base_url=cfg["base_url"])
+            resp = await client.chat.completions.create(
+                model=cfg["model"], max_tokens=max_tokens,
+                messages=[{"role": "system", "content": system},
+                          {"role": "user",   "content": user}],
+            )
+            text = resp.choices[0].message.content or ""
+    except ImportError:
+        return {"error": f"pip install {cfg['lib']}"}
+    except Exception as e:
+        return {"error": str(e)[:120]}
+    return {"text": text.strip(), "model": cfg["model"]}
+
+
 async def verify_with_ai(results: List[dict], provider: str = "openrouter") -> Dict:
     cfg = PROVIDERS.get(provider)
     if not cfg:
@@ -68,36 +102,10 @@ async def verify_with_ai(results: List[dict], provider: str = "openrouter") -> D
         for r in to_check
     ]
 
-    raw = ""
-    try:
-        if cfg["lib"] == "anthropic":
-            # ── Async Anthropic client ────────────────────────────────────────
-            from anthropic import AsyncAnthropic
-            client = AsyncAnthropic(api_key=api_key)
-            msg = await client.messages.create(
-                model=cfg["model"], max_tokens=1000,
-                system=SYSTEM_PROMPT,
-                messages=[{"role":"user","content":json.dumps(payload,indent=2)}],
-            )
-            raw = msg.content[0].text.strip()
-
-        else:
-            # ── Async OpenAI-compatible client (OpenRouter / NVIDIA) ──────────
-            from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=api_key, base_url=cfg["base_url"])
-            resp = await client.chat.completions.create(
-                model=cfg["model"], max_tokens=1000,
-                messages=[
-                    {"role":"system","content":SYSTEM_PROMPT},
-                    {"role":"user",  "content":json.dumps(payload,indent=2)},
-                ],
-            )
-            raw = resp.choices[0].message.content.strip()
-
-    except ImportError as e:
-        return {"error": f"pip install {cfg['lib']}", "provider": provider}
-    except Exception as e:
-        return {"error": str(e)[:120], "provider": provider}
+    out = await complete(provider, SYSTEM_PROMPT, json.dumps(payload, indent=2))
+    if out.get("error"):
+        return {"error": out["error"], "provider": provider}
+    raw = out["text"]
 
     raw = raw.replace("```json","").replace("```","").strip()
     try:

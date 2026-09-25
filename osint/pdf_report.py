@@ -38,12 +38,97 @@ def _source_badge(src: str) -> str:
     return f'<span style="background:{c}22;color:{c};border:1px solid {c}44;border-radius:3px;padding:1px 6px;font-size:10px">{src}</span>'
 
 
+_E = _html_esc.escape
+_GRADE_C = {"HIGH": "#00ff88", "MEDIUM": "#60a5fa", "LOW": "#6b7280"}
+
+
+def _grade(g: str) -> str:
+    c = _GRADE_C.get(g, "#6b7280")
+    return (f'<span style="background:{c}22;color:{c};border:1px solid {c}55;border-radius:3px;'
+            f'padding:1px 6px;font-size:10px;font-weight:600">{_E(g)}</span>')
+
+
+def _relationships_section(edges: List[Dict]) -> str:
+    if not edges:
+        return ""
+    from osint.relationships import edge_line
+    rows = ""
+    for e in edges:
+        quotes = "<br>".join(
+            f'{_E(s["platform"])}: <i>&ldquo;{_E(s["quote"])}&rdquo;</i> '
+            f'<span style="color:#6b7280">({_E(s["method"])})</span>' for s in e["sources"])
+        rows += (f'<tr><td style="padding:6px 12px">{_grade(e["confidence"])}</td>'
+                 f'<td style="padding:6px 12px;color:#e5e7eb">{_E(e["relation"].replace("_", " "))}</td>'
+                 f'<td style="padding:6px 12px;color:#fbbf24">{_E(e["target"])}</td>'
+                 f'<td style="padding:6px 12px;font-size:10px;color:#9ca3af">{quotes}</td></tr>\n')
+    plain = "<br>".join(_E(edge_line(e)) for e in edges)
+    return f"""
+<div class="section">
+  <div class="section-title">↔ Relationships ({len(edges)}) — declared by the subject's accounts, never inferred</div>
+  <table class="data-table"><tr><th>Confidence</th><th>Relation</th><th>Target</th><th>Evidence</th></tr>{rows}</table>
+  <div style="font-family:monospace;font-size:10px;color:#6b7280;margin-top:10px;line-height:1.7">{plain}</div>
+</div>"""
+
+
+def _breach_section(verdicts: List[Dict]) -> str:
+    if not verdicts:
+        return ""
+    body = ""
+    for v in verdicts:
+        colour = "#f87171" if v.get("exposed") else ("#00ff88" if v.get("exposed") is False else "#fbbf24")
+        body += f'<div class="intel-item" style="color:{colour}"><b>{_E(v["summary"])}</b></div>'
+        for b in v.get("breaches") or []:
+            body += (f'<div class="intel-item" style="padding-left:16px">{_E(b["name"])} '
+                     f'<span style="color:#6b7280">({_E(b["date"] or "date unknown")})</span> — '
+                     f'{_E(", ".join(b["data_classes"]))} '
+                     f'<span style="color:#6b7280">via {_E(", ".join(b["sources"]))}</span></div>')
+        checked = "; ".join(f'{s["source"]}: {s["status"]}{" — " + s["detail"] if s["detail"] else ""}'
+                            for s in v["sources"])
+        body += (f'<div class="intel-item" style="padding-left:16px;color:#6b7280;font-size:10px">'
+                 f'checked {_E(v["checked_at"])} · {_E(checked)}</div>')
+    return f"""
+<div class="section">
+  <div class="section-title">⚠ Breach Exposure — leads: exposure confirms a leak, not identity</div>
+  {body}
+</div>"""
+
+
+def _darkweb_section(dw: Dict) -> str:
+    blocks = dw.get("ahmia") or []
+    if not blocks:
+        return ""
+    body = ""
+    for blk in blocks:
+        if blk["status"] != "ok":
+            body += (f'<div class="intel-item" style="color:#fbbf24">&lsquo;{_E(blk["term"])}&rsquo;: '
+                     f'not checked — {_E(blk["detail"])}</div>')
+            continue
+        body += (f'<div class="intel-item"><b>&lsquo;{_E(blk["term"])}&rsquo;</b>: '
+                 f'{len(blk["hits"])} lead(s)</div>')
+        for h in blk["hits"]:
+            body += (f'<div class="intel-item" style="padding-left:16px;font-size:10px">'
+                     f'<span style="color:#a78bfa">{_E(h["onion"])}</span> {_E(h["title"])}'
+                     f'{" · seen " + _E(h["last_seen"]) if h["last_seen"] else ""}</div>')
+    an = dw.get("analysis") or {}
+    for f in an.get("findings") or []:
+        body += (f'<div class="intel-item">{_grade(f["confidence"])} {_E(f["statement"])} '
+                 f'<span style="color:#6b7280">[{_E(", ".join(f["sources"]))}]</span></div>')
+    return f"""
+<div class="section">
+  <div class="section-title">☍ Dark-Web Leads (Ahmia) — unverified</div>
+  {body}
+</div>"""
+
+
 def _build_html(username: str, results: List[Dict],
                 email: str = "", email_results: List[Dict] = None,
                 wayback_data: Dict = None, github_intel: Dict = None,
                 crt_data: Dict = None, paste_data: Dict = None,
                 phash_matches: List[Dict] = None,
                 pivot_data: Dict = None,
+                breach_verdicts: List[Dict] = None,
+                darkweb: Dict = None,
+                relationships: List[Dict] = None,
                 scan_time: float = 0) -> str:
 
     found      = [r for r in results if r.get("found")]
@@ -92,9 +177,9 @@ def _build_html(username: str, results: List[Dict],
     if github_intel and not github_intel.get("error"):
         gh_items = ""
         if github_intel.get("emails"):
-            gh_items += f'<div class="intel-item"><span class="intel-label">Extracted emails:</span> {", ".join(github_intel["emails"])}</div>'
+            gh_items += f'<div class="intel-item"><span class="intel-label">Extracted emails:</span> {_html_esc.escape(", ".join(github_intel["emails"]))}</div>'
         if github_intel.get("orgs"):
-            gh_items += f'<div class="intel-item"><span class="intel-label">Organizations:</span> {", ".join(o["name"] for o in github_intel["orgs"])}</div>'
+            gh_items += f'<div class="intel-item"><span class="intel-label">Organizations:</span> {_html_esc.escape(", ".join(o["name"] for o in github_intel["orgs"]))}</div>'
         if github_intel.get("timezone",{}).get("timezone"):
             tz = github_intel["timezone"]
             gh_items += f'<div class="intel-item"><span class="intel-label">Inferred timezone:</span> {tz["timezone"]} (conf: {tz.get("confidence","?")})</div>'
@@ -116,7 +201,11 @@ def _build_html(username: str, results: List[Dict],
     crt_section = ""
     if crt_data and crt_data.get("all_domains"):
         domains = crt_data["all_domains"][:20]
-        crt_section = f'<div class="section"><div class="section-title">🔐 Certificate Transparency ({len(domains)} domains)</div><div style="font-family:monospace;font-size:11px;color:#60a5fa;line-height:1.8">{"<br>".join(domains)}</div></div>'
+        crt_section = f'<div class="section"><div class="section-title">🔐 Certificate Transparency ({len(domains)} domains)</div><div style="font-family:monospace;font-size:11px;color:#60a5fa;line-height:1.8">{"<br>".join(_html_esc.escape(d) for d in domains)}</div></div>'
+
+    rel_section = _relationships_section(relationships or [])
+    breach_section = _breach_section(breach_verdicts or [])
+    dw_section = _darkweb_section(darkweb or {})
 
     email_line = f'<div class="meta-item"><span class="meta-label">Email:</span> {email}</div>' if email else ""
 
@@ -186,6 +275,9 @@ def _build_html(username: str, results: List[Dict],
 {gh_section}
 {ph_section}
 {crt_section}
+{rel_section}
+{breach_section}
+{dw_section}
 
 <div class="footer">
   <div>Helix v3.3 · github.com/thalha-a9/helix · @thalha-a9</div>
@@ -207,6 +299,9 @@ def generate_pdf_report(username: str, results: List[Dict],
                          paste_data: Dict = None,
                          phash_matches: List[Dict] = None,
                          pivot_data: Dict = None,
+                         breach_verdicts: List[Dict] = None,
+                         darkweb: Dict = None,
+                         relationships: List[Dict] = None,
                          scan_time: float = 0) -> Dict[str, str]:
     """
     Generate PDF (if weasyprint installed) and HTML investigation report.
@@ -221,6 +316,9 @@ def generate_pdf_report(username: str, results: List[Dict],
         paste_data=paste_data or {},
         phash_matches=phash_matches or [],
         pivot_data=pivot_data or {},
+        breach_verdicts=breach_verdicts or [],
+        darkweb=darkweb or {},
+        relationships=relationships or [],
         scan_time=scan_time,
     )
 

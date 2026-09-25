@@ -25,8 +25,7 @@ def _gh_headers() -> Dict:
 async def _get(session: aiohttp.ClientSession, url: str) -> Optional[any]:
     try:
         async with session.get(url, headers=_gh_headers(),
-                               timeout=aiohttp.ClientTimeout(total=12),
-                               ssl=False) as resp:
+                               timeout=aiohttp.ClientTimeout(total=12)) as resp:
             if resp.status == 200: return await resp.json()
             if resp.status == 403: return {"_rate_limited": True}
             return None

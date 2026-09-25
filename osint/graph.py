@@ -5,6 +5,14 @@ from datetime import datetime
 from osint.platforms import CATEGORY_META
 
 
+def _script_json(obj):
+    """JSON safe to inline in <script>: profile text like "</script>" from a
+    scanned page must not be able to close the block and inject markup."""
+    s=json.dumps(obj, default=lambda o: int(o) if hasattr(o,'item') else str(o))
+    return (s.replace("<","\\u003c").replace(">","\\u003e").replace("&","\\u0026")
+             .replace("\u2028","\\u2028").replace("\u2029","\\u2029"))
+
+
 def _build_cross_links(found, node_id_by_platform, username):
     cross_links = []
     for r in found:
@@ -27,7 +35,8 @@ def _build_cross_links(found, node_id_by_platform, username):
 
 def generate_graph(username, results, output_path,
                    email=None, email_results=None,
-                   pivot_data=None, phash_matches=None):
+                   pivot_data=None, phash_matches=None,
+                   relationships=None, breach_verdicts=None, darkweb=None):
 
     found        = [r for r in results if r.get("found")]
     not_found    = [r for r in results if not r.get("found") and not r.get("error")]
@@ -115,6 +124,51 @@ def generate_graph(username, results, output_path,
             links.append({"source":s,"target":t,"type":"phash_match",
                           "confidence":m["confidence"],"distance":m["distance"]})
 
+    # Relationship nodes — declared edges only (osint/relationships.py)
+    rel_colors={"employer":"#fbbf24","former_employer":"#a3a3a3","organization":"#34d399",
+                "family":"#f472b6","mentioned":"#94a3b8"}
+    rel_names={"employer":"works at","former_employer":"formerly at",
+               "organization":"member of","family":"family","mentioned":"mentions"}
+    for e in (relationships or []):
+        via="; ".join(f"{x['platform']}: \u201c{x['quote']}\u201d" for x in e["sources"])
+        nodes.append({"id":nid,"label":e["target"],"type":"relation","category":"relation",
+                      "color":rel_colors.get(e["relation"],"#94a3b8"),
+                      "url":e["sources"][0]["url"] if e["sources"] else "","size":11,
+                      "confidence":e["confidence"],
+                      "source":f"{rel_names.get(e['relation'],e['relation'])} · declared",
+                      "og_title":via[:220],"phash":False})
+        links.append({"source":0,"target":nid,"type":"relation"})
+        nid+=1
+
+    # Breach exposure — hung off the identifier that leaked
+    for v in (breach_verdicts or []):
+        if not v.get("breaches"): continue
+        if email_root_id is not None and email and v["identifier"]==email.lower():
+            anchor_id=email_root_id
+        else:
+            anchor_id=nid
+            nodes.append({"id":nid,"label":v["identifier"],"type":"identifier","category":"breach",
+                          "color":"#fbbf24","url":"","size":14})
+            links.append({"source":0,"target":nid,"type":"identifier"})
+            nid+=1
+        for b in v["breaches"]:
+            nodes.append({"id":nid,"label":f"\u26a0 {b['name']}","type":"breach","category":"breach",
+                          "color":"#f87171","url":"","size":9,
+                          "source":f"breach {b['date']} · via {', '.join(b['sources'])}",
+                          "og_title":"exposed: "+", ".join(b["data_classes"]),"phash":False})
+            links.append({"source":anchor_id,"target":nid,"type":"breach"})
+            nid+=1
+
+    # Dark-web leads (Ahmia)
+    for blk in ((darkweb or {}).get("ahmia") or []):
+        for h in blk.get("hits") or []:
+            nodes.append({"id":nid,"label":h["onion"][:16]+"\u2026.onion","type":"onion",
+                          "category":"darkweb","color":"#a78bfa","url":h["url"],"size":8,
+                          "source":f"Ahmia lead · mentions '{h['term']}'",
+                          "og_title":h["title"][:160],"phash":False})
+            links.append({"source":0,"target":nid,"type":"onion"})
+            nid+=1
+
     ghost_nodes=[{"platform":r["platform"],"url":r["url"],"category":r["category"]}
                  for r in not_found]
 
@@ -146,9 +200,9 @@ def generate_graph(username, results, output_path,
     for src, cnt in sorted(src_breakdown.items(), key=lambda x:-x[1]):
         src_rows+=f'<div class="src-row"><span class="src-badge">{src}</span><span class="src-cnt">{cnt}</span></div>\n'
 
-    nodes_json=json.dumps(nodes, default=lambda o: int(o) if hasattr(o,'item') else str(o))
-    links_json=json.dumps(links, default=lambda o: int(o) if hasattr(o,'item') else str(o))
-    ghosts_json=json.dumps(ghost_nodes, default=lambda o: int(o) if hasattr(o,'item') else str(o))
+    nodes_json=_script_json(nodes)
+    links_json=_script_json(links)
+    ghosts_json=_script_json(ghost_nodes)
 
     html=f"""<!DOCTYPE html>
 <html lang="en">
@@ -251,6 +305,10 @@ svg#graph{{width:100%;height:100%;}}
 .link.pivot_platform{{stroke:#f59e0b44;stroke-width:1px;}}
 .link.cross_link{{stroke:var(--accent);stroke-width:2.5px;stroke-opacity:.9;
   animation:lp 3s ease-in-out infinite;}}
+.link.relation{{stroke:#fbbf24;stroke-width:1.5px;stroke-opacity:.55;}}
+.link.identifier{{stroke:#fbbf24;stroke-width:1px;stroke-dasharray:3,3;}}
+.link.breach{{stroke:#f87171;stroke-width:1px;stroke-opacity:.5;}}
+.link.onion{{stroke:#a78bfa;stroke-width:1px;stroke-dasharray:2,4;stroke-opacity:.45;}}
 .link.phash_match{{stroke:var(--accent4);stroke-width:2px;stroke-dasharray:4,2;stroke-opacity:.8;
   animation:lp 2s ease-in-out infinite;}}
 @keyframes lp{{0%,100%{{stroke-opacity:.9;}}50%{{stroke-opacity:.3;}}}}
@@ -404,6 +462,9 @@ svg#graph{{width:100%;height:100%;}}
       <div class="leg-row"><div class="leg-dot" style="background:#ffffff;box-shadow:0 0 6px #fff"></div>Username root</div>
       {'<div class="leg-row"><div class="leg-dot" style="background:var(--accent2);box-shadow:0 0 6px var(--accent2)"></div>Email root</div>' if email else ''}
       <div class="leg-row"><div class="leg-dot" style="border:1.5px solid var(--accent);background:transparent"></div>High confidence</div>
+      {'<div class="leg-row"><div class="leg-line" style="background:#fbbf24"></div>Declared relationship</div>' if relationships else ''}
+      {'<div class="leg-row"><div class="leg-dot" style="background:#f87171"></div>Breach exposure (lead)</div>' if any(v.get("breaches") for v in (breach_verdicts or [])) else ''}
+      {'<div class="leg-row"><div class="leg-dot" style="background:#a78bfa"></div>Dark-web lead</div>' if any(b.get("hits") for b in ((darkweb or {}).get("ahmia") or [])) else ''}
     </div>
   </div>
 </div>
@@ -437,6 +498,8 @@ const sim=d3.forceSimulation(NODES)
       if(d.type==="category") return 200;
       if(d.type==="cross_link"||d.type==="phash_match") return 120;
       if(d.type==="pivot") return 180;
+      if(d.type==="relation") return 140;
+      if(d.type==="onion") return 160;
       return 80;
     }}).strength(d=>d.type==="cross_link"||d.type==="phash_match"?.7:.8))
   .force("charge",d3.forceManyBody().strength(-350))

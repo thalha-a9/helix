@@ -20,7 +20,7 @@ async def _gists(session: aiohttp.ClientSession, username: str) -> List[Dict]:
         async with session.get(
             f"https://api.github.com/users/{username}/gists?per_page=20",
             headers={**_HEADERS, "Accept": "application/vnd.github.v3+json"},
-            timeout=aiohttp.ClientTimeout(total=12), ssl=False,
+            timeout=aiohttp.ClientTimeout(total=12),
         ) as resp:
             if resp.status != 200: return []
             data = await resp.json()
@@ -46,7 +46,7 @@ async def _psbdmp(session: aiohttp.ClientSession, query: str) -> List[Dict]:
         async with session.get(
             f"https://psbdmp.ws/api/v3/search/{query}",
             headers=_HEADERS,
-            timeout=aiohttp.ClientTimeout(total=15), ssl=False,
+            timeout=aiohttp.ClientTimeout(total=15),
         ) as resp:
             if resp.status != 200: return []
             data = await resp.json(content_type=None)

@@ -20,7 +20,7 @@ TIMEOUT = aiohttp.ClientTimeout(total=10)
 
 async def _fetch_image(session, url: str) -> bytes | None:
     try:
-        async with session.get(url, timeout=TIMEOUT, ssl=False) as r:
+        async with session.get(url, timeout=TIMEOUT) as r:
             if r.status == 200:
                 return await r.read()
     except Exception:
