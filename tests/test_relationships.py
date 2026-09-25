@@ -37,6 +37,12 @@ def _found(platform, grade, bio=""):
     ("Maintainer of Django. Ex-Googler", {("organization", "Django"), ("former_employer", "Google")}),
     ("Engineer at Google working on Search", {("employer", "Google")}),
     ("Photographer. Say hi to @bob_k", {("mentioned", "@bob_k")}),
+    ("Student at University of Oxford", {("education", "University of Oxford")}),
+    ("PhD student at MIT and ex-Google", {("education", "MIT"), ("former_employer", "Google")}),
+    ("Engineer at Bank of America. Opinions mine", {("employer", "Bank of America")}),
+    ("Engineer at Google and Meta", {("employer", "Google")}),
+    ("Engineer at Google for 5 years", {("employer", "Google")}),
+    ("Works at The New York Times", {("employer", "New York Times")}),
 ])
 def test_declared_relations_are_extracted(bio, expected):
     got = {(d["relation"], d["target"]) for d in rel.extract_declarations(bio, "janeroe")}

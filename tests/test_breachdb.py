@@ -179,3 +179,9 @@ def test_format_lines_lists_each_breach():
     lines = breachdb.format_lines(v)
     assert "Adobe (2013) · 1,500 records · verified" in lines[1]
     assert "exposed: Passwords" in lines[2]
+
+
+def test_api_text_is_stripped_of_control_characters():
+    b = breachdb.parse_hibp([{"Name": "Evil\x1b[2J", "BreachDate": "2020-01-01",
+                              "DataClasses": ["Passwords\x07", "\x1b"]}])
+    assert b[0]["name"] == "Evil [2J" and b[0]["data_classes"] == ["Passwords"]

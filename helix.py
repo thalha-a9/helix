@@ -563,6 +563,8 @@ async def run(args):
             if an:
                 if an.get("error"):
                     print(f"  {Y}[!]{RST} AI analysis: {an['error']}")
+                elif an.get("skipped"):
+                    print(f"  {DIM}    AI analysis: {an['skipped']}{RST}")
                 elif an.get("findings"):
                     print(f"  {G}[+]{RST} AI analysis ({an.get('model')}) — cited findings only:")
                     for f in an["findings"]:

@@ -24,7 +24,7 @@
 ### Intelligence
 - **#20 Robin dark-web module** (`--darkweb`, alias `--robin`) — Ahmia .onion search for the subject's username, confirmed emails and corroborated real name. Hits must contain the exact term (a longer handle such as `janeroe2000` is dropped), and a page that is neither results nor Ahmia's empty state is reported as "not checked", never as "nothing found". With `--ai`, results go to the model as numbered sources; statements that cite no real source are discarded.
 - **#21 / #22 Breach sweep** (`osint/adapters/breachdb.py`) — XposedOrNot plus Have I Been Pwned (`HIBP_API_KEY`), merged per breach. One plain-language verdict per email with data classes, date range, the sources checked and when. HIBP spam-list and fabricated entries are ignored. Unreachable sources are listed as not checked, never read as clean. **Fixes `--breach` never reporting a breach**: it called XposedOrNot's `check-email` endpoint but parsed the `breach-analytics` response shape.
-- **#23 Relationship map** — employers, former employers, organisations, family and mentioned accounts, taken only from what the subject's own profiles declare (bio, GitHub company field, public GitHub orgs). Each edge cites its source and quote; its confidence never exceeds the declaring account's identity confidence, and HIGH needs two independent accounts. In the console, graph, HTML report, JSON, CSV and TXT.
+- **#23 Relationship map** — employers, former employers, education, organisations, family and mentioned accounts, taken only from what the subject's own profiles declare (bio, GitHub company field, public GitHub orgs). Each edge cites its source and quote; its confidence never exceeds the declaring account's identity confidence, and HIGH needs two independent accounts. In the console, graph, HTML report, JSON, CSV and TXT.
 - **Approved-subject gate** — breach and dark-web lookups only use analyst-supplied identifiers and those from accounts corroborated as the subject's (identity MEDIUM/HIGH); held-back identifiers are listed with the reason.
 - Breach, dark-web and relationship findings appear in every writer: JSON, CSV, TXT, HTML report and graph.
 
@@ -32,6 +32,7 @@
 - **Graph XSS** — scanned profile text (e.g. an `og:title` containing `</script>`) was inlined unescaped into the graph's script block and could run script when the graph was opened. The inlined JSON is now escaped.
 - TLS verification re-enabled in the GitHub deep recon, Wayback, crt.sh, paste, avatar-hash and breach modules, which still passed `ssl=False` after #1.
 - GitHub emails, organisations and CT domains are HTML-escaped in the report.
+- Dark-web page text and breach-API text are stripped of terminal control characters before they are printed.
 
 ### Graph
 - **Graph rendered blank** — the D3 script's SRI `integrity` value was a malformed SHA-512 digest (63 bytes), so every browser refused to load D3. Now pinned to `d3@7.8.5` with its correct digest, taken from the npm registry tarball.

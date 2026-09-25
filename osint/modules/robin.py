@@ -43,6 +43,14 @@ MAX_HITS_PER_TERM = 20
 _EMPTY_STATE = re.compile(r'class=["\'][^"\']*searchResults|no results|0 results|'
                           r"(?:couldn't|could not|did not|didn't) find", re.I)
 
+# Terminal control characters (ANSI escapes etc.) from hostile page text.
+_CTRL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def _text(s: str, limit: int) -> str:
+    return " ".join(_CTRL.sub(" ", s or "").split())[:limit]
+
+
 _ONION_RE = re.compile(r"\b[a-z2-7]{16}(?:[a-z2-7]{40})?\.onion\b", re.I)
 
 
@@ -137,10 +145,11 @@ def parse_results(html: str) -> List[Dict]:
         if not m:
             continue
         out.append({
-            "title":       " ".join(r["title"].split())[:200],
-            "description": " ".join(r["description"].split())[:400],
+            "title":       _text(r["title"], 200),
+            "description": _text(r["description"], 400),
             "onion":       m.group(0).lower(),
-            "url":         target if ".onion" in target else f"http://{m.group(0).lower()}/",
+            "url":         _text(target, 500) if ".onion" in target
+                           else f"http://{m.group(0).lower()}/",
             "last_seen":   r["last_seen"],
         })
     return out
@@ -261,7 +270,7 @@ def validate_findings(raw: str, sources: Dict[str, Dict]) -> Dict:
             rejected += 1
             continue
         conf = str(f.get("confidence") or "LOW").upper()
-        kept.append({"statement": stmt[:400], "sources": cites,
+        kept.append({"statement": _text(stmt, 400), "sources": cites,
                      "confidence": conf if conf in ("LOW", "MEDIUM", "HIGH") else "LOW"})
     return {"findings": kept, "rejected": rejected, "error": None}
 

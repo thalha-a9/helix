@@ -49,6 +49,14 @@ SOURCES = [
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
+_CTRL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def _clean(v) -> str:
+    """API text is printed to the terminal — drop control characters."""
+    return " ".join(_CTRL.sub(" ", str(v or "")).split())[:200]
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
@@ -74,10 +82,10 @@ def parse_xposedornot(data) -> List[Dict]:
     for b in details or []:
         if not isinstance(b, dict) or not b.get("breach"):
             continue
-        classes = [c.strip() for c in str(b.get("xposed_data") or "").split(";") if c.strip()]
+        classes = [_clean(c) for c in str(b.get("xposed_data") or "").split(";") if _clean(c)]
         out.append({
-            "name":         str(b["breach"]),
-            "date":         str(b.get("xposed_date") or ""),
+            "name":         _clean(b["breach"]),
+            "date":         _clean(b.get("xposed_date")),
             "records":      b.get("xposed_records"),
             "data_classes": classes,
             "domain":       b.get("domain") or "",
@@ -99,10 +107,10 @@ def parse_hibp(data) -> List[Dict]:
         if b.get("IsFabricated") or b.get("IsSpamList"):
             continue
         out.append({
-            "name":         str(b.get("Title") or b.get("Name")),
-            "date":         str(b.get("BreachDate") or ""),
+            "name":         _clean(b.get("Title") or b.get("Name")),
+            "date":         _clean(b.get("BreachDate")),
             "records":      b.get("PwnCount"),
-            "data_classes": [str(c) for c in b.get("DataClasses") or []],
+            "data_classes": [_clean(c) for c in b.get("DataClasses") or [] if _clean(c)],
             "domain":       b.get("Domain") or "",
             "verified":     bool(b.get("IsVerified")),
         })

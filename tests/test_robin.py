@@ -208,3 +208,10 @@ async def test_analysis_goes_through_the_shared_ai_client(monkeypatch):
     out = await robin.analyse("claude", {"terms": ["t"]}, SOURCES)
     assert out["findings"][0]["sources"] == ["A1"] and out["model"] == "m"
     assert set(seen["user"]["sources"]) == {"A1", "B1"}
+
+
+def test_terminal_control_characters_are_stripped():
+    html = _result(ONION_A, "janeroe \x1b[2J\x1b]0;pwned\x07title", "desc\x1b[31m red")
+    [h] = robin.parse_results(html)
+    assert "\x1b" not in h["title"] and "\x07" not in h["title"]
+    assert "\x1b" not in h["description"]

@@ -125,10 +125,12 @@ def generate_graph(username, results, output_path,
                           "confidence":m["confidence"],"distance":m["distance"]})
 
     # Relationship nodes — declared edges only (osint/relationships.py)
-    rel_colors={"employer":"#fbbf24","former_employer":"#a3a3a3","organization":"#34d399",
+    rel_colors={"employer":"#fbbf24","former_employer":"#a3a3a3","education":"#60a5fa",
+                "organization":"#34d399",
                 "family":"#f472b6","mentioned":"#94a3b8"}
     rel_names={"employer":"works at","former_employer":"formerly at",
-               "organization":"member of","family":"family","mentioned":"mentions"}
+               "education":"studies at","organization":"member of","family":"family",
+               "mentioned":"mentions"}
     for e in (relationships or []):
         via="; ".join(f"{x['platform']}: \u201c{x['quote']}\u201d" for x in e["sources"])
         nodes.append({"id":nid,"label":e["target"],"type":"relation","category":"relation",

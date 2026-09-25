@@ -33,12 +33,14 @@ _META_DESC = [
 
 # A target is either an @handle or 1–3 Capitalised words. Deliberately
 # case-sensitive: "engineer at heart", "dev at night" are not employers.
-_ORG = r"(?:@([A-Za-z0-9][\w\-]{1,30})|([A-Z0-9][\w&.'\-]*(?:\s+[A-Z0-9][\w&.'\-]*){0,2}))"
+_ORG = (r"(?:@([A-Za-z0-9][\w\-]{1,30})|(?:The\s+)?([A-Z0-9][\w&.'\-]*"
+        r"(?:(?:\s+(?:of|de|du|la|the))?\s+[A-Z0-9][\w&.'\-]*){0,2}))")
 _AT  = r"(?:(?i:at|for|with)\s+|@\s*)"
 _ROLE = (r"(?i:(?:software\s+|senior\s+|staff\s+|lead\s+|principal\s+)?"
          r"(?:engineer|developer|dev|designer|manager|intern|researcher|scientist|analyst|"
          r"consultant|architect|director|ceo|cto|coo|cfo|founder|co-founder|cofounder|"
-         r"head\s+of\s+\w+|product\s+manager|sre|devops|student))")
+         r"head\s+of\s+\w+|product\s+manager|sre|devops))")
+_STUDY = r"(?i:(?:phd\s+|msc\s+|ms\s+|grad(?:uate)?\s+|undergrad(?:uate)?\s+)?student|studying)"
 
 # (relation, target_type, compiled pattern) — the last matched group is the target.
 _PATTERNS = [
@@ -47,6 +49,7 @@ _PATTERNS = [
         r"(?:" + _ROLE + r"\s+)?" + _AT + "?" + _ORG)),
     ("employer", "org", re.compile(
         r"\b(?i:works?|working|employed|currently)\s+" + _AT + _ORG)),
+    ("education", "org", re.compile(r"\b" + _STUDY + r"\s+" + _AT + _ORG)),
     ("employer", "org", re.compile(r"\b" + _ROLE + r"\s+" + _AT + _ORG)),
     ("organization", "org", re.compile(
         r"\b(?i:member|maintainer|core\s+team|contributor)\s+(?i:of|at)?\s*@?\s*" + _ORG)),
@@ -58,7 +61,7 @@ _PATTERNS = [
 _MENTION = re.compile(r"(?<![\w@./])@([A-Za-z0-9_](?:[A-Za-z0-9_.]{0,28}[A-Za-z0-9_])?)\b")
 
 # Words the org pattern can swallow that are never an organisation name.
-_STOP = {"the", "a", "an", "my", "our", "home", "night", "times", "heart", "work",
+_STOP = {"the", "a", "an", "my", "our", "home", "night", "heart", "work",
          "large", "least", "most", "best", "scale", "day", "this", "that",
          "and", "or", "of", "in", "on", "i", "me", "you", "it"}
 
@@ -181,7 +184,8 @@ def build_relationships(results: List[dict], username: str, github_intel: Dict =
         best_account = max(_ORDER.get(s["identity"], 0) for s in e["sources"])
         e["confidence"] = _GRADE[min(cap, best_account)]
         out.append(e)
-    rank = {"employer": 0, "former_employer": 1, "organization": 2, "family": 3, "mentioned": 4}
+    rank = {"employer": 0, "former_employer": 1, "education": 2, "organization": 3,
+            "family": 4, "mentioned": 5}
     out.sort(key=lambda e: (-_ORDER[e["confidence"]], rank.get(e["relation"], 9), e["target"].lower()))
     return out
 
@@ -189,7 +193,7 @@ def build_relationships(results: List[dict], username: str, github_intel: Dict =
 def edge_line(e: Dict) -> str:
     """Plain-text edge for the console / TXT report."""
     rel = {"employer": "works at", "former_employer": "formerly at",
-           "organization": "member of", "family": "family",
+           "education": "studies at", "organization": "member of", "family": "family",
            "mentioned": "mentions"}.get(e["relation"], e["relation"])
     via = "; ".join(f"{s['platform']} ({s['method']})" for s in e["sources"])
     return f"[{e['confidence']}] subject —{rel}→ {e['target']}   via {via}"
