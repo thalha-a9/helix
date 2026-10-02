@@ -62,3 +62,9 @@ def test_email_permutations_use_real_name_when_available():
 
 def test_email_permutations_from_username_alone():
     assert generate_email_permutations("jroe", "")
+
+
+def test_bare_first_or_last_names_are_never_guessed():
+    emails = generate_email_permutations("jack", "Jack Brown")
+    assert not any(e.split("@")[0] == "brown" for e in emails)
+    assert emails[:2] == ["jack@gmail.com", "jack.brown@gmail.com"]

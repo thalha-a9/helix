@@ -111,7 +111,7 @@ async def _reprobe(session, lead: dict, semaphore: asyncio.Semaphore) -> dict:
                 timeout=aiohttp.ClientTimeout(total=14, connect=7),
                 **netconfig.request_kwargs(),
             ) as r:
-                raw  = await r.content.read(_MAX_BODY_BYTES)
+                raw  = await netconfig.read_body(r, _MAX_BODY_BYTES)
                 text = raw.decode("utf-8", errors="ignore")
                 lead["status_code"] = r.status
                 lead["final_url"]   = str(r.url)
@@ -179,7 +179,7 @@ async def _fetch_control(session, url: str, semaphore: asyncio.Semaphore):
                     **netconfig.request_kwargs(),
                 ) as r:
                     status = r.status
-                    text = (await r.content.read(_MAX_BODY_BYTES)).decode("utf-8", errors="ignore")
+                    text = (await netconfig.read_body(r, _MAX_BODY_BYTES)).decode("utf-8", errors="ignore")
             except Exception:
                 status, text = None, ""
         if status is not None and status not in _TRANSIENT_STATUSES and not _is_waf_page(text):

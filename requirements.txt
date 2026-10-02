@@ -15,8 +15,9 @@ aiohttp>=3.9.0,<4.0.0
 # Pillow>=10.0.0,<12.0.0
 
 # ── Optional: Deep email scanning ────────────────────────────────────────────
-# pip install holehe
+# pip install holehe            (Kali/Debian build error → pip install --use-pep517 holehe)
 # holehe>=1.4.4
+# pip install "httpx[socks]"    (holehe over --tor / SOCKS proxies)
 
 # ── Optional: PDF report generation ──────────────────────────────────────────
 # pip install weasyprint

@@ -114,3 +114,66 @@ async def test_new_session_trusts_env():
 def test_tor_shorthand_is_a_socks_url():
     assert netconfig.is_socks(netconfig.TOR_PROXY)
     assert netconfig.TOR_PROXY.endswith(":9050")
+
+
+@pytest.mark.parametrize("given,curl", [
+    ("socks5://127.0.0.1:9050", "socks5h://127.0.0.1:9050"),
+    ("socks4://127.0.0.1:1080", "socks4a://127.0.0.1:1080"),
+    ("socks5h://127.0.0.1:9050", "socks5h://127.0.0.1:9050"),
+    ("http://10.0.0.5:3128", "http://10.0.0.5:3128"),
+])
+def test_curl_resolves_names_at_the_proxy(given, curl):
+    """Live: with socks5:// curl sent bare IPs through the proxy — local DNS saw every platform."""
+    netconfig.set_proxy(given)
+    assert netconfig.curl_kwargs()["proxies"]["https"] == curl
+
+
+@pytest.mark.asyncio
+async def test_socks_connector_resolves_remotely():
+    netconfig.set_proxy("socks5://127.0.0.1:9050")
+    c = netconfig.build_connector()
+    try:
+        assert c._rdns is True
+    finally:
+        await c.close()
+
+
+class _SlowBody(__import__("http.server").server.BaseHTTPRequestHandler):
+    """Sends a large body in small, delayed pieces — like a real page over the network."""
+    def do_GET(self):
+        import time
+        body = b"<html>" + b"x" * 200_000 + b"MARKER</html>"
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        for i in range(0, len(body), 4096):
+            self.wfile.write(body[i:i + 4096]); self.wfile.flush(); time.sleep(0.001)
+
+    def log_message(self, *a):
+        pass
+
+
+@pytest.fixture
+def slow_server():
+    import socket, threading, http.server
+    sock = socket.socket(); sock.bind(("127.0.0.1", 0)); port = sock.getsockname()[1]; sock.close()
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", port), _SlowBody)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{port}/"
+    httpd.shutdown(); httpd.server_close()
+
+
+@pytest.mark.asyncio
+async def test_read_body_reads_to_the_end_not_the_first_chunk(slow_server):
+    async with netconfig.new_session() as s:
+        async with s.get(slow_server) as r:
+            body = await netconfig.read_body(r, 512 * 1024)
+    assert body.endswith(b"MARKER</html>")
+
+
+@pytest.mark.asyncio
+async def test_read_body_respects_the_cap(slow_server):
+    async with netconfig.new_session() as s:
+        async with s.get(slow_server) as r:
+            body = await netconfig.read_body(r, 10_000)
+    assert len(body) == 10_000

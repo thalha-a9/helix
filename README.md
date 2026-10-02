@@ -80,7 +80,7 @@ python helix.py -u johndoe --wayback --crt --paste --pivot --phash
 | `--paste` | **Paste Intelligence** — searches GitHub Gists and public Pastebin index for mentions |
 | `--breach` | **Breach sweep** — every confirmed email against XposedOrNot, plus Have I Been Pwned when `HIBP_API_KEY` is set. Per-email verdict: which breaches, what was exposed, date range, which sources were checked and when (e.g. *"x@y appears in 7 breaches (2012–2024), passwords exposed in 5"*). A source that could not be reached is reported as not checked, never as clean. Metadata only — no credentials |
 | `--darkweb` / `--robin` | **Robin dark-web leads** — Ahmia .onion search for the username, confirmed emails and (when corroborated) real name; only hits that contain the exact term are kept. Includes the breach sweep. With `--ai`, the results go to the model as numbered sources and only statements that cite them are kept |
-| `--holehe` | **Deep email scan** — hands off to holehe for 120+ platform email-registration checks |
+| `--holehe` | **Deep email scan** — which of ~120 sites the address is registered on (holehe). Modules that would send the target a password-recovery email are skipped. Rate-limited sites are reported as not checked, never as "not registered". With `--email-permute`, accounts found for *guessed* addresses are listed as leads and never count as email confirmation |
 | `--ai` | **AI false-positive filter** — second verification pass via Claude, OpenRouter (free), or NVIDIA NIM (free) |
 
 ### Auto-Triggered
@@ -132,6 +132,10 @@ pip install aiohttp
 pip install curl-cffi        # WAF bypass for Twitter, Instagram, TikTok, Patreon
 pip install imagehash Pillow # Perceptual avatar hash matching (--phash)
 pip install holehe            # Deep email scanning 120+ platforms (--holehe)
+                              #   Kali/Debian: if the build fails with "install_layout",
+                              #   use: pip install --use-pep517 holehe
+pip install "httpx[socks]"    # holehe over --tor / SOCKS proxies
+pip install weasyprint        # PDF output for --report
 pip install anthropic         # Claude AI verification (--ai claude)
 pip install openai            # OpenRouter / NVIDIA AI verification (--ai openrouter)
 ```

@@ -130,3 +130,27 @@ async def test_uncorroborated_account_declarations_are_not_mapped(site, monkeypa
     await helix.run(_args(tmp_path, email=None, breach=False, darkweb=False))
     out = capsys.readouterr().out
     assert "Globex" not in out and "not mapped" in out
+
+
+@pytest.mark.asyncio
+async def test_guessed_email_accounts_never_corroborate_identity(site, monkeypatch, tmp_path):
+    """A guessed address (jack@gmail.com) is usually a stranger's."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(helix, "PLATFORMS", {"Exampleweb": {
+        "url": site + "/u/{username}", "method": "status_code", "found": [200],
+        "category": "social", "color": "#fff"}})
+
+    async def fake_holehe(email, progress_cb=None):
+        return [{"platform": "Exampleweb", "url": "https://exampleweb", "found": True,
+                 "category": "social", "color": "#fff", "source": "holehe", "target_type": "email"}]
+    import osint.adapters.holehe_adapter as hm
+    monkeypatch.setattr(hm, "load_with_fallback", fake_holehe)
+
+    await helix.run(_args(tmp_path, email=None, breach=False, darkweb=False,
+                          email_permute=True, holehe=True))
+    res = os.path.join(tmp_path, "results", "janeroe")
+    data = json.load(open(glob.glob(os.path.join(res, "janeroe_*.json"))[0]))
+    assert data["intel"]["email_guesses"]                       # reported as leads
+    hit = next(r for r in data["found"] if r["platform"] == "Exampleweb")
+    assert hit["identity_confidence"] == "LOW"                  # not "email confirmed"
+    assert not any("email" in e for e in hit["evidence"])

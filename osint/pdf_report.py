@@ -7,6 +7,7 @@ or falls back to a standalone HTML report if weasyprint not installed.
 import os, json
 from datetime import datetime
 from typing import List, Dict, Optional
+from osint import __version__
 
 try:
     from weasyprint import HTML as WP_HTML
@@ -164,12 +165,15 @@ def _build_html(username: str, results: List[Dict],
     if wayback_data:
         wb_rows = ""
         for plat, wd in wayback_data.items():
-            wb_rows += f'<tr><td style="padding:6px 12px;color:#e5e7eb">{plat}</td><td style="padding:6px 12px;color:#00ff88">{wd.get("first_seen","?")}</td><td style="padding:6px 12px;color:#6b7280">{wd.get("last_seen","?")}</td><td style="padding:6px 12px;color:#60a5fa">{wd.get("count",0)} snapshots</td></tr>\n'
+            if wd.get("error"):
+                continue
+            plat = _html_esc.escape(str(plat))
+            wb_rows += f'<tr><td style="padding:6px 12px;color:#e5e7eb">{plat}</td><td style="padding:6px 12px;color:#00ff88">{wd.get("first_seen","?")}</td><td style="padding:6px 12px;color:#6b7280">{wd.get("last_seen","?")}</td><td style="padding:6px 12px;color:#60a5fa">{wd.get("months", wd.get("count", 0))} month(s)</td></tr>\n'
         if wb_rows:
             wb_section = f"""
 <div class="section">
   <div class="section-title">⏱ Wayback Machine</div>
-  <table class="data-table"><tr><th>Platform</th><th>First Seen</th><th>Last Seen</th><th>Snapshots</th></tr>{wb_rows}</table>
+  <table class="data-table"><tr><th>Platform</th><th>First Seen</th><th>Last Seen</th><th>Archived</th></tr>{wb_rows}</table>
 </div>"""
 
     # GitHub intel section
@@ -199,9 +203,21 @@ def _build_html(username: str, results: List[Dict],
 
     # CRT section
     crt_section = ""
-    if crt_data and crt_data.get("all_domains"):
-        domains = crt_data["all_domains"][:20]
-        crt_section = f'<div class="section"><div class="section-title">🔐 Certificate Transparency ({len(domains)} domains)</div><div style="font-family:monospace;font-size:11px;color:#60a5fa;line-height:1.8">{"<br>".join(_html_esc.escape(d) for d in domains)}</div></div>'
+    if crt_data and (crt_data.get("all_domains") or crt_data.get("status")):
+        rows = ""
+        if crt_data.get("email_domains"):
+            rows += (f'<div class="intel-item"><span class="intel-label">On certificates listing '
+                     f'{_html_esc.escape(email or "")}:</span> '
+                     f'{_html_esc.escape(", ".join(crt_data["email_domains"]))}</div>')
+        if crt_data.get("named_domains"):
+            rows += (f'<div class="intel-item"><span class="intel-label">Named after the username '
+                     f'(leads — anyone can register a name):</span> '
+                     f'{_html_esc.escape(", ".join(crt_data["named_domains"][:30]))}</div>')
+        for kind, state in (crt_data.get("status") or {}).items():
+            if state != "ok":
+                rows += f'<div class="intel-item" style="color:#fbbf24">{_html_esc.escape(kind)}: {_html_esc.escape(state)}</div>'
+        if rows:
+            crt_section = f'<div class="section"><div class="section-title">🔐 Certificate Transparency</div>{rows}</div>'
 
     rel_section = _relationships_section(relationships or [])
     breach_section = _breach_section(breach_verdicts or [])
@@ -216,6 +232,9 @@ def _build_html(username: str, results: List[Dict],
 <title>Helix Report — {username}</title>
 <style>
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  @page {{ size: A4; margin: 14mm 12mm; background: #0a0a0f; }}
+  tr, .intel-item {{ page-break-inside: avoid; break-inside: avoid; }}
+  .section-title {{ page-break-after: avoid; break-after: avoid; }}
   body {{ background: #0a0a0f; color: #c8d3e0; font-family: 'Courier New', monospace; font-size: 12px; padding: 32px; }}
   .header {{ border-bottom: 2px solid #00ff88; padding-bottom: 20px; margin-bottom: 28px; display: flex; justify-content: space-between; align-items: flex-end; }}
   .logo {{ font-size: 22px; font-weight: bold; color: #00ff88; letter-spacing: 4px; }}
@@ -280,7 +299,7 @@ def _build_html(username: str, results: List[Dict],
 {dw_section}
 
 <div class="footer">
-  <div>Helix v3.3 · github.com/thalha-a9/helix · @thalha-a9</div>
+  <div>Helix v{__version__} · github.com/thalha-a9/helix · @thalha-a9</div>
   <div>For authorized security research and OSINT investigations only</div>
 </div>
 

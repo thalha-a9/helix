@@ -17,7 +17,7 @@ def _check_deps():
     except ImportError:
         print("\n[!] Missing: aiohttp  →  pip install -r requirements.txt\n"); sys.exit(1)
 
-from osint              import netconfig
+from osint              import netconfig, __version__
 from osint.checker      import check_username, check_email, validate_username, validate_email, HAS_CURL_CFFI
 from osint.location     import annotate_locations, flag_conflicts, describe_subject_location, resolve_countries
 from osint.confidence   import score_identity
@@ -205,7 +205,7 @@ async def run(args):
         print(f"  {DIM}           every probed platform logs your IP — "
               f"use --tor or --proxy for real investigations{RST}\n")
 
-    results=[];  email_results=[];  pivot_data={};  phash_matches=[]; loc_conflicts=[]
+    results=[];  email_results=[];  email_guesses={};  pivot_data={};  phash_matches=[]; loc_conflicts=[]
     real_name="";  real_name_source="";  identity_counts={}
     wayback_data={}; crt_data={}; paste_data={}; github_intel={}
 
@@ -353,8 +353,14 @@ async def run(args):
                         ep_res = _sanitize(await holehe_run(ep))
                         ep_found = [r for r in ep_res if r.get("found")]
                         if ep_found:
-                            print(f"  {G}[+]{RST} {C}{ep}{RST}: found on {', '.join(r['platform'] for r in ep_found)}")
-                            email_results.extend(ep_res)
+                            # A guessed address may be anyone's: a lead, never
+                            # "email confirmed" for identity scoring or the graph.
+                            print(f"  {Y}[?]{RST} {C}{ep}{RST} (guessed): has accounts on "
+                                  f"{', '.join(r['platform'] for r in ep_found)}")
+                            email_guesses[ep] = [r["platform"] for r in ep_found]
+                    if email_guesses:
+                        print(f"  {DIM}  Guessed addresses can belong to anyone — verify before "
+                              f"treating them as the subject's.{RST}")
             print()
 
         # ── pHash ─────────────────────────────────────────────────────────────
@@ -380,14 +386,21 @@ async def run(args):
         if args.wayback:
             print(f"  {C}[*]{RST} Checking Wayback Machine (Archive.org)…")
             from osint.modules.wayback import check_profiles as wb_check
-            wayback_data = await wb_check(found_u)
-            if wayback_data:
-                print(f"  {G}[+]{RST} Wayback: {len(wayback_data)} profile(s) archived")
-                for plat, wd in wayback_data.items():
-                    clues = wd.get("identity_clues",[])
-                    print(f"  {DIM}  {plat}: first seen {wd['first_seen']}"
-                          f" · {wd['count']} snapshots"
-                          + (f" · {len(clues)} clue(s)" if clues else "") + RST)
+            wayback_data = await wb_check(found_u, username)
+            archived = {p: w for p, w in wayback_data.items() if not w.get("error")}
+            failed   = {p: w for p, w in wayback_data.items() if w.get("error")}
+            if archived:
+                print(f"  {G}[+]{RST} Wayback: {len(archived)} profile(s) archived")
+                for plat, wd in archived.items():
+                    clues = wd.get("identity_clues", [])
+                    print(f"  {DIM}  {plat}: {wd['first_seen']} → {wd['last_seen']}"
+                          f" · archived in {wd['months']} month(s)"
+                          + (f" · old bio: {'; '.join(clues[:3])}" if clues else "") + RST)
+            if failed:
+                why = next(iter(failed.values()))["error"].replace("not checked — ", "")
+                print(f"  {Y}[!]{RST} {DIM}Wayback not checked for {len(failed)} profile(s): {why[:70]}{RST}")
+            if not archived and not failed:
+                print(f"  {DIM}  None of the found profiles are archived{RST}")
             print()
 
         # ── GitHub Deep Recon (auto-runs when GitHub found) ───────────────────
@@ -420,15 +433,20 @@ async def run(args):
             print(f"  {C}[*]{RST} Certificate transparency (crt.sh)…")
             from osint.modules.crt import run as crt_run
             crt_data = await crt_run(username, email)
-            domains  = crt_data.get("all_domains",[])
-            if domains:
-                print(f"  {G}[+]{RST} CRT: {len(domains)} domain(s) found")
-                for d in domains[:8]:
-                    print(f"  {DIM}  {d}{RST}")
-                if len(domains) > 8:
-                    print(f"  {DIM}  … +{len(domains)-8} more{RST}")
-            else:
-                print(f"  {DIM}  No domains found in CT logs{RST}")
+            st = crt_data.get("status", {})
+            if crt_data["email_domains"]:
+                print(f"  {G}[+]{RST} CRT: on certificates listing {email}: "
+                      f"{', '.join(crt_data['email_domains'][:8])}")
+            if crt_data["named_domains"]:
+                nd = crt_data["named_domains"]
+                print(f"  {Y}[?]{RST} CRT: {len(nd)} domain(s) named '{username}' — leads only, "
+                      f"anyone can register a name:")
+                print(f"  {DIM}    {', '.join(nd[:10])}{' …' if len(nd) > 10 else ''}{RST}")
+            for kind, state in st.items():
+                if state != "ok":
+                    print(f"  {Y}[!]{RST} {DIM}CRT {kind}: {state}{RST}")
+            if not crt_data["all_domains"] and all(v == "ok" for v in st.values()):
+                print(f"  {DIM}  No matching domains in CT logs{RST}")
             print()
 
         # ── Paste Intelligence ────────────────────────────────────────────────
@@ -436,15 +454,16 @@ async def run(args):
             print(f"  {C}[*]{RST} Paste intelligence (Gist + Pastebin)…")
             from osint.modules.paste import run as paste_run
             paste_data = await paste_run(username, email)
-            total = paste_data.get("total",0)
-            if total:
-                print(f"  {G}[+]{RST} Paste: {total} result(s)")
-                for g in paste_data.get("gists",[])[:3]:
-                    print(f"  {DIM}  [gist] {g['description'][:50]} — {g['url']}{RST}")
-                for p in paste_data.get("username_pastes",[])[:3]:
-                    print(f"  {DIM}  [paste] {p['url']}{RST}")
-            else:
-                print(f"  {DIM}  No mentions found{RST}")
+            for g in paste_data.get("gists", [])[:3]:
+                print(f"  {G}[+]{RST} {DIM}[gist of github.com/{username}] {g['description'][:50]} — {g['url']}{RST}")
+            for key, what in (("username_pastes", username), ("email_pastes", email)):
+                for p in paste_data.get(key, [])[:3]:
+                    print(f"  {Y}[?]{RST} {DIM}[paste mentioning {what}] {p['url']}{RST}")
+            for src, state in paste_data.get("status", {}).items():
+                if state != "ok":
+                    print(f"  {Y}[!]{RST} {DIM}Paste {src}: {state}{RST}")
+            if not paste_data.get("total") and all(v == "ok" for v in paste_data.get("status", {}).values()):
+                print(f"  {DIM}  No gists or paste mentions found{RST}")
             print()
 
         # ── Pivot ─────────────────────────────────────────────────────────────
@@ -474,7 +493,9 @@ async def run(args):
             email_results = _sanitize(await check_email(email))
 
         ef = [r for r in email_results if r.get("found")]
-        print(f"  {G}[+]{RST} Email: {len(ef)} profile(s) found")
+        unchecked = sum(1 for r in email_results if (r.get("error") or "").startswith("not checked"))
+        print(f"  {G}[+]{RST} Email: {len(ef)} site(s) with an account for this address"
+              + (f"  {DIM}({unchecked} not checked — rate-limited or blocked){RST}" if unchecked else ""))
         for r in ef:
             print(f"  {M}[e]{RST} {r['platform']:<24}{DIM}{r['url']}{RST}")
         if not args.holehe:
@@ -502,8 +523,10 @@ async def run(args):
                 print(f"  {colour[g]}[{g:<6}]{RST} {r['platform']:<22}"
                       f"{DIM}{'; '.join(r['evidence'])}{RST}")
             if identity_counts["LOW"] and not (identity_counts["HIGH"] or identity_counts["MEDIUM"]):
+                tips = [t for t, used in (("--phash", args.phash), ("-e EMAIL", email),
+                                          ("--location", args.location)) if not used]
                 print(f"  {DIM}  A username match alone does not show these accounts are "
-                      f"one person — add --phash, -e EMAIL or --location to corroborate.{RST}")
+                      f"one person{' — add ' + ', '.join(tips) + ' to corroborate' if tips else ''}.{RST}")
             print()
 
     # ── Relationship map (declared only — no extra requests) ────────────────
@@ -618,6 +641,7 @@ async def run(args):
             "conflicts": loc_conflicts,
         },
         "identity_confidence": identity_counts,
+        "email_guesses": email_guesses,
         "relationships": relationships,
         "breaches":      breach_verdicts,
         "darkweb":       darkweb,
@@ -720,7 +744,7 @@ Operational security:
     p.add_argument("--output",    default=None)
     p.add_argument("--no-browser",action="store_true", dest="no_browser")
     p.add_argument("--nsfw",      action="store_true", help="Include adult/NSFW platforms from WMN/Maigret (excluded by default)")
-    p.add_argument("--version",   action="version", version="Helix v3.4.0")
+    p.add_argument("--version",   action="version", version=f"Helix v{__version__}")
 
     args = p.parse_args()
     args.pivot_depth = min(max(getattr(args,"pivot_depth",3),1),4)

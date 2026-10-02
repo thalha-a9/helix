@@ -1,6 +1,7 @@
 """Helix — Report Generator (JSON, CSV, TXT)"""
 import json, csv, os
 from datetime import datetime
+from osint import __version__
 
 def _ts() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -10,7 +11,7 @@ def save_json(username: str, results: list, output_dir: str, extra: dict = None)
     errors = [r for r in results if r.get("error")]
     report = {
         "tool":      "Helix",
-        "version":   "3.1.0",
+        "version":   __version__,
         "author":    "github.com/thalha-a9/helix",
         "timestamp": datetime.now().isoformat(),
         "target":    username,
@@ -108,7 +109,7 @@ def save_txt(username: str, results: list, output_dir: str, extra: dict = None) 
     errors = [r for r in results if r.get("error")]
     ts     = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     lines  = [
-        "="*60, f"  Helix v3.1 — @{username}", f"  {ts}", "="*60, "",
+        "="*60, f"  Helix v{__version__} — @{username}", f"  {ts}", "="*60, "",
         f"  Found  : {len(found)}/{len(results)}",
         f"  Errors : {len(errors)}", "", "-"*60, "  FOUND PROFILES", "-"*60,
     ]

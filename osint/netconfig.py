@@ -113,12 +113,21 @@ def curl_kwargs() -> dict:
     """Proxy kwargs for curl_cffi, which takes a requests-style proxies dict."""
     if not _PROXY:
         return {}
-    return {"proxies": {"http": _PROXY, "https": _PROXY}}
+    proxy = _PROXY
+    # curl resolves names locally for socks5:// and socks4:// — every probed
+    # platform would leak to the local DNS resolver (and Tor's .onion names
+    # would not resolve at all). The "h" variants resolve at the proxy.
+    scheme = _scheme(proxy)
+    if scheme in ("socks5", "socks4"):
+        proxy = ("socks5h" if scheme == "socks5" else "socks4a") + proxy[len(scheme):]
+    return {"proxies": {"http": proxy, "https": proxy}}
 
 
 def build_connector(**kwargs) -> aiohttp.BaseConnector:
     """TCPConnector, or a SOCKS-aware connector when a socks:// proxy is set."""
     if _PROXY and is_socks():
+        # rdns: hostnames are resolved by the proxy, never locally (no DNS leak).
+        kwargs.setdefault("rdns", True)
         return ProxyConnector.from_url(_PROXY, **kwargs)
     # aiohttp silently switches to aiodns when it is installed (maigret pulls it
     # in), and c-ares times out under thousands of concurrent lookups. The
@@ -134,6 +143,21 @@ def new_session(connector: aiohttp.BaseConnector = None, **kwargs) -> aiohttp.Cl
     if connector is None:
         connector = build_connector()
     return aiohttp.ClientSession(connector=connector, **kwargs)
+
+
+async def read_body(resp: aiohttp.ClientResponse, cap: int) -> bytes:
+    """
+    The body, up to `cap` bytes. resp.content.read(n) is NOT this: it returns
+    whatever has arrived so far (5.5 KB of a 213 KB Twitch page, live), so a
+    capped read must keep reading until the cap or the end of the body.
+    """
+    buf = bytearray()
+    async for chunk in resp.content.iter_chunked(64 * 1024):
+        buf += chunk
+        if len(buf) >= cap:
+            del buf[cap:]
+            break
+    return bytes(buf)
 
 
 def describe() -> str:

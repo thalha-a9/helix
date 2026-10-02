@@ -42,8 +42,8 @@ def _base_parts(username: str, real_name: str = "") -> List[str]:
                     f"{f[0]}.{l}",       # m.aqib
                     f"{l}{f}",           # aqibmohammad
                     f"{l}.{f}",          # aqib.mohammad
-                    f"{f}",              # mohammad
-                    f"{l}",              # aqib
+                    # A bare first or last name (mohammad@, aqib@) is someone
+                    # else's address far more often than the subject's.
                 ])
     return list(bases)
 
@@ -64,11 +64,17 @@ def generate_email_permutations(username: str,
     # Score bases by likelihood (shorter + matching username = higher priority)
     clean_u = _clean(username)
     def score(b):
-        s = 0
-        if b == clean_u: s += 10
-        if b.replace('.','').replace('_','') == clean_u: s += 5
-        s -= len(b)  # prefer shorter
-        return s
+        # The username first, then full-name patterns in their usual order of
+        # popularity (first.last, firstlast, f.last …) — never "shortest".
+        if b == clean_u: return 100
+        if b.replace('.','').replace('_','') == clean_u: return 90
+        order = ["{f}.{l}", "{f}{l}", "{f}_{l}", "{f0}.{l}", "{f0}{l}", "{l}.{f}", "{l}{f}"]
+        if real_name and len(real_name.split()) >= 2:
+            f, l = _clean(real_name.split()[0]), _clean(real_name.split()[-1])
+            for i, pat in enumerate(order):
+                if b == pat.format(f=f, l=l, f0=f[:1]):
+                    return 80 - i
+        return 0
     
     bases = sorted(set(bases), key=score, reverse=True)[:max_per_provider]
 

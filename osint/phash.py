@@ -16,13 +16,38 @@ try:
 except ImportError:
     HAS_PHASH = False
 
+import re
+
 TIMEOUT = aiohttp.ClientTimeout(total=10)
+
+# Bits (of 64) two perceptual hashes may differ by and still be the same
+# picture. 10 let simple, unrelated images (initials on a flat colour) match.
+MATCH_THRESHOLD = 6
+
+# og:image URLs that are a platform default or a site-wide card, not the
+# user's picture (live scans, Oct 2026). Two sites' defaults must never read
+# as "same person".
+_DEFAULT_IMAGE = re.compile(
+    r"missing\.png|default_profile|og-default|default[-_]?avatar|avatar[-_]?default|"
+    r"no[-_]?avatar|placeholder|anonymous|/defaults?/|/og/image/|web-capture|"
+    r"/background/|/opengraph/|card\.jpg|uploads/articles/|og[-_]image|social[-_]?(?:card|preview)",
+    re.I)
+
+
+def is_default_image(url: str) -> bool:
+    return bool(_DEFAULT_IMAGE.search(url or ""))
+
+
+def _too_plain(img) -> bool:
+    """Blank or flat images (letters on a colour, solid fills) carry no identity."""
+    from PIL import ImageStat
+    return max(ImageStat.Stat(img.convert("L")).stddev) < 20
 
 async def _fetch_image(session, url: str) -> bytes | None:
     try:
-        async with session.get(url, timeout=TIMEOUT) as r:
+        async with session.get(url, timeout=TIMEOUT, **netconfig.request_kwargs()) as r:
             if r.status == 200:
-                return await r.read()
+                return await netconfig.read_body(r, 5 * 1024 * 1024)
     except Exception:
         pass
     return None
@@ -35,7 +60,7 @@ async def hash_all_avatars(found: list) -> dict:
     urls = {
         r["platform"]: r.get("avatar_url", "")
         for r in found
-        if r.get("avatar_url", "").startswith("http")
+        if r.get("avatar_url", "").startswith("http") and not is_default_image(r["avatar_url"])
     }
     if not urls:
         return {}
@@ -49,6 +74,8 @@ async def hash_all_avatars(found: list) -> dict:
             if isinstance(data, bytes) and data:
                 try:
                     img  = Image.open(io.BytesIO(data)).convert("RGB")
+                    if _too_plain(img):
+                        continue
                     phash = str(imagehash.phash(img))
                     hashes[plat] = phash
                 except Exception:
@@ -56,7 +83,7 @@ async def hash_all_avatars(found: list) -> dict:
     return hashes
 
 
-def find_matches(hashes: dict, threshold: int = 10) -> list:
+def find_matches(hashes: dict, threshold: int = MATCH_THRESHOLD) -> list:
     """
     Find similar avatar hashes.
     CRITICAL FIX: any hash shared by 3+ platforms is a default/placeholder

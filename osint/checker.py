@@ -232,7 +232,7 @@ async def check_platform(session, name: str, platform: dict,
                         allow_redirects=True, ssl=True,
                         read_bufsize=2**16, **netconfig.request_kwargs(),
                     ) as r:
-                        raw_bytes = await r.content.read(_MAX_BODY_BYTES)
+                        raw_bytes = await netconfig.read_body(r, _MAX_BODY_BYTES)
                         text = raw_bytes.decode("utf-8", errors="ignore")
                         await _apply(result, platform, username, r.status, text, str(r.url), probe_url)
                 result["status_code"] = result.get("status_code")
