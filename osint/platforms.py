@@ -8,7 +8,7 @@ _BIO_PATTERNS_DEVELOPER = {
     "twitter":   r"(?:twitter|x)\.com/([a-zA-Z0-9_]{1,50})",
     "linkedin":  r"linkedin\.com/in/([a-zA-Z0-9_\-]{1,100})",
     "instagram": r"instagram\.com/([a-zA-Z0-9_.]{1,50})",
-    "youtube":   r"youtube\.com/(?:@|c/|user/)?([a-zA-Z0-9_\-]{1,100})",
+    "youtube":   r"youtube\.com/(?:@|c/|user/)([a-zA-Z0-9_.\-]{1,100})",
     "medium":    r"medium\.com/@([a-zA-Z0-9_\-]{1,50})",
     "devto":     r"dev\.to/([a-zA-Z0-9_\-]{1,50})",
     "website":   r"(https?://(?!github\.com|linkedin\.com|twitter\.com|x\.com)[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}[^\s\"\'<>]*)",
@@ -17,7 +17,7 @@ _BIO_PATTERNS_DEVELOPER = {
 _BIO_PATTERNS_SOCIAL = {
     "github":   r"github\.com/([a-zA-Z0-9_\-]{1,100})",
     "linkedin": r"linkedin\.com/in/([a-zA-Z0-9_\-]{1,100})",
-    "youtube":  r"youtube\.com/(?:@|c/|user/)?([a-zA-Z0-9_\-]{1,100})",
+    "youtube":  r"youtube\.com/(?:@|c/|user/)([a-zA-Z0-9_.\-]{1,100})",
     "website":  r"(https?://(?!twitter\.com|x\.com|instagram\.com)[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}[^\s\"\'<>]*)",
 }
 
@@ -33,14 +33,20 @@ PLATFORMS = {
         "bio_patterns": _BIO_PATTERNS_SOCIAL, "bio_extract": True,
     },
     "Instagram": {
+        # Logged out, only a real account's page carries its og:title,
+        # "Name (@user) • Instagram photos and videos" (@ is HTML-escaped).
+        # Unknown names and login walls have none — the old "not found" text
+        # check passed on those.
         "url": "https://www.instagram.com/{username}/",
-        "method": "text_not_present", "not_found_text": "Page Not Found",
+        "method": "og_meta", "og_found": ["(&#064;{username})", "(@{username})"],
         "tls_impersonate": True, "requires_tls": True,
         "category": "social", "color": "#E1306C",
     },
     "TikTok": {
+        # A real account's page embeds its user record ("uniqueId"); an
+        # unknown name gets statusCode 10221 and no record.
         "url": "https://www.tiktok.com/@{username}",
-        "method": "text_not_present", "not_found_text": "Couldn\u2019t find this account",
+        "method": "text_present", "found_text": '"uniqueId":"{username}"',
         "tls_impersonate": True,
         "category": "social", "color": "#010101",
     },
@@ -91,8 +97,10 @@ PLATFORMS = {
         "category": "social", "color": "#000000",
     },
     "VK": {
+        # VK answers 404 for an unregistered short name and 200 (often a bare
+        # login wall without the name in it) for a registered one.
         "url": "https://vk.com/{username}",
-        "method": "text_not_present", "not_found_text": "Page not found",
+        "method": "status_code", "found": [200], "name_in_page": False,
         "category": "social", "color": "#4C75A3",
     },
     "Telegram": {
@@ -325,9 +333,20 @@ PLATFORMS = {
     # ── Professional / Other ───────────────────────────────────────────────────
     "Keybase": {
         "url": "https://keybase.io/{username}",
-        "method": "og_meta", "og_not_found": ["Keybase - 404"],
+        # Profile pages lost their og:title (live, Oct 2026) — real users read as
+        # missing. The public API answers {"them":[null]} for unknown names and
+        # carries the user's verified proofs (Twitter, GitHub, Reddit, domains).
+        "check_url": "https://keybase.io/_/api/1.0/user/lookup.json?usernames={username}&fields=basics,proofs_summary",
+        "method": "text_present", "found_text": '"username":"{username}"',
         "category": "other", "color": "#33A0FF",
-        "bio_extract": True, "bio_patterns": _BIO_PATTERNS_DEVELOPER,
+        "bio_extract": True, "bio_patterns": {
+            # Keybase proofs: accounts the user cryptographically proved they own
+            "twitter":    r'"proof_type":"twitter","nametag":"([A-Za-z0-9_]{1,50})"',
+            "github":     r'"proof_type":"github","nametag":"([A-Za-z0-9-]{1,39})"',
+            "reddit":     r'"proof_type":"reddit","nametag":"([A-Za-z0-9_-]{1,40})"',
+            "hackernews": r'"proof_type":"hackernews","nametag":"([A-Za-z0-9_-]{1,40})"',
+            "website":    r'"proof_type":"(?:dns|generic_web_site)","nametag":"([A-Za-z0-9.-]{3,100})"',
+        },
     },
     "About.me": {
         "url": "https://about.me/{username}",

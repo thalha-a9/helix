@@ -18,8 +18,9 @@ import tempfile
 from typing import Dict, List, Optional
 
 from osint import netconfig
-from osint.checker import (CONTROL_ERROR, _extract_og_tag, _headers, _is_waf_page,
-                           _MAX_BODY_BYTES, control_username)
+from osint.checker import (CONTROL_ERROR, CONTROL_INCONCLUSIVE, _extract_og_tag, _headers,
+                           _is_waf_page, _MAX_BODY_BYTES, _TRANSIENT_STATUSES,
+                           control_username, names_user)
 
 import aiohttp
 
@@ -128,6 +129,13 @@ async def _reprobe(session, lead: dict, semaphore: asyncio.Semaphore) -> dict:
         lead["error"] = "waf_blocked: bot-check page detected"
         return lead
 
+    if lead.get("_username") and not names_user(text, lead["_username"]):
+        # A real profile page names its user; a catch-all or error page that
+        # Maigret mistook for a profile usually does not.
+        lead["found"] = False
+        lead["error"] = "unverifiable: page does not name the user"
+        return lead
+
     lead["og_title"]   = _extract_og_tag(text, "title") or ""
     lead["_page_text"] = text[:6000]
     img = _extract_og_tag(text, "image")
@@ -155,27 +163,57 @@ def looks_same(page_a: str, page_b: str, username: str, control: str,
     return difflib.SequenceMatcher(None, a[:6000], b[:6000], autojunk=False).ratio() >= threshold
 
 
-async def _control_check(session, lead: dict, username: str, ctrl: str,
+CONTROL_RETRY_DELAY = 3.0
+
+
+async def _fetch_control(session, url: str, semaphore: asyncio.Semaphore):
+    """(status, text) for a control URL, retried once if the answer was transient."""
+    for attempt in range(2):
+        if attempt:
+            await asyncio.sleep(CONTROL_RETRY_DELAY)
+        async with semaphore:
+            try:
+                async with session.get(
+                    url, headers=_headers(), allow_redirects=True,
+                    timeout=aiohttp.ClientTimeout(total=14, connect=7),
+                    **netconfig.request_kwargs(),
+                ) as r:
+                    status = r.status
+                    text = (await r.content.read(_MAX_BODY_BYTES)).decode("utf-8", errors="ignore")
+            except Exception:
+                status, text = None, ""
+        if status is not None and status not in _TRANSIENT_STATUSES and not _is_waf_page(text):
+            return status, text
+    return None, ""
+
+
+async def _control_check(session, lead: dict, username: str, ctrls: tuple,
                          semaphore: asyncio.Semaphore) -> None:
-    """Discard a lead whose URL serves the same page for a name that cannot exist."""
-    if username.lower() not in lead["url"].lower():
-        return  # ID-based URL — no control URL can be built
-    ctrl_url = re.sub(re.escape(username), ctrl, lead["url"], flags=re.IGNORECASE)
-    async with semaphore:
-        try:
-            async with session.get(
-                ctrl_url, headers=_headers(), allow_redirects=True,
-                timeout=aiohttp.ClientTimeout(total=14, connect=7),
-                **netconfig.request_kwargs(),
-            ) as r:
-                status = r.status
-                text = (await r.content.read(_MAX_BODY_BYTES)).decode("utf-8", errors="ignore")
-        except Exception:
-            return
-    if status == 200 and looks_same(lead.get("_page_text", ""), text[:6000], username, ctrl):
+    """
+    Keep a lead only when two names that cannot exist both get a clear,
+    identical "no such user" answer from the same URL pattern. A lead whose
+    URL cannot be rebuilt for another name (ID-based) cannot be checked, so
+    it is not kept either.
+    """
+    def discard(reason):
         lead["found"] = False
-        lead["error"] = CONTROL_ERROR
+        lead["error"] = reason
         lead["control_failed"] = True
+
+    if username.lower() not in lead["url"].lower():
+        return discard(CONTROL_INCONCLUSIVE)
+    answers = []
+    for ctrl in ctrls:
+        ctrl_url = re.sub(re.escape(username), ctrl, lead["url"], flags=re.IGNORECASE)
+        status, text = await _fetch_control(session, ctrl_url, semaphore)
+        if status is None:
+            return discard(CONTROL_INCONCLUSIVE)
+        if status == 200 and (names_user(text, ctrl)
+                              or looks_same(lead.get("_page_text", ""), text[:6000], username, ctrl)):
+            return discard(CONTROL_ERROR)             # the made-up name "exists" too
+        answers.append(status)
+    if len(set(answers)) != 1:
+        discard(CONTROL_INCONCLUSIVE)
 
 
 async def reprobe_leads(leads: List[dict], concurrency: int = 10,
@@ -186,11 +224,15 @@ async def reprobe_leads(leads: List[dict], concurrency: int = 10,
     semaphore = asyncio.Semaphore(concurrency)
     connector = netconfig.build_connector(limit=concurrency, force_close=True)
     async with netconfig.new_session(connector=connector) as session:
+        for l in leads:
+            l["_username"] = username
         leads = list(await asyncio.gather(*(_reprobe(session, l, semaphore) for l in leads)))
+        for l in leads:
+            l.pop("_username", None)
         if control and username:
-            ctrl = control_username()
+            ctrls = (control_username(), control_username())
             await asyncio.gather(*(
-                _control_check(session, l, username, ctrl, semaphore)
+                _control_check(session, l, username, ctrls, semaphore)
                 for l in leads if l.get("found")
             ))
     return leads

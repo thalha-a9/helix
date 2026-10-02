@@ -84,7 +84,7 @@ python helix.py -u johndoe --wayback --crt --paste --pivot --phash
 | `--ai` | **AI false-positive filter** — second verification pass via Claude, OpenRouter (free), or NVIDIA NIM (free) |
 
 ### Auto-Triggered
-- **Relationship map** — built from what the subject's own accounts *declare*: employers and former employers ("engineer at Globex", "ex-Initech", GitHub company field), organisations (public GitHub orgs, "maintainer of …"), family members named by handle ("my wife @…") and accounts the bio mentions. Never inferred from shared surnames, followers or co-occurrence. Each edge carries its source, quote and a confidence that can never exceed the declaring account's identity confidence; two independent accounts are needed for HIGH. Shown in the console, graph, report, JSON, CSV and TXT
+- **Relationship map** — built from what the subject's own accounts *declare*: employers and former employers ("engineer at Globex", "ex-Initech", GitHub company field), organisations (public GitHub orgs, "maintainer of …"), family members named by handle ("my wife @…") and accounts the bio mentions. Never inferred from shared surnames, followers or co-occurrence. Only accounts corroborated as the subject's (identity MEDIUM/HIGH) are read: a bio on an account that merely shares the handle may be a stranger's, so those declarations are counted but not mapped. Each edge carries its source, quote and a confidence that can never exceed the declaring account's; two independent accounts are needed for HIGH. Shown in the console, graph, report, JSON, CSV and TXT
 - **Approved-subject gate** — breach and dark-web lookups send identifiers to third parties, so only analyst-supplied identifiers (`-u`, `-e`) and those from accounts corroborated as the subject's (identity MEDIUM/HIGH) are queried. Anything held back is listed with the reason
 - **GitHub Deep Recon** — runs automatically when a GitHub profile is found. Extracts real emails from public commits (filters noreply), org memberships, language stats, npm packages, and infers timezone from commit timestamp distribution (requires ≥15 commits for confidence)
 
@@ -295,6 +295,11 @@ helix/
 ---
 
 ## 🔬 How False Positive Prevention Works
+
+**Every hit must survive a live cross-check before it is reported.** At the moment of checking, Helix re-requests the profile and two usernames that cannot exist. A hit is kept only if the profile is found again (twice) and both made-up names get the same clear "no such user" answer. A site that "finds" a made-up name is a catch-all, and is dropped. A made-up name that only gets a rate limit, challenge or gateway error proves nothing, so that hit is dropped as unverifiable. Pages judged by status code or by the absence of a not-found message must also name the exact user, so a rate-limit page, a sign-in redirect or a search result listing `jackie` cannot pass for `jack`.
+
+Measured live (Oct 2026), full `--all` database of 6,158 sites: **0 false positives** across seven scans of made-up usernames, against 8 per scan before these checks. Sampled real-name hits were confirmed against the live pages.
+
 
 Helix uses the right detection method per platform instead of naive HTTP 200 checks:
 

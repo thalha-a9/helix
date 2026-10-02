@@ -113,6 +113,8 @@ def parse_hibp(data) -> List[Dict]:
             "data_classes": [_clean(c) for c in b.get("DataClasses") or [] if _clean(c)],
             "domain":       b.get("Domain") or "",
             "verified":     bool(b.get("IsVerified")),
+            "stealer_log":  bool(b.get("IsStealerLog")),
+            "aliases":      [_clean(b.get("Name"))] if b.get("Name") else [],
         })
     return out
 
@@ -161,27 +163,47 @@ async def _query(session: aiohttp.ClientSession, src: Dict, identifier: str) -> 
 
 # ── Verdicts ──────────────────────────────────────────────────────────────────
 
+def _keys(b: Dict) -> set:
+    """Identities of one breach record. Sources name breaches differently
+    (XposedOrNot "Condo", HIBP "CondoCom" / "Condo.com"), so a record is the
+    same breach if any normalised name, or its domain plus year, agree."""
+    keys = {"n:" + _norm_name(x) for x in [b["name"], *b.get("aliases", [])] if _norm_name(x)}
+    dom, yr = (b.get("domain") or "").lower().strip(), _year(b["date"])
+    if dom and yr:
+        keys.add(f"d:{dom}:{yr}")
+    return keys
+
+
 def _merge(per_source: List[Dict]) -> List[Dict]:
-    """Merge the same breach reported by several sources into one entry."""
-    merged: Dict[str, Dict] = {}
+    """Merge the same breach reported by several sources (or twice by one) into one entry."""
+    merged: List[Dict] = []
+    index: Dict[str, Dict] = {}
     for src_label, breaches in per_source:
         for b in breaches:
-            k = _norm_name(b["name"])
-            if k not in merged:
-                merged[k] = {**b, "data_classes": list(b["data_classes"]), "sources": []}
+            keys = _keys(b)
+            m = next((index[k] for k in keys if k in index), None)
+            if m is None:
+                m = {k: v for k, v in b.items() if k != "aliases"}
+                m["data_classes"] = list(b["data_classes"])
+                m["sources"] = []
+                merged.append(m)
             else:
-                m = merged[k]
                 for c in b["data_classes"]:
                     if c.lower() not in (x.lower() for x in m["data_classes"]):
                         m["data_classes"].append(c)
                 if len(b["date"]) > len(m["date"]):   # prefer the fuller date
                     m["date"] = b["date"]
                 m["verified"] = m["verified"] or b["verified"]
+                m["stealer_log"] = m.get("stealer_log") or b.get("stealer_log", False)
                 if not m.get("records") and b.get("records"):
                     m["records"] = b["records"]
-            if src_label not in merged[k]["sources"]:
-                merged[k]["sources"].append(src_label)
-    return sorted(merged.values(), key=lambda b: (_year(b["date"]) or 0, b["name"]), reverse=True)
+                if not m.get("domain") and b.get("domain"):
+                    m["domain"] = b["domain"]
+            for k in keys:
+                index.setdefault(k, m)
+            if src_label not in m["sources"]:
+                m["sources"].append(src_label)
+    return sorted(merged, key=lambda b: (_year(b["date"]) or 0, b["name"]), reverse=True)
 
 
 def _password_exposed(b: Dict) -> bool:
@@ -203,7 +225,10 @@ def summarise(v: Dict) -> str:
         line  = f"{ident} appears in {n} breach{'es' if n != 1 else ''}{span}"
         if pw:
             line += f", passwords exposed in {pw}"
-        return line + f" — source: {', '.join(ok)}."
+        line += f" — source: {', '.join(ok)}"
+        if not_ok:
+            line += f"; not checked — {'; '.join(not_ok)}"
+        return line + "."
     if ok:
         line = f"{ident}: no breaches found in {', '.join(ok)} (checked {v['checked_at']})"
         if not_ok:
@@ -236,7 +261,8 @@ async def check_identifiers(emails: List[str], session: aiohttp.ClientSession = 
             srcs = [s for s in SOURCES if "email" in s["kinds"]]
             answers = await asyncio.gather(*(_query(session, s, ident) for s in srcs))
             sources = [{"source": s["label"], "status": a["status"], "detail": a["detail"],
-                        "count": len(a["breaches"])} for s, a in zip(srcs, answers)]
+                        "count": len(_merge([("", a["breaches"])]))}
+                       for s, a in zip(srcs, answers)]
             breaches = _merge([(s["label"], a["breaches"]) for s, a in zip(srcs, answers)
                                if a["status"] == "ok"])
             any_ok = any(a["status"] == "ok" for a in answers)
@@ -257,10 +283,11 @@ async def check_identifiers(emails: List[str], session: aiohttp.ClientSession = 
             await session.close()
 
 
-def format_lines(v: Dict) -> List[str]:
-    """Terminal / TXT lines for one verdict."""
+def format_lines(v: Dict, limit: Optional[int] = None) -> List[str]:
+    """Terminal / TXT lines for one verdict (newest breaches first)."""
     lines = [v["summary"]]
-    for b in v["breaches"]:
+    shown = v["breaches"] if limit is None else v["breaches"][:limit]
+    for b in shown:
         extra = []
         if b.get("records"):
             try:
@@ -269,9 +296,13 @@ def format_lines(v: Dict) -> List[str]:
                 pass
         if b.get("verified"):
             extra.append("verified")
+        if b.get("stealer_log"):
+            extra.append("stealer log")
         lines.append(f"  - {b['name']} ({b['date'] or 'date unknown'})"
                      + (f" · {' · '.join(extra)}" if extra else ""))
         if b["data_classes"]:
             lines.append(f"      exposed: {', '.join(b['data_classes'])}")
         lines.append(f"      via: {', '.join(b['sources'])}")
+    if len(shown) < len(v["breaches"]):
+        lines.append(f"  … +{len(v['breaches']) - len(shown)} older breach(es) in the JSON/TXT/HTML report")
     return lines

@@ -9,7 +9,8 @@ identifiers tied to the subject are queried:
     from a username-only match could belong to a stranger.
 """
 
-from typing import Dict, List, Tuple
+import re
+from typing import Dict, List, Optional, Tuple
 
 _TRUSTED = ("HIGH", "MEDIUM")
 
@@ -54,3 +55,38 @@ def approved_identifiers(email: str, username: str, results: List[dict],
             held.append(f"name '{real_name}' from {real_name_source} — that account is "
                         f"identity {grade}")
     return {"emails": emails, "terms": terms}, held
+
+
+# Words that make an og:title site boilerplate, not a person's name.
+_NOT_A_NAME = {"profile", "profiles", "user", "users", "account", "page", "home", "official",
+               "member", "members", "community", "channel", "portfolio", "applets", "blog",
+               "login", "log", "sign", "signup", "welcome", "error", "not", "found", "on",
+               "the", "of", "and", "at", "s", "chess", "rating", "games", "stream", "streams",
+               "music", "videos", "photos", "listen", "watch", "follow", "collection"}
+
+
+def real_name_from_title(og_title: str, platform: str, username: str) -> Optional[str]:
+    """
+    A display name from an og:title such as "Jane Roe (@janeroe) • Instagram"
+    or "Jane Roe - Dribbble". Returns None unless the result looks like a
+    person's name: 2-4 capitalised words, none of them site boilerplate or the
+    platform's name ("HackerOne profile - jack" is not a name).
+    """
+    if not og_title:
+        return None
+    t = re.sub(r"\s*[(\[]@?[^)\]]*[)\]]", " ", og_title)        # "(@janeroe)"
+    t = re.split(r"\s+[|\-\u2013\u2014\u00b7\u2022:]\s+|\s*[|\u00b7\u2022]\s*", t)[0]
+    t = " ".join(t.split()).strip(" .,'\"")
+    plat = {w for w in re.split(r"[^a-z0-9]+", (platform or "").lower()) if w}
+    m = re.match(r"(.+?)\s+(?:on|at|is on)\s+(\S+)!?$", t)          # "Linus Torvalds on Snapchat"
+    if m and m.group(2).lower().strip("!.") in plat:
+        t = m.group(1)
+    words = t.split()
+    if not 2 <= len(words) <= 4:
+        return None
+    for w in words:
+        lw = w.lower().strip(".,'\"")
+        if (not w[0].isupper() or not re.fullmatch(r"[^\W\d_][\w'.-]*", w)
+                or lw in _NOT_A_NAME or lw in plat):
+            return None
+    return t

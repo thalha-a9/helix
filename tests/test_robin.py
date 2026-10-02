@@ -6,6 +6,8 @@ anti-scraping token) and a results page in Ahmia's markup.
 """
 
 import http.server
+import os
+import re
 import json
 import socket
 import threading
@@ -26,11 +28,16 @@ HOME = """<html><body>
 </form></body></html>"""
 
 
-def _result(onion, title, desc, ts="1720000000.0"):
+def _result(onion, title, desc, ts="July 3, 2024, 9:46 a.m."):
+    # Ahmia's live result markup (Oct 2026).
     return f"""<li class="result">
-  <h4><a href="/search/search/redirect?search_term=x&redirect_url=http://{onion}/page">{title}</a></h4>
+  <h4><a
+    href="/search/redirect?search_term=x&redirect_url=http://{onion}/page">
+    {title}
+  </a></h4>
   <p>{desc}</p>
-  <p class="urlinfo"><cite>http://{onion}/page</cite> - <span class="lastSeen" data-timestamp="{ts}">x</span></p>
+  <cite>{onion}</cite>
+  &mdash; <span class="lastSeen" data-timestamp="{ts}"> 3 days </span> &mdash;
 </li>"""
 
 
@@ -58,7 +65,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if term == "challenge":
                 return self._html(200, "<html>Please verify you are human</html>")
             if term == "nothing":
-                return self._html(200, "<html><p>No results found for your query.</p></html>")
+                return self._html(200, '<html><p id="noResults"> Sorry, but Ahmia couldn\'t find '
+                                       'results for <code>nothing</code>.</p></html>')
             return self._html(200, RESULTS)
         self._html(404, "")
 
@@ -215,3 +223,41 @@ def test_terminal_control_characters_are_stripped():
     [h] = robin.parse_results(html)
     assert "\x1b" not in h["title"] and "\x07" not in h["title"]
     assert "\x1b" not in h["description"]
+
+
+# ── Saved live pages (ahmia.fi, Oct 2026) ─────────────────────────────────────
+
+FIX = os.path.join(os.path.dirname(__file__), "fixtures")
+
+
+def _fixture(name):
+    with open(os.path.join(FIX, name), encoding="utf-8") as f:
+        return f.read()
+
+
+def test_live_results_page_parses_with_dates():
+    hits = robin.parse_results(_fixture("ahmia_results_live.html"))
+    assert len(hits) == 3
+    assert all(h["onion"].endswith(".onion") and len(h["onion"]) == 62 for h in hits)
+    assert all(re.fullmatch(r"\d{4}-\d{2}-\d{2}", h["last_seen"]) for h in hits)
+    assert all(h["url"].startswith("http://") and h["title"] for h in hits)
+
+
+def test_live_empty_page_is_empty_and_live_homepage_is_not():
+    assert robin.parse_results(_fixture("ahmia_empty_live.html")) == []
+    assert robin._EMPTY_STATE.search(_fixture("ahmia_empty_live.html"))
+    assert not robin._EMPTY_STATE.search(_fixture("ahmia_home_live.html"))
+
+
+def test_live_homepage_form_token_is_found():
+    tokens = robin.parse_form_tokens(_fixture("ahmia_home_live.html"))
+    assert len(tokens) == 1 and all(tokens.values())
+
+
+@pytest.mark.parametrize("raw,want", [
+    ("Sept. 28, 2026, 9:01 a.m.", "2026-09-28"), ("May 3, 2026, noon", "2026-05-03"),
+    ("March 5, 2026, midnight", "2026-03-05"), ("1720000000.0", "2024-07-03"),
+    ("garbage", ""), ("Feb. 30, 2026", ""), (None, ""),
+])
+def test_last_seen_formats(raw, want):
+    assert robin.parse_last_seen(raw) == want

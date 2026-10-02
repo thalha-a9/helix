@@ -7,6 +7,7 @@ import aiohttp
 import hashlib
 import re
 import random
+from urllib.parse import urlparse
 from typing import Optional
 from osint.platforms import PLATFORMS
 from osint import netconfig
@@ -126,12 +127,58 @@ _BIO_NOISE = (
     "gstatic.com", "googletagmanager.com", "google-analytics.com",
     "githubassets.com", "gitlab-static.net", "cloudflareinsights.com",
     "cdnjs.cloudflare.com", "jsdelivr.net", "unpkg.com", "gravatar.com/avatar",
+    # The platform's own media CDNs: avatars and banners, not links the user posted
+    "twimg.com", "fbcdn.net", "cdninstagram.com", "tiktokcdn.com", "redditmedia.com",
+    "redd.it", "ytimg.com", "ggpht.com", "googleusercontent.com", "licdn.com",
+    "githubusercontent.com", "akamaihd.net", "cloudfront.net",
+    # Platforms' official onion mirrors, present on every one of their pages
+    "twitter3e4tixl4xyajtrzo62zg5vztmjuricljdp2c5kshju4avyoid.onion",
+    "facebookwkhpilnemxj7asaniu7vnjjbiltxjqhye3mhbshg7kx5tfyd.onion",
 )
+_MEDIA_EXT = re.compile(r"\.(?:jpe?g|png|gif|webp|svg|ico|bmp|avif|mp4|webm|css|js|woff2?)(?:[?#].*)?$", re.I)
+
+
+_SHORTENER_ROOT = re.compile(r"^https?://(?:t\.co|bit\.ly|lnkd\.in|goo\.gl|ow\.ly|buff\.ly)/?$", re.I)
 
 
 def _is_bio_noise(value: str) -> bool:
     v = value.lower()
-    return any(n in v for n in _BIO_NOISE)
+    return (any(n in v for n in _BIO_NOISE) or bool(_MEDIA_EXT.search(v))
+            or bool(_SHORTENER_ROOT.match(v)))      # "https://t.co" in X's page chrome
+
+
+def _site_of(url: str) -> str:
+    host = (urlparse(url if "://" in url else "https://" + url).hostname or "").lower()
+    parts = host.split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else host
+
+
+def _drop_self_links(links: dict, profile_url: str, platform: str) -> dict:
+    """A profile page links to its own site everywhere (canonical URL, share
+    buttons, the platform's own handle). Those are not links the user posted."""
+    own = _site_of(profile_url)
+    plat = re.sub(r"[^a-z0-9]", "", (platform or "").lower())
+    out = {}
+    for key, value in links.items():
+        if re.sub(r"[^a-z0-9]", "", key.lower()) == plat:
+            continue                              # "devto" handle on Dev.to itself
+        if "://" in value or "." in value.split("/")[0]:
+            if own and _site_of(value) == own:
+                continue                          # dev.to/jack on dev.to, linktr.ee/jack on Linktree
+        out[key] = value
+    return out
+
+
+# Site paths that the handle patterns can capture but that are never a user:
+# youtube.com/channel/…, twitter.com/intent/…, instagram.com/p/…, github.com/features …
+_RESERVED_PATHS = {
+    "channel", "watch", "embed", "results", "feed", "playlist", "shorts", "live", "c", "user",
+    "intent", "share", "home", "i", "search", "hashtag", "explore", "p", "reel", "reels",
+    "stories", "accounts", "about", "login", "signup", "join", "settings", "privacy", "terms",
+    "help", "features", "pricing", "sponsors", "orgs", "topics", "trending", "marketplace",
+    "enterprise", "security", "notifications", "new", "site", "tos", "legal", "jobs",
+    "company", "school", "pub", "in", "tag", "tags", "privacy-policy", "en", "static",
+}
 
 
 def _extract_bio_links(html: str, patterns: dict) -> dict:
@@ -139,6 +186,8 @@ def _extract_bio_links(html: str, patterns: dict) -> dict:
     for key, pat in patterns.items():
         for m in re.finditer(pat, html, re.IGNORECASE):
             handle = m.group(1).rstrip("/").strip()
+            if key != "website" and handle.lower() in _RESERVED_PATHS:
+                continue
             if handle and not _is_bio_noise(handle):
                 out[key] = handle
                 break
@@ -204,6 +253,15 @@ async def check_platform(session, name: str, platform: dict,
     return result
 
 
+def names_user(text: str, username: str) -> bool:
+    """The page names this exact user — not just a longer name containing it
+    ("Cjacker" or "jackie" on a search page is not "jack")."""
+    if not text or not username:
+        return False
+    pat = r"(?<![A-Za-z0-9])" + re.escape(username) + r"(?![A-Za-z0-9])"
+    return re.search(pat, text, re.I) is not None
+
+
 async def _apply(result: dict, platform: dict, username: str,
                  status: int, text: str, final_url: str, probe_url: str = ""):
     result["final_url"] = final_url
@@ -221,6 +279,12 @@ async def _apply(result: dict, platform: dict, username: str,
 
     if method == "status_code":
         result["found"] = status in platform.get("found", [200])
+        # A status code alone cannot tell a profile from a catch-all page that
+        # answers 200 for any name (forum homepages, sign-in redirects). A real
+        # profile page names its user; VK-style login walls opt out.
+        if (result["found"] and platform.get("name_in_page", True)
+                and not names_user(text, username)):
+            result["found"] = False
         if result["found"]: result["confidence"] = "medium"
         # For suspicious WMN status_code-only entries, also read body
         # so the verifier's soft-404 layer can catch false positives
@@ -232,7 +296,11 @@ async def _apply(result: dict, platform: dict, username: str,
 
     elif method == "text_not_present":
         nf = platform.get("not_found_text", "")
-        result["found"] = (status == 200) and (nf not in text)
+        # Absence of the not-found text alone is weak: a rate-limit page, an
+        # error page or changed wording lacks it too. A real profile page
+        # names its user, so require that as well.
+        result["found"] = ((status == 200) and (nf not in text)
+                           and names_user(text, username))
         if result["found"]: result["confidence"] = "medium"
 
     elif method == "text_present":
@@ -285,10 +353,34 @@ async def _apply(result: dict, platform: dict, username: str,
     if result["found"] and platform.get("bio_extract") and text:
         bio_pats = platform.get("bio_patterns", {})
         if bio_pats:
-            result["bio_links"] = _extract_bio_links(text, bio_pats)
+            result["bio_links"] = _drop_self_links(
+                _extract_bio_links(text, bio_pats), result.get("url", ""), result["platform"])
 
 
 CONTROL_ERROR = "unverifiable: platform also reports a random nonexistent username as found"
+CONTROL_INCONCLUSIVE = "unverifiable: no clear 'not found' for a random username (blocked, rate-limited or erroring)"
+RECHECK_ERROR = "unverifiable: hit did not reproduce on re-check"
+CONTROL_RETRY_DELAY = 3.0
+
+# For the random username, these answers say nothing about whether the site
+# can tell names apart: rate limits, challenges, gateway and edge errors.
+# Every other clear status is the site's answer for an unknown name — usually
+# 404, but some sites answer 400, 403, 410 or even 500 ("Interner
+# Serverfehler" for unknown users), and that still differs from a profile.
+_TRANSIENT_STATUSES = {202, 408, 425, 429, 502, 503, 504, 999} | set(range(520, 531))
+_CONTENT_METHODS = ("text_not_present", "text_present", "og_meta", "response_url")
+
+
+def definitive_negative(control: dict, platform: dict) -> bool:
+    """True when a check got a genuine "no such user" answer."""
+    if control.get("found") or control.get("error"):
+        return False
+    status = control.get("status_code")
+    if status is None or status in _TRANSIENT_STATUSES:
+        return False
+    # A 200 is a real negative only where the method read not-found evidence
+    # from the page content (not-found text present, profile marker absent).
+    return status != 200 or platform.get("method") in _CONTENT_METHODS
 
 
 def control_username() -> str:
@@ -312,15 +404,52 @@ async def _control_probe(session, results: list, plat_map: dict,
     while ctrl.lower() == username.lower():
         ctrl = control_username()
 
-    checks = await asyncio.gather(*(
-        check_platform(session, r["platform"], plat_map[r["platform"]], ctrl, semaphore)
-        for r in hits
-    ))
-    discarded = []
-    for hit, control in zip(hits, checks):
+    ctrl2 = control_username()
+    while ctrl2.lower() in (username.lower(), ctrl.lower()):
+        ctrl2 = control_username()
+
+    async def settled(pdef, name, platform):
+        """One check, retried once if the answer was transient (429, timeout…)."""
+        r = await check_platform(session, platform, pdef, name, semaphore)
+        if not r.get("found") and not definitive_negative(r, pdef):
+            await asyncio.sleep(CONTROL_RETRY_DELAY)
+            r = await check_platform(session, platform, pdef, name, semaphore)
+        return r
+
+    async def verify(hit):
+        pdef, name = plat_map[hit["platform"]], hit["platform"]
+        # Hit and control are fetched together so both answers come from the
+        # same moment: a site that served the scan a transient 200 (overload,
+        # error page) and a clean 404 a minute later must not "confirm" it.
+        control, again = await asyncio.gather(settled(pdef, ctrl, name),
+                                              settled(pdef, username, name))
         if control.get("found"):
+            return CONTROL_ERROR
+        if not definitive_negative(control, pdef):
+            return CONTROL_INCONCLUSIVE
+        if not again.get("found"):
+            return RECHECK_ERROR
+        # A second random name must get the same "no such user" answer: a
+        # one-off 403/500 under load is not the site's answer for unknown names.
+        control2 = await settled(pdef, ctrl2, name)
+        if control2.get("found"):
+            return CONTROL_ERROR
+        if (not definitive_negative(control2, pdef)
+                or control2.get("status_code") != control.get("status_code")):
+            return CONTROL_INCONCLUSIVE
+        # And the hit must hold a third time. A site that answers unknown names
+        # at random now has to land "found" three times and "not found" twice
+        # in a row to slip through.
+        if not (await settled(pdef, username, name)).get("found"):
+            return RECHECK_ERROR
+        return None
+
+    reasons = await asyncio.gather(*(verify(h) for h in hits))
+    discarded = []
+    for hit, reason in zip(hits, reasons):
+        if reason:
             hit["found"] = False
-            hit["error"] = CONTROL_ERROR
+            hit["error"] = reason
             hit["control_failed"] = True
             discarded.append(hit["platform"])
     return discarded

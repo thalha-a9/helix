@@ -21,7 +21,7 @@ from test_robin import ahmia, ONION_A             # noqa: F401  (fixture)
 
 PROFILE = (b'<html><head><meta property="og:title" content="Jane Roe (@janeroe)">'
            b'<meta property="og:description" content="Senior engineer at Globex. Ex-Initech.">'
-           b'</head><body>janeroe</body></html>')
+           b'</head><body>janeroe<br>Location: Berlin, Germany</body></html>')
 
 
 class Site(http.server.BaseHTTPRequestHandler):
@@ -77,7 +77,9 @@ async def test_full_run_reports_relationships_breaches_and_onion_leads(
         return []
     monkeypatch.setattr(helix, "check_email", no_email_scan)
 
-    await helix.run(_args(tmp_path))
+    # The stated location corroborates the account (identity MEDIUM), so its
+    # declarations count as the subject's.
+    await helix.run(_args(tmp_path, location="Germany"))
     out = capsys.readouterr().out
 
     assert "works at→ Globex" in out and "formerly at→ Initech" in out
@@ -88,7 +90,7 @@ async def test_full_run_reports_relationships_breaches_and_onion_leads(
     data = json.load(open(glob.glob(os.path.join(res, "janeroe_*.json"))[0]))
     intel = data["intel"]
     assert {e["target"] for e in intel["relationships"]} == {"Globex", "Initech"}
-    assert all(e["confidence"] == "LOW" for e in intel["relationships"])   # username match only
+    assert all(e["confidence"] == "MEDIUM" for e in intel["relationships"])  # one corroborated account
     assert intel["breaches"][0]["exposed"] is True
     assert intel["darkweb"]["ahmia"][0]["hits"][0]["onion"] == ONION_A
 
@@ -116,3 +118,15 @@ async def test_without_the_flags_no_third_party_is_queried(site, api, ahmia, mon
 
     await helix.run(_args(tmp_path, breach=False, darkweb=False))
     assert BreachHandler.hibp_keys == [] and AhmiaHandler.queries == []
+
+
+
+@pytest.mark.asyncio
+async def test_uncorroborated_account_declarations_are_not_mapped(site, monkeypatch, tmp_path, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(helix, "PLATFORMS", {"Exampleweb": {
+        "url": site + "/u/{username}", "method": "status_code", "found": [200],
+        "category": "social", "color": "#fff"}})
+    await helix.run(_args(tmp_path, email=None, breach=False, darkweb=False))
+    out = capsys.readouterr().out
+    assert "Globex" not in out and "not mapped" in out

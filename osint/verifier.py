@@ -326,6 +326,24 @@ _GATE_BLOCKED_HOSTS = {
     "gitlab.gnome.org",        # GNOME GitLab, soft-404 as 200 for missing users
     "gitlab.freedesktop.org",  # same pattern
     "patriots.win",            # "invalid user" served as 200 OK
+    # Observed on live --all scans of made-up names (Oct 2026): these answer
+    # unknown names inconsistently — sometimes 200, sometimes 404 — or for
+    # every name, so a hit from them is never evidence.
+    "mb.srb2.org",             # random 200/404 for unknown names
+    "proshkolu.ru",            # intermittently omits its "user not found" text
+    "psychotype.info",         # 200 for unknown names under load
+    "reincarnationforum.com",  # 200 for unknown names under load
+    "codecademy.com",          # every name "found" (database text out of date)
+    "cydak.ru",                # every name "found" (database text out of date)
+    "explore.openaire.eu",     # a search page, not a profile
+    "cigarpass.com",           # forum homepage for any name
+    "breakers.tv",             # every name "found" (database text out of date)
+    "gefragt.net",             # 200 for unknown names under load
+    # Logged out, these serve the same login wall for every name (live check,
+    # Oct 2026), so no hit from them can be verified.
+    "facebook.com",
+    "threads.com",
+    "threads.net",
 }
 
 

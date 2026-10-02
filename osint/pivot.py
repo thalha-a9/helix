@@ -16,10 +16,13 @@ _ALIAS_PATTERNS = [
 
 
 def _extract_aliases(bio_links: dict) -> Set[str]:
+    """Handles only: a website URL ("https://t.co", "jack.blog") is not a username."""
     aliases = set()
-    for handle in bio_links.values():
+    for key, handle in bio_links.items():
+        if key == "website":
+            continue
         h = handle.strip().lstrip("@").lower()
-        if 3 <= len(h) <= 40:
+        if 3 <= len(h) <= 40 and re.fullmatch(r"[a-z0-9][a-z0-9_.\-]*", h) and "://" not in h:
             aliases.add(h)
     return aliases
 

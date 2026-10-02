@@ -17,8 +17,21 @@ async def apply(base_result, platform, status, text, final_url="", username="jan
 
 async def test_status_code_found(base_result):
     plat = {"url": "https://x.com/u", "method": "status_code", "found": [200]}
-    r = await apply(base_result, plat, 200, "<html>profile</html>")
+    r = await apply(base_result, plat, 200, "<html>janeroe's profile</html>")
     assert r["found"] and r["confidence"] == "medium"
+
+
+async def test_status_code_200_without_the_username_is_a_catch_all(base_result):
+    """cigarpass.com / gitlab sign-in redirects answer 200 for any name (live --all scan)."""
+    plat = {"url": "https://x.com/u", "method": "status_code", "found": [200]}
+    r = await apply(base_result, plat, 200, "<html><title>Cigar Forums</title>Welcome!</html>")
+    assert not r["found"]
+
+
+async def test_status_code_login_wall_platform_can_opt_out(base_result):
+    plat = {"url": "https://vk.com/u", "method": "status_code", "found": [200], "name_in_page": False}
+    r = await apply(base_result, plat, 200, "<html>Log in to VK</html>")
+    assert r["found"]
 
 
 async def test_status_code_not_found(base_result):
@@ -30,7 +43,7 @@ async def test_status_code_not_found(base_result):
 async def test_status_code_soft404_body_overrides_when_flagged(base_result):
     plat = {"url": "https://x.com/u", "method": "status_code",
             "found": [200], "wmn_soft404_risk": True}
-    r = await apply(base_result, plat, 200, "<h1>User not found</h1>")
+    r = await apply(base_result, plat, 200, "<h1>User janeroe not found</h1>")
     assert not r["found"]
     assert "soft404" in r["error"]
 
@@ -40,8 +53,16 @@ async def test_status_code_soft404_body_overrides_when_flagged(base_result):
 async def test_text_not_present_found(base_result):
     plat = {"url": "https://x.com/u", "method": "text_not_present",
             "not_found_text": "This account doesn't exist"}
-    r = await apply(base_result, plat, 200, "<html>Jane Roe's profile</html>")
+    r = await apply(base_result, plat, 200, "<html>Jane Roe's profile (@janeroe)</html>")
     assert r["found"]
+
+
+async def test_text_not_present_needs_the_username_on_the_page(base_result):
+    """A rate-limit or error page lacks the not-found text too — live Steam/HN lesson."""
+    plat = {"url": "https://x.com/u", "method": "text_not_present",
+            "not_found_text": "This account doesn't exist"}
+    r = await apply(base_result, plat, 200, "<html>Too many requests, slow down</html>")
+    assert not r["found"]
 
 
 async def test_text_not_present_absent_when_marker_present(base_result):
@@ -187,3 +208,19 @@ async def test_page_text_retained_for_verifier(base_result, profile_html):
     plat = {"url": "https://x.com/u", "method": "og_meta", "og_not_found": ["nope"]}
     r = await apply(base_result, plat, 200, profile_html)
     assert r["_page_text"].startswith("<html>")
+
+
+
+@pytest.mark.parametrize("text,ok", [
+    ('<title>jack - RapPad</title>', True), ('"handle":"jack"', True), ("User:Jack", True),
+    ("https://jack.statuspage.io", True), ("/u/jack/", True), ("@jack_", True),
+    ("Cjacker Jackie jackson", False), ("", False),
+])
+async def test_names_user_matches_whole_names_only(text, ok):
+    assert checker.names_user(text, "jack") is ok
+
+
+async def test_search_page_listing_a_longer_name_is_not_a_hit(base_result):
+    plat = {"url": "https://x.com/u", "method": "text_not_present", "not_found_text": "No results"}
+    r = await apply(base_result, plat, 200, "<html>Users: janeroe2000, xjaneroe</html>")
+    assert not r["found"]

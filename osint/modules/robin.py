@@ -40,8 +40,29 @@ MAX_HITS_PER_TERM = 20
 # Markers of a genuine results page with zero hits. Anything else with no
 # parsable results (the homepage after a rejected token, a challenge page, a
 # redesigned layout) is an error, not "nothing on the dark web".
-_EMPTY_STATE = re.compile(r'class=["\'][^"\']*searchResults|no results|0 results|'
-                          r"(?:couldn't|could not|did not|didn't) find", re.I)
+_EMPTY_STATE = re.compile(r'id=["\']noResults["\']|class=["\'][^"\']*searchResults|'
+                          r"(?:couldn't|could not) find results", re.I)
+
+_MONTHS = {m: i for i, m in enumerate(
+    ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+_HUMAN_DATE = re.compile(r"([A-Za-z]{3,9})\.?\s+(\d{1,2}),\s*(\d{4})")
+
+
+def parse_last_seen(ts: str) -> str:
+    """Ahmia's data-timestamp → YYYY-MM-DD. Live pages carry Django's human
+    format ("Sept. 28, 2026, 9:01 a.m."); older ones a Unix epoch."""
+    ts = (ts or "").strip()
+    m = _HUMAN_DATE.search(ts)
+    if m and m.group(1)[:3].lower() in _MONTHS:
+        mon, day, year = _MONTHS[m.group(1)[:3].lower()], int(m.group(2)), int(m.group(3))
+        try:
+            return datetime(year, mon, day).strftime("%Y-%m-%d")
+        except ValueError:
+            return ""
+    try:
+        return datetime.fromtimestamp(float(ts), timezone.utc).strftime("%Y-%m-%d")
+    except (ValueError, OSError, OverflowError):
+        return ""
 
 # Terminal control characters (ANSI escapes etc.) from hostile page text.
 _CTRL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
@@ -110,12 +131,7 @@ class _Results(HTMLParser):
         elif tag == "cite":
             self.field = "cite"
         elif tag == "span" and "lastSeen" in classes:
-            ts = a.get("data-timestamp") or ""
-            try:
-                self.cur["last_seen"] = datetime.fromtimestamp(
-                    float(ts), timezone.utc).strftime("%Y-%m-%d")
-            except (ValueError, OSError, OverflowError):
-                pass
+            self.cur["last_seen"] = parse_last_seen(a.get("data-timestamp"))
 
     def handle_endtag(self, tag):
         if self.cur is None:

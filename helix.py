@@ -21,8 +21,9 @@ from osint              import netconfig
 from osint.checker      import check_username, check_email, validate_username, validate_email, HAS_CURL_CFFI
 from osint.location     import annotate_locations, flag_conflicts, describe_subject_location, resolve_countries
 from osint.confidence   import score_identity
-from osint.relationships import annotate_relations, build_relationships, edge_line
-from osint.subject      import approved_identifiers
+from osint.relationships import (annotate_relations, build_relationships, edge_line,
+                                 unconfirmed_declarations)
+from osint.subject      import approved_identifiers, real_name_from_title
 from osint.platform_schema import filter_valid
 from osint.graph        import generate_graph
 from osint.report       import save_json, save_csv, save_txt
@@ -280,7 +281,7 @@ async def run(args):
                 print(f"  {G}[+]{RST} Maigret: {eng['leads']} leads · "
                       f"{eng['skipped_known']} already checked by Helix · "
                       f"{G}{kept} verified{RST} · {Y}{len(eng_purged)} purged{RST} · "
-                      f"{DIM}{failed} unreachable on re-check{RST}")
+                      f"{DIM}{failed} rejected on re-check (blocked, unverifiable or page doesn't name the user){RST}")
                 for p in eng_purged[:5]:
                     print(f"  {DIM}  ✗ {p['platform']}: {p['reason'][:70]}{RST}")
 
@@ -317,16 +318,10 @@ async def run(args):
 
         # ── Real name extraction from OG-verified profiles ────────────────
         for r in found_u:
-            og = r.get("og_title","") or ""
-            if og and r.get("confidence") == "high":
-                # Strip platform name suffixes like "- Dribbble", "| Poe"
-                import re as _re
-                clean = _re.sub(r'[|\-\u2013\u2014].*$','',og).strip()
-                if clean and len(clean.split()) >= 2 and not any(
-                    x in clean.lower() for x in ['http','www','.com',username.lower()]
-                ):
-                    real_name = clean
-                    real_name_source = r["platform"]
+            if r.get("confidence") == "high":
+                name = real_name_from_title(r.get("og_title", ""), r["platform"], username)
+                if name:
+                    real_name, real_name_source = name, r["platform"]
                     break
         if real_name:
             print(f"  {G}[+]{RST} Real name extracted: {C}{real_name}{RST}")
@@ -513,6 +508,10 @@ async def run(args):
 
     # ── Relationship map (declared only — no extra requests) ────────────────
     relationships = build_relationships(results, username or "", github_intel) if username else []
+    unconfirmed = unconfirmed_declarations(results, username) if username else 0
+    if unconfirmed and not relationships:
+        print(f"  {DIM}Relationships: {unconfirmed} declaration(s) on accounts not yet tied to "
+              f"the subject — not mapped. Corroborate the accounts (--phash, -e) to include them.{RST}\n")
     if relationships:
         print(f"  {B}Relationships{RST}  {DIM}declared by the subject's own accounts — "
               f"never inferred{RST}")
@@ -536,7 +535,7 @@ async def run(args):
                 breach_verdicts = await check_identifiers(approved["emails"])
                 for v in breach_verdicts:
                     colour = R if v["exposed"] else (G if v["exposed"] is False else Y)
-                    lines = format_lines(v)
+                    lines = format_lines(v, limit=8)
                     print(f"  {colour}[{'!' if v['exposed'] else '·'}]{RST} {lines[0]}")
                     for line in lines[1:]:
                         print(f"  {DIM}  {line}{RST}")
@@ -554,7 +553,7 @@ async def run(args):
                 if blk["status"] != "ok":
                     print(f"  {Y}[!]{RST} Ahmia '{blk['term']}': {blk['detail']} — not checked")
                     continue
-                note = f" {DIM}({blk['dropped']} loose match(es) dropped){RST}" if blk["dropped"] else ""
+                note = f" {DIM}({blk['dropped']} unconfirmed match(es) dropped — term not in title or description){RST}" if blk["dropped"] else ""
                 print(f"  {M}[onion]{RST} '{blk['term']}': {len(blk['hits'])} lead(s){note}")
                 for h in blk["hits"][:5]:
                     print(f"  {DIM}    {h['onion']}  {h['title'][:60]}"

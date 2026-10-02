@@ -10,9 +10,11 @@ Declarations are read from the profile's own description (og:description /
 meta description, i.e. the bio the account holder wrote) and, for GitHub,
 the profile's company field and public organisation memberships.
 
+Only accounts corroborated as the subject's (identity MEDIUM or HIGH) are
+read: a bio on an account that merely shares the username may be a stranger's.
+
 Edge confidence:
-  An edge can never be stronger than the account that declared it — a bio on
-  an account that is only a username match (identity LOW) yields a LOW edge.
+  An edge can never be stronger than the account that declared it.
   Declared by one account          → at most MEDIUM
   Declared by two or more accounts → at most HIGH (independent selectors)
 """
@@ -36,10 +38,13 @@ _META_DESC = [
 _ORG = (r"(?:@([A-Za-z0-9][\w\-]{1,30})|(?:The\s+)?([A-Z0-9][\w&.'\-]*"
         r"(?:(?:\s+(?:of|de|du|la|the))?\s+[A-Z0-9][\w&.'\-]*){0,2}))")
 _AT  = r"(?:(?i:at|for|with)\s+|@\s*)"
-_ROLE = (r"(?i:(?:software\s+|senior\s+|staff\s+|lead\s+|principal\s+)?"
-         r"(?:engineer|developer|dev|designer|manager|intern|researcher|scientist|analyst|"
-         r"consultant|architect|director|ceo|cto|coo|cfo|founder|co-founder|cofounder|"
-         r"head\s+of\s+\w+|product\s+manager|sre|devops))")
+_ONE_ROLE = (r"(?:(?:software\s+|senior\s+|staff\s+|lead\s+|principal\s+)?"
+             r"(?:engineer|developer|dev|designer|manager|intern|researcher|scientist|analyst|"
+             r"consultant|architect|director|ceo|cto|coo|cfo|cpo|ciso|founder|co-founder|cofounder|"
+             r"president|owner|partner|vp|chief(?:\s+\w+){1,2}\s+officer|"
+             r"head\s+of\s+\w+|product\s+manager|sre|devops))")
+# "Founder & Chief Innovation Officer", "Founder, CEO" — roles chained together.
+_ROLE = r"(?i:" + _ONE_ROLE + r"(?:\s*(?:&|,|and|/)\s*" + _ONE_ROLE + r")*)"
 _STUDY = r"(?i:(?:phd\s+|msc\s+|ms\s+|grad(?:uate)?\s+|undergrad(?:uate)?\s+)?student|studying)"
 
 # (relation, target_type, compiled pattern) — the last matched group is the target.
@@ -51,6 +56,9 @@ _PATTERNS = [
         r"\b(?i:works?|working|employed|currently)\s+" + _AT + _ORG)),
     ("education", "org", re.compile(r"\b" + _STUDY + r"\s+" + _AT + _ORG)),
     ("employer", "org", re.compile(r"\b" + _ROLE + r"\s+" + _AT + _ORG)),
+    ("employer", "org", re.compile(
+        r"\b(?i:founder|co-founder|cofounder|ceo|cto|coo|cfo|president|owner|"
+        r"chief(?:\s+\w+){1,2}\s+officer)\s+(?i:of)\s+@?" + _ORG)),
     ("organization", "org", re.compile(
         r"\b(?i:member|maintainer|core\s+team|contributor)\s+(?i:of|at)?\s*@?\s*" + _ORG)),
     ("family", "person", re.compile(
@@ -89,10 +97,28 @@ _DEMONYMS = {"googler": "Google", "xoogler": "Google", "microsoftie": "Microsoft
              "appler": "Apple", "twitterati": "Twitter"}
 
 
+_PHRASE_START = {"working", "building", "making", "helping", "writing", "living", "based",
+                 "previously", "formerly", "ex", "opinions", "views", "tweets", "posts", "she",
+                 "he", "they", "her", "his", "dad", "mom", "mum", "father", "mother", "husband",
+                 "wife", "founder", "cofounder", "co-founder", "ceo", "cto", "engineer",
+                 "developer", "designer", "speaker", "author", "blogger", "creator", "host",
+                 "follow", "views", "personal", "account", "dms", "love", "loves", "i", "we",
+                 "my", "our", "also", "and", "with", "in", "on", "since", "from", "who"}
+_GERUNDS = {"working", "building", "making", "helping", "writing", "living", "shipping",
+            "learning", "teaching", "creating", "designing", "coding", "hacking", "running",
+            "leading", "investing", "exploring", "thinking", "playing", "streaming"}
+
+
 def _clean_target(t: str) -> str:
     t = re.split(r"\s*[|·•,;/()\[\]!?]\s*|\s+-\s+|\.\s", t.strip())[0]
     t = t.strip(" .'-@")
     words = t.split()
+    # Bios often run on without punctuation ("@ Bluesky Working on …"): a word
+    # that starts the next phrase is never part of the organisation's name.
+    for i, w in enumerate(words[1:], 1):
+        if w.lower() in _PHRASE_START or w.lower().endswith("ing") and w.lower() in _GERUNDS:
+            words = words[:i]
+            break
     while words and words[-1].lower() in _STOP:
         words.pop()
     t = " ".join(words)
@@ -129,12 +155,26 @@ def _key(target: str) -> str:
     return re.sub(r"[^a-z0-9]", "", target.lower())
 
 
+# A declaration is the subject's only if the account is. A username match
+# alone (identity LOW) may be a stranger with the same handle.
+_TRUSTED = ("MEDIUM", "HIGH")
+
+
+def unconfirmed_declarations(results: List[dict], username: str) -> int:
+    """Declarations seen on accounts not (yet) tied to the subject — not mapped."""
+    return sum(len(extract_declarations(r.get("declared_bio") or "", username))
+               for r in results
+               if r.get("found") and (r.get("identity_confidence") or "LOW") not in _TRUSTED)
+
+
 def build_relationships(results: List[dict], username: str, github_intel: Dict = None) -> List[Dict]:
     """
-    Subject-centric edges:
+    Subject-centric edges, from accounts corroborated as the subject's
+    (identity MEDIUM or HIGH) only:
       {relation, target, target_type, confidence, sources:[{platform,url,method,quote,identity}]}
     """
-    found = [r for r in results if r.get("found")]
+    found = [r for r in results if r.get("found")
+             and (r.get("identity_confidence") or "LOW") in _TRUSTED]
     identity = {r["platform"]: r.get("identity_confidence") or "LOW" for r in found}
     edges: Dict[tuple, Dict] = {}
 

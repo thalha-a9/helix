@@ -43,6 +43,16 @@ def _found(platform, grade, bio=""):
     ("Engineer at Google and Meta", {("employer", "Google")}),
     ("Engineer at Google for 5 years", {("employer", "Google")}),
     ("Works at The New York Times", {("employer", "New York Times")}),
+    # Live bios (Oct 2026)
+    ("Executive Strategy & Product Advisor, Founder of @Mastodon. Film photography",
+     {("employer", "Mastodon")}),
+    ("Founder & Chief Innovation Officer @ Bluesky Working on @attie.ai",
+     {("employer", "Bluesky"), ("mentioned", "@attie.ai")}),
+    ("Founder & CEO of @haveibeenpwned, the most trusted name in data breach intelligence.",
+     {("employer", "haveibeenpwned")}),
+    ("Dreamer. Engineer. Writer. She/Her. Engineer at GitHub. #Hachyderm. krisnova.net",
+     {("employer", "GitHub")}),
+    ("Chief Technology Officer at Stripe", {("employer", "Stripe")}),
 ])
 def test_declared_relations_are_extracted(bio, expected):
     got = {(d["relation"], d["target"]) for d in rel.extract_declarations(bio, "janeroe")}
@@ -51,6 +61,9 @@ def test_declared_relations_are_extracted(bio, expected):
 
 @pytest.mark.parametrize("bio", [
     "developer at night, engineer at heart",
+    "Lover of Coffee and owner of two cats",
+    "President of the United States",
+    "Play Torvalds and discover followers on SoundCloud | Stream tracks, albums, playlists",
     "Jane Roe. Loves hiking with the Roe family.",       # shared surname ≠ relationship
     "contact: jane@example.com",
     "Formerly known as JR",
@@ -72,11 +85,19 @@ def test_bio_is_read_from_own_description_only():
 
 # ── Confidence: never stronger than the account that declared it ──────────────
 
-def test_single_account_declaration_is_capped_by_identity():
-    edges = rel.build_relationships([_found("Twitter", "LOW", "Engineer at Google")], "janeroe")
-    assert [(e["target"], e["confidence"]) for e in edges] == [("Google", "LOW")]
+def test_username_only_accounts_are_not_mapped():
+    """A bio on an account that merely shares the handle may be a stranger's
+    (live: three different "max" accounts declared three employers)."""
+    r = [_found("Twitter", "LOW", "Engineer at Google")]
+    assert rel.build_relationships(r, "janeroe") == []
+    assert rel.unconfirmed_declarations(r, "janeroe") == 1
+
+
+def test_single_account_declaration_is_capped_at_medium():
     edges = rel.build_relationships([_found("Twitter", "HIGH", "Engineer at Google")], "janeroe")
-    assert edges[0]["confidence"] == "MEDIUM"          # one declaration → at most MEDIUM
+    assert [(e["target"], e["confidence"]) for e in edges] == [("Google", "MEDIUM")]
+    edges = rel.build_relationships([_found("Twitter", "MEDIUM", "Engineer at Google")], "janeroe")
+    assert edges[0]["confidence"] == "MEDIUM"
 
 
 def test_two_independent_accounts_reach_high():
@@ -188,3 +209,13 @@ def test_graph_gets_relation_breach_and_onion_nodes(tmp_path):
     email_id = next(n["id"] for n in nodes if n.get("root_type") == "email")
     assert {"source": email_id, "target": breach_id, "type": "breach"} in links
     assert "<script>x" not in page
+
+
+def test_graph_collapses_long_breach_lists(tmp_path):
+    many = {**VERDICT, "breaches": [{**VERDICT["breaches"][0], "name": f"B{i}"} for i in range(40)]}
+    out = os.path.join(tmp_path, "g.html")
+    generate_graph("janeroe", [], out, email="jane@example.com", breach_verdicts=[many])
+    nodes = json.loads(open(out).read().split("const NODES=")[1].split(";\n")[0])
+    breach = [n for n in nodes if n["type"] == "breach"]
+    assert len(breach) == 13
+    assert any(n["label"].endswith("+28 older breaches") for n in breach)

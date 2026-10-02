@@ -36,6 +36,8 @@ PAGES = {
     "/soft/janeroe": (200, b'<html><head><meta property="og:title" content="Oops">'
                            b'</head><body>Sorry, this user was not found</body></html>'),
     "/bounce/janeroe": (302, b""),
+    "/id/12345": (200, b'<html><head><meta property="og:title" content="janeroe"></head>'
+                       b'<body>Profile of janeroe</body></html>'),
 }
 
 
@@ -269,8 +271,21 @@ async def test_only_genuine_profiles_survive_maigret_false_positives(server, fak
     survivors = sorted(r["platform"] for r in results if r.get("found"))
 
     assert survivors == ["RealSite"]
-    purged_names = {p["platform"] for p in purged}
-    assert {"Discord", "SoftSite", "BounceSite"} <= purged_names
+    # Every false lead is rejected with a stated reason — at re-fetch (WAF,
+    # dead, page that never names the user) or by the verifier.
+    reasons = {r["platform"]: r.get("error") for r in results if not r.get("found")}
+    assert set(reasons) == {"Discord", "WafSite", "DeadSite", "SoftSite", "BounceSite"}
+    assert "Lookalike" not in {r["platform"] for r in results}       # never a lead
+    assert all(reasons.values())
+
+
+@pytest.mark.asyncio
+async def test_id_based_lead_cannot_be_controlled_so_is_not_kept(server):
+    lead = {"platform": "IdSite", "url": f"{server}/profile/janeroe", "found": True}
+    lead["url"] = f"{server}/id/12345"
+    out = await me.reprobe_leads([lead], username=USERNAME)
+    assert out[0]["found"] is False
+    assert out[0]["error"].startswith("unverifiable")
 
 
 @pytest.mark.asyncio

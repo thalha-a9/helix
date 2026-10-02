@@ -185,3 +185,55 @@ def test_api_text_is_stripped_of_control_characters():
     b = breachdb.parse_hibp([{"Name": "Evil\x1b[2J", "BreachDate": "2020-01-01",
                               "DataClasses": ["Passwords\x07", "\x1b"]}])
     assert b[0]["name"] == "Evil [2J" and b[0]["data_classes"] == ["Passwords"]
+
+
+# Real naming differences between XposedOrNot and HIBP (from the live catalogues).
+@pytest.mark.parametrize("xon,hibp", [
+    ({"breach": "Condo", "xposed_date": "2019", "domain": "condo.com"},
+     {"Name": "CondoCom", "Title": "Condo.com", "Domain": "condo.com", "BreachDate": "2019-06-01"}),
+    ({"breach": "Verifications", "xposed_date": "2019", "domain": "verifications.io"},
+     {"Name": "VerificationsIO", "Title": "Verifications.io", "Domain": "verifications.io",
+      "BreachDate": "2019-02-25"}),
+    ({"breach": "AdultFriendFinder", "xposed_date": "2015", "domain": "x.invalid"},
+     {"Name": "AdultFriendFinder", "Title": "Adult FriendFinder (2015)", "Domain": "",
+      "BreachDate": "2015-05-21"}),
+])
+def test_same_breach_under_different_names_is_merged(xon, hibp):
+    m = breachdb._merge([("XposedOrNot", breachdb.parse_xposedornot(
+                             {"ExposedBreaches": {"breaches_details": [xon]}})),
+                         ("Have I Been Pwned", breachdb.parse_hibp([hibp]))])
+    assert len(m) == 1 and m[0]["sources"] == ["XposedOrNot", "Have I Been Pwned"]
+    assert "aliases" not in m[0]
+
+
+def test_same_domain_different_years_stay_separate():
+    m = breachdb._merge([("Have I Been Pwned", breachdb.parse_hibp([
+        {"Name": "Twitter", "Title": "Twitter", "Domain": "twitter.com", "BreachDate": "2022-01-01"},
+        {"Name": "Twitter200M", "Title": "Twitter (200M)", "Domain": "twitter.com",
+         "BreachDate": "2021-01-01"}]))])
+    assert len(m) == 2
+
+
+def test_duplicate_within_one_source_counts_once(api, monkeypatch):
+    dup = {"breach": "Apollo", "xposed_date": "2018", "domain": "apollo.io", "xposed_data": "Names"}
+    assert len(breachdb._merge([("X", breachdb.parse_xposedornot(
+        {"ExposedBreaches": {"breaches_details": [dup, dict(dup)]}}))])) == 1
+
+
+def test_found_breaches_still_name_unchecked_sources():
+    v = {"identifier": "a@b.co", "checked_at": "t",
+         "sources": [{"source": "XposedOrNot", "status": "ok", "detail": ""},
+                     {"source": "Have I Been Pwned", "status": "error",
+                      "detail": "API key rejected (401)"}],
+         "breaches": [{"name": "Adobe", "date": "2013", "data_classes": [], "sources": ["XposedOrNot"]}]}
+    s = breachdb.summarise(v)
+    assert "appears in 1 breach (2013)" in s and "not checked — Have I Been Pwned: API key rejected" in s
+
+
+def test_console_listing_is_capped():
+    v = {"summary": "s", "breaches": [{"name": f"B{i}", "date": "2020", "data_classes": [],
+                                       "sources": ["X"]} for i in range(20)]}
+    lines = breachdb.format_lines(v, limit=8)
+    assert sum(1 for l in lines if l.startswith("  - ")) == 8
+    assert "+12 older breach(es)" in lines[-1]
+    assert sum(1 for l in breachdb.format_lines(v) if l.startswith("  - ")) == 20

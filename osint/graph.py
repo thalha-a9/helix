@@ -5,6 +5,11 @@ from datetime import datetime
 from osint.platforms import CATEGORY_META
 
 
+# Breach nodes per identifier before the rest collapse into one summary node:
+# a widely leaked address has hundreds, which would bury the profile graph.
+GRAPH_BREACH_NODES = 12
+
+
 def _script_json(obj):
     """JSON safe to inline in <script>: profile text like "</script>" from a
     scanned page must not be able to close the block and inject markup."""
@@ -57,6 +62,8 @@ def generate_graph(username, results, output_path,
         nodes.append({"id":nid,"label":email,"type":"target","category":"target",
                       "color":"#fbbf24","url":"","size":22,"root_type":"email"})
         email_root_id=nid; nid+=1
+        # Same subject: keep the two roots together even when one has no hits.
+        links.append({"source":0,"target":email_root_id,"type":"email_also"})
 
     # Category nodes
     cats_found = list({r["category"] for r in found})
@@ -153,7 +160,17 @@ def generate_graph(username, results, output_path,
                           "color":"#fbbf24","url":"","size":14})
             links.append({"source":0,"target":nid,"type":"identifier"})
             nid+=1
-        for b in v["breaches"]:
+        shown=v["breaches"][:GRAPH_BREACH_NODES]          # newest first
+        rest=v["breaches"][GRAPH_BREACH_NODES:]
+        if rest:
+            names=", ".join(b["name"] for b in rest)
+            nodes.append({"id":nid,"label":f"\u26a0 +{len(rest)} older breaches","type":"breach",
+                          "category":"breach","color":"#f87171","url":"","size":12,
+                          "source":"full list in the report / JSON / CSV / TXT",
+                          "og_title":names[:400]+("\u2026" if len(names)>400 else ""),"phash":False})
+            links.append({"source":anchor_id,"target":nid,"type":"breach"})
+            nid+=1
+        for b in shown:
             nodes.append({"id":nid,"label":f"\u26a0 {b['name']}","type":"breach","category":"breach",
                           "color":"#f87171","url":"","size":9,
                           "source":f"breach {b['date']} · via {', '.join(b['sources'])}",
