@@ -314,7 +314,11 @@ async def run(args):
                   f"often means a different person.{RST}\n")
 
         found_u  = [r for r in results if r.get("found")]
-        xlinks   = sum(1 for r in found_u if r.get("bio_links"))
+        # Same count as the graph: bio links that point at another found profile
+        # of this username (not "profiles that have any bio link").
+        from osint.graph import _build_cross_links
+        xlinks   = len(_build_cross_links(found_u, {r["platform"]: i for i, r in enumerate(found_u)},
+                                          username))
 
         # ── Real name extraction from OG-verified profiles ────────────────
         for r in found_u:
@@ -574,7 +578,10 @@ async def run(args):
                                       ai_provider=args.ai, breach_verdicts=breach_verdicts)
             for blk in darkweb["ahmia"]:
                 if blk["status"] != "ok":
-                    print(f"  {Y}[!]{RST} Ahmia '{blk['term']}': {blk['detail']} — not checked")
+                    if blk["status"] == "skipped":
+                        print(f"  {DIM}  Ahmia '{blk['term']}': skipped — {blk['detail']}{RST}")
+                    else:
+                        print(f"  {Y}[!]{RST} Ahmia '{blk['term']}': {blk['detail']} — not checked")
                     continue
                 note = f" {DIM}({blk['dropped']} unconfirmed match(es) dropped — term not in title or description){RST}" if blk["dropped"] else ""
                 print(f"  {M}[onion]{RST} '{blk['term']}': {len(blk['hits'])} lead(s){note}")

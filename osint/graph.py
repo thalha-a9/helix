@@ -523,7 +523,22 @@ const sim=d3.forceSimulation(NODES)
     }}).strength(d=>d.type==="cross_link"||d.type==="phash_match"?.7:.8))
   .force("charge",d3.forceManyBody().strength(-350))
   .force("center",d3.forceCenter(W()/2,H()/2))
-  .force("collide",d3.forceCollide().radius(d=>d.size+12));
+  .force("collide",d3.forceCollide().radius(d=>d.size+12))
+  .force("x",d3.forceX(W()/2).strength(.04))
+  .force("y",d3.forceY(H()/2).strength(.04));
+
+// Large graphs settle wider than the window — zoom out to fit everything
+// once the layout has settled (and on Reset), never zoom in past 1:1.
+function fitView(ms){{
+  const xs=NODES.map(n=>n.x), ys=NODES.map(n=>n.y);
+  if(!xs.length) return;
+  const pad=60, x0=Math.min(...xs)-pad, x1=Math.max(...xs)+pad, y0=Math.min(...ys)-pad, y1=Math.max(...ys)+pad;
+  const k=Math.min(1, W()/(x1-x0), H()/(y1-y0));
+  const t=d3.zoomIdentity.translate(W()/2-k*(x0+x1)/2, H()/2-k*(y0+y1)/2).scale(k);
+  svg.transition().duration(ms).call(zoom.transform,t);
+}}
+let fitted=false;
+sim.on("end",()=>{{ if(!fitted){{ fitted=true; fitView(400); }} }});
 
 const link=zoomG.append("g").selectAll("line")
   .data(LINKS).join("line")
@@ -689,7 +704,7 @@ function exportSVG(){{
   a.click();
 }}
 
-function resetZoom(){{svg.transition().duration(500).call(zoom.transform,d3.zoomIdentity);}}
+function resetZoom(){{fitView(500);}}
 
 window.addEventListener("resize",()=>{{
   svg.attr("width",W()).attr("height",H());

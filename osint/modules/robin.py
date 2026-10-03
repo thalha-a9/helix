@@ -171,6 +171,16 @@ def parse_results(html: str) -> List[Dict]:
     return out
 
 
+def too_generic(term: str) -> bool:
+    """
+    A short, all-letter handle ("max", "jack") is an everyday word on the dark
+    web too: live, "max" matched 20 listings for "AirPods Max" and "iPhone Pro
+    Max". Such terms are skipped rather than reported as leads.
+    """
+    t = (term or "").strip()
+    return len(t) < 5 and t.isalpha()
+
+
 def mentions(hit: Dict, term: str) -> bool:
     """The exact term (not a fragment of a longer word) appears in the hit."""
     hay = f"{hit.get('title','')} {hit.get('description','')} {hit.get('url','')}"
@@ -324,7 +334,11 @@ async def run(terms: List[str], emails: List[str], ai_provider: str = None,
     if own:
         session = netconfig.new_session()
     try:
-        ahmia = [await ahmia_search(session, t) for t in clean]
+        ahmia = [await ahmia_search(session, t) if not too_generic(t) else
+                 {"term": t, "status": "skipped",
+                  "detail": "too common a word to search — every page using it would match",
+                  "hits": [], "dropped": 0}
+                 for t in clean]
         if breach_verdicts is None:
             from osint.adapters.breachdb import check_identifiers
             breach_verdicts = await check_identifiers(emails, session=session)

@@ -261,3 +261,20 @@ def test_live_homepage_form_token_is_found():
 ])
 def test_last_seen_formats(raw, want):
     assert robin.parse_last_seen(raw) == want
+
+
+@pytest.mark.parametrize("term,generic", [
+    ("max", True), ("jack", True), ("torvalds", False), ("jack99", False),
+    ("j_roe", False), ("Jane Roe", False), ("test@example.com", False),
+])
+def test_short_all_letter_terms_are_too_generic(term, generic):
+    assert robin.too_generic(term) is generic
+
+
+@pytest.mark.asyncio
+async def test_generic_terms_are_skipped_not_searched(ahmia):
+    out = await robin.run(["max", "janeroe"], [], breach_verdicts=[])
+    by = {b["term"]: b for b in out["ahmia"]}
+    assert by["max"]["status"] == "skipped" and by["max"]["hits"] == []
+    assert by["janeroe"]["status"] == "ok"
+    assert not any(q.get("q") == ["max"] for q in Handler.queries)

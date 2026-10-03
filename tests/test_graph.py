@@ -55,3 +55,14 @@ def test_profile_text_cannot_close_the_graph_script(tmp_path):
     assert "<script>alert" not in page and "<!--" not in page.split("const NODES=")[1]
     nodes = _json.loads(page.split("const NODES=")[1].split(";\n")[0])
     assert any(n.get("og_title") == evil for n in nodes)        # data survives intact
+
+
+def test_graph_fits_large_layouts_to_the_window(tmp_path):
+    """Live: an 83-node graph settled wider than the window (nodes off-screen)."""
+    import os as _os
+    from osint.graph import generate_graph as _gen
+    out = _os.path.join(tmp_path, "g.html")
+    _gen("a", [], out)
+    page = open(out).read()
+    assert "function fitView(" in page and 'sim.on("end"' in page
+    assert "function resetZoom(){fitView(500);}" in page
