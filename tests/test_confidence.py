@@ -139,3 +139,17 @@ def test_counts_cover_every_found_profile():
     results = [profile("A"), profile("B"), profile("C", found=False)]
     counts = score_identity(results, "janeroe")
     assert sum(counts.values()) == 2
+
+
+def test_status_code_detection_never_reaches_high():
+    """README promise: status-code-only detection caps at MEDIUM (it never did)."""
+    from osint.confidence import score_identity
+    def hit(p, method, link):
+        return {"platform": p, "found": True, "confidence": "medium", "detection_method": method,
+                "bio_links": {"twitter": "janeroe"} if link else {}, "og_title": ""}
+    rs = [hit("Bluesky", "status_code", True), hit("Twitter/X", "og_meta", False)]
+    score_identity(rs, "janeroe")
+    by = {r["platform"]: r for r in rs}
+    assert by["Bluesky"]["identity_confidence"] == "MEDIUM"
+    assert "capped: detection is status-code only" in by["Bluesky"]["evidence"]
+    assert by["Twitter/X"]["identity_confidence"] == "HIGH"

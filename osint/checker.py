@@ -206,6 +206,7 @@ async def check_platform(session, name: str, platform: dict,
         "color": platform["color"], "found": False, "error": None,
         "confidence": "low", "bio_links": {}, "target_type": "username",
         "source": platform.get("source", "builtin"), "status_code": None, "og_title": "",
+        "detection_method": platform.get("method", ""),
     }
 
     # Skip WAF-only platforms when curl_cffi unavailable
@@ -505,9 +506,13 @@ async def check_email(email: str, progress_cb=None) -> list:
             try:
                 async with session.get(chk["probe"], headers=_headers(),
                                        timeout=TIMEOUT, ssl=True) as resp:
+                    # d=404: 200 = an avatar exists for this address, 404 = none.
+                    # Anything else (429, 5xx) says nothing either way.
                     r["found"] = resp.status == 200
+                    if resp.status not in (200, 404):
+                        r["error"] = f"not checked — HTTP {resp.status}"
             except Exception as e:
-                r["error"] = str(e)[:60]
+                r["error"] = f"not checked — {netconfig.redact(str(e))[:50] or type(e).__name__}"
             results.append(r)
             if progress_cb: progress_cb(i + 1, len(checks))
     return results

@@ -103,3 +103,14 @@ def test_html_report_shows_identity_and_escapes_evidence(tmp_path, results):
 def test_empty_results_do_not_crash(tmp_path):
     for saver in (save_json, save_csv, save_txt):
         assert os.path.exists(saver("nobody", [], str(tmp_path)))
+
+
+def test_github_intel_is_labelled_with_the_accounts_identity():
+    from osint.pdf_report import _build_html
+    gh = {"emails": ["x@corp.com"], "orgs": [], "timezone": {}, "npm_packages": []}
+    low = _build_html("jane", [{"platform": "GitHub", "found": True, "identity_confidence": "LOW",
+                                "url": "u", "category": "dev"}], github_intel=gh)
+    assert "identity LOW" in low and "may describe someone else" in low
+    high = _build_html("jane", [{"platform": "GitHub", "found": True, "identity_confidence": "HIGH",
+                                 "url": "u", "category": "dev"}], github_intel=gh)
+    assert "identity HIGH" in high and "may describe someone else" not in high

@@ -12,9 +12,9 @@
 ### Decode the digital DNA of any identity
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-3.1.0-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
+[![Version](https://img.shields.io/badge/Version-3.4.0-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
 [![License](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)](LICENSE)
-[![Platforms](https://img.shields.io/badge/Platforms-70%2B%20builtin%20·%20700%2B%20WMN%20·%20400%2B%20Sherlock%20·%20Maigret-a78bfa?style=flat-square)](https://github.com/thalha-a9/helix)
+[![Platforms](https://img.shields.io/badge/Platforms-56%20builtin%20·%206%2C158%20with%20--all-a78bfa?style=flat-square)](https://github.com/thalha-a9/helix)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](https://github.com/thalha-a9/helix/pulls)
 
 **Helix** is a next-generation open-source OSINT framework that goes far beyond username checking.<br>
@@ -33,7 +33,7 @@ Most OSINT tools answer one question: *"Does this username exist on Platform X?"
 
 Helix answers a harder one: **"How do all these accounts connect to the same person?"**
 
-It extracts cross-platform links from bios, matches profile pictures by perceptual hash, infers timezone from commit patterns, discovers domains via certificate transparency, and plots every relationship as a glowing edge in a browser-based network graph — all in a single command.
+It extracts cross-platform links the account holders declare, matches identical profile pictures by perceptual hash, infers timezone from commit patterns, discovers domains via certificate transparency, and plots every relationship as a glowing edge in a browser-based network graph — all in a single command.
 
 ```bash
 python helix.py -u johndoe --wayback --crt --paste --pivot --phash
@@ -68,16 +68,16 @@ python helix.py -u johndoe --wayback --crt --paste --pivot --phash
 ### Core Flags
 | Flag | What it does |
 |---|---|
-| `--wmn` | Loads WhatsMyName database at runtime — **700+ platforms**, community-maintained |
+| `--wmn` | Loads WhatsMyName database at runtime — **~590 platforms** after unsafe entries are filtered out |
 | `--maigret` | Loads **Maigret** database at runtime — sophisticated detection with `presenceStrs`/`absenceStrs`, 24h cached |
-| `--all` | Full coverage in one flag — builtin + WhatsMyName + Sherlock + Maigret databases (~6,000 sites), every hit checked by the control probe |
+| `--all` | Full coverage in one flag — builtin + WhatsMyName + Sherlock + Maigret databases (6,158 sites), every hit checked by the control probe |
 | `--maigret-engine` | Runs the installed **Maigret engine** (`pip install maigret`) as a lead source — every hit is re-fetched and verified by Helix before it is reported. `--maigret-top N` sets how many sites it checks (default 500) |
-| `--sherlock` | Loads Sherlock's database at runtime — **400+ platforms**, cached 24h locally |
-| `--pivot` | **Recursive bio pivot** — finds aliases in bios and auto-scans them, up to 4 hops deep |
-| `--phash` | **Perceptual avatar hash** — downloads profile pics, hashes them, cross-matches across platforms. Finds the same person even if they changed their username |
-| `--wayback` | **Wayback Machine** — fetches snapshot history + parses archived HTML for old usernames, historic emails, and past bios |
-| `--crt` | **Certificate Transparency** — queries crt.sh for SSL certs containing the target's name or email. Finds personal domains that never appeared in any bio |
-| `--paste` | **Paste Intelligence** — searches GitHub Gists and public Pastebin index for mentions |
+| `--sherlock` | Loads Sherlock's database at runtime — **~440 platforms**, cached 24h locally |
+| `--pivot` | **Recursive alias pivot** — follows handles the account holder declares (Keybase proofs, profile links) and scans them, up to 4 hops deep. Pivot results are leads about the alias, verified like any scan |
+| `--phash` | **Perceptual avatar hash** — matches the *same picture* used on two accounts (a different photo of the same person will not match). Platform defaults, site-wide share cards and blank images are ignored |
+| `--wayback` | **Wayback Machine** — when each found profile was first and last archived, in how many months, and the bio of the earliest capture (emails / @handles in it listed as leads — a username can change hands) |
+| `--crt` | **Certificate Transparency** — domains on certificates that list the subject's email, plus domains named exactly after the username (leads only — anyone can register a name). crt.sh outages are reported as not checked |
+| `--paste` | **Paste Intelligence** — public Gists of github.com/&lt;username&gt; and Pastebin pastes that *mention* the username/email (leads). Unreachable sources are reported as not checked |
 | `--breach` | **Breach sweep** — every confirmed email against XposedOrNot, plus Have I Been Pwned when `HIBP_API_KEY` is set. Per-email verdict: which breaches, what was exposed, date range, which sources were checked and when (e.g. *"x@y appears in 7 breaches (2012–2024), passwords exposed in 5"*). A source that could not be reached is reported as not checked, never as clean. Metadata only — no credentials |
 | `--darkweb` / `--robin` | **Robin dark-web leads** — Ahmia .onion search for the username, confirmed emails and (when corroborated) real name; only hits that contain the exact term are kept. Includes the breach sweep. With `--ai`, the results go to the model as numbered sources and only statements that cite them are kept |
 | `--holehe` | **Deep email scan** — which of ~120 sites the address is registered on (holehe). Modules that would send the target a password-recovery email are skipped. Rate-limited sites are reported as not checked, never as "not registered". With `--email-permute`, accounts found for *guessed* addresses are listed as leads and never count as email confirmation |
@@ -86,7 +86,7 @@ python helix.py -u johndoe --wayback --crt --paste --pivot --phash
 ### Auto-Triggered
 - **Relationship map** — built from what the subject's own accounts *declare*: employers and former employers ("engineer at Globex", "ex-Initech", GitHub company field), organisations (public GitHub orgs, "maintainer of …"), family members named by handle ("my wife @…") and accounts the bio mentions. Never inferred from shared surnames, followers or co-occurrence. Only accounts corroborated as the subject's (identity MEDIUM/HIGH) are read: a bio on an account that merely shares the handle may be a stranger's, so those declarations are counted but not mapped. Each edge carries its source, quote and a confidence that can never exceed the declaring account's; two independent accounts are needed for HIGH. Shown in the console, graph, report, JSON, CSV and TXT
 - **Approved-subject gate** — breach and dark-web lookups send identifiers to third parties, so only analyst-supplied identifiers (`-u`, `-e`) and those from accounts corroborated as the subject's (identity MEDIUM/HIGH) are queried. Anything held back is listed with the reason
-- **GitHub Deep Recon** — runs automatically when a GitHub profile is found. Extracts real emails from public commits (filters noreply), org memberships, language stats, npm packages, and infers timezone from commit timestamp distribution (requires ≥15 commits for confidence)
+- **GitHub Deep Recon** — runs automatically when a GitHub profile is found, and is labelled with that account's identity grade: until it is corroborated, the facts may describe someone else who has the same handle. Extracts real emails from public commits (filters noreply), org memberships, language stats, npm packages, and infers timezone from commit timestamp distribution (requires ≥15 commits for confidence)
 
 ---
 
@@ -98,8 +98,9 @@ The HTML output is a standalone zero-dependency interactive network — no serve
 White pulsing node     →  Username root
 Amber pulsing node     →  Email root
 Amber/orange nodes     →  Pivot-discovered aliases
-Green solid edges      →  Bio-extracted cross-links (proven connections)
-Pink dashed edges      →  Avatar hash matches (same person across accounts)
+Green solid edges      →  Cross-links the account holder declared (Keybase proofs, profile links)
+Pink dashed edges      →  The same picture on both accounts (perceptual hash)
+Red / violet nodes     →  Breach exposure / dark-web leads (leads, not proof)
 Amber dashed edges     →  Email-matched platforms
 Green ring on node     →  High confidence (OG meta validated)
 Blue ring on node      →  Medium confidence
@@ -168,7 +169,7 @@ python helix.py -u johndoe -e johndoe@gmail.com --breach --holehe
 export HIBP_API_KEY=...        # optional — adds Have I Been Pwned to the breach sweep
 python helix.py -u johndoe -e johndoe@gmail.com --darkweb --ai claude
 
-# Massive scan — 1100+ platforms
+# Bigger scan — ~1,080 platforms
 python helix.py -u johndoe --wmn --sherlock
 
 # AI-verified scan (free — no API key cost)
@@ -267,7 +268,7 @@ helix/
 ├── pyproject.toml                   ← pip installable (helix-osint)
 ├── osint/
 │   ├── checker.py                   ← Async engine (aiohttp + optional curl_cffi)
-│   ├── platforms.py                 ← 70+ platform definitions with OG/API detection
+│   ├── platforms.py                 ← 56 platform definitions with OG/API detection
 │   ├── verifier.py                  ← Local heuristic false-positive engine
 │   ├── graph.py                     ← D3.js relational graph generator
 │   ├── report.py                    ← JSON / CSV / TXT exporters
@@ -302,7 +303,15 @@ helix/
 
 **Every hit must survive a live cross-check before it is reported.** At the moment of checking, Helix re-requests the profile and two usernames that cannot exist. A hit is kept only if the profile is found again (twice) and both made-up names get the same clear "no such user" answer. A site that "finds" a made-up name is a catch-all, and is dropped. A made-up name that only gets a rate limit, challenge or gateway error proves nothing, so that hit is dropped as unverifiable. Pages judged by status code or by the absence of a not-found message must also name the exact user, so a rate-limit page, a sign-in redirect or a search result listing `jackie` cannot pass for `jack`.
 
-Measured live (Oct 2026), full `--all` database of 6,158 sites: **0 false positives** across seven scans of made-up usernames, against 8 per scan before these checks. Sampled real-name hits were confirmed against the live pages.
+Measured live (Oct 2026), full `--all` database of 6,158 sites, default settings:
+
+- **0 false positives** in each of 12 scans of fresh made-up usernames since these checks were added — the last 5 on the current code (8 per scan before them).
+- **Precision on real names:** every sampled hit was a real account when checked against the live page (40 of 40, `--all`, username `jack`; every built-in hit for `jack`, `torvalds`, `max`, `Gargron`).
+- **Cross-links:** all cross-links found on 16 real usernames were genuine — Keybase cryptographic proofs and profile links set by the account holder.
+- **Avatar matches:** all 5 matches on the same 16 usernames were the identical personal photo, checked by eye; no defaults or look-alikes.
+- **Email:** made-up addresses (`@example.com`) get 0 accounts from Gravatar and from holehe's 118 sites.
+
+What "no false positive" means here: a reported account exists. Whether it belongs to *your* subject is a separate question — that is what the identity grade below answers, and a username match alone is only ever LOW.
 
 
 Helix uses the right detection method per platform instead of naive HTTP 200 checks:
@@ -315,7 +324,11 @@ Helix uses the right detection method per platform instead of naive HTTP 200 che
 | Lichess | `lichess.org/api/user/{u}` | Official public API |
 | GitHub | `og:title` parsed + validated against known error strings | Server-side rendered, reliable |
 | Medium | `og:title` rejects homepage redirect string | Catches "Where good ideas find you" |
-| Twitter/X | `curl_cffi` TLS impersonation | Skipped gracefully without it |
+| Twitter/X | not-found text + the page must name the user (`curl_cffi`) | Skipped gracefully without curl_cffi |
+| Instagram | profile `og:title` "Name (@user)" | Logged out, anything else is a wall |
+| TikTok | embedded user record `"uniqueId":"user"` | Unknown names get statusCode 10221 |
+| Keybase | public lookup API | Pages lost og:title; the API also gives cryptographic proofs |
+| Facebook, Threads | never reported | Logged out they show the same wall for every name |
 
 ---
 
@@ -326,15 +339,18 @@ login walls (Facebook and Instagram when logged out), catch-all pages, sites
 whose markup changed since the database entry was written. A single site like
 that puts a fake account in every report.
 
-So every hit is checked again with a random username that cannot exist. If the
-site "finds" that one too, the hit proves nothing and is discarded — no per-site
-tuning, so it holds across all ~6,000 sites. On a live full scan of a made-up
-username it caught PyPi, Packagist and Apple Developer, and the scan reported
-nothing found.
+So every hit is re-checked, at the same moment, against two random usernames
+that cannot exist. The hit survives only if it is found again (twice) and both
+random names get the same clear "no such user" answer. A site that "finds" a
+random name is a catch-all; a random name that only gets a rate limit,
+challenge or gateway error proves nothing, so that hit is dropped as
+unverifiable. No per-site tuning — it holds across all 6,158 sites. Sites seen
+answering unknown names at random are blocked outright.
 
-Leads from the Maigret engine get the same check by URL: the page for the real
-name is compared with the page for the random one, and near-identical pages
-are discarded. `--no-control` turns the probe off (faster, less safe).
+Leads from the Maigret engine get the same treatment by URL: the page must name
+the user, two random names must both get the same clear answer, and a lead
+whose URL cannot be rebuilt for another name is not kept. `--no-control` turns
+the probe off (faster, **not** covered by the no-false-positive measurements).
 
 Database entries are also validated before they are scanned: a URL that is not
 a real web address, an unfilled template, or a detection rule with no evidence
@@ -372,6 +388,7 @@ every grade in the console and in all reports.
 | Format | Contents |
 |---|---|
 | `.html` | Standalone interactive D3.js graph — no server needed |
+| `_report.html` / `.pdf` | Investigation report (`--report`; PDF needs weasyprint) |
 | `.json` | Full structured report including intel bundle (wayback, GitHub deep, CRT, paste) |
 | `.csv` | Spreadsheet-friendly, all platforms |
 | `.txt` | Clean terminal-style summary |

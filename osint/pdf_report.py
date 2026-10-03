@@ -190,7 +190,13 @@ def _build_html(username: str, results: List[Dict],
         if github_intel.get("npm_packages"):
             gh_items += f'<div class="intel-item"><span class="intel-label">npm packages:</span> {", ".join(p["name"] for p in github_intel["npm_packages"])}</div>'
         if gh_items:
-            gh_section = f'<div class="section"><div class="section-title">⚙ GitHub Deep Recon</div>{gh_items}</div>'
+            gh = next((r for r in results if r.get("platform") == "GitHub" and r.get("found")), {})
+            grade = gh.get("identity_confidence") or "LOW"
+            note = ("" if grade in ("HIGH", "MEDIUM") else
+                    '<div class="intel-item" style="color:#fbbf24">This GitHub account is only a username '
+                    'match (identity LOW) — these facts may describe someone else.</div>')
+            gh_section = (f'<div class="section"><div class="section-title">⚙ GitHub Deep Recon — '
+                          f'github.com/{_html_esc.escape(username)} (identity {grade})</div>{note}{gh_items}</div>')
 
     # pHash section
     ph_section = ""

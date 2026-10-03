@@ -80,7 +80,7 @@ def _sanitize(results: list) -> list:
         "location_hints":[],"location_countries":[],
         "location_conflict":False,"location_note":"",
         "identity_confidence":"","selectors":[],"evidence":[],
-        "declared_bio":"",
+        "declared_bio":"", "detection_method":"",
     }
     safe = []
     for r in results:
@@ -410,7 +410,8 @@ async def run(args):
         # ── GitHub Deep Recon (auto-runs when GitHub found) ───────────────────
         github_r = next((r for r in found_u if r["platform"] == "GitHub"), None)
         if github_r:
-            print(f"  {C}[*]{RST} GitHub deep recon for @{username}…")
+            print(f"  {C}[*]{RST} GitHub deep recon for github.com/{username}… "
+                  f"{DIM}(facts about that account — it is the subject's only if corroborated below){RST}")
             from osint.modules.github_deep import run as gh_run
             intel = await gh_run(username)
             github_intel = intel

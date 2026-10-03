@@ -142,10 +142,12 @@ def score_identity(results: List[dict], username: str,
         conflict = bool(r.get("location_conflict"))
         if conflict:
             evidence.append(f"capped: {r.get('location_note') or 'location conflict'}")
-        if r.get("confidence") == "low" and not conflict and len(selectors) >= 2:
+        # A bare status code is the weakest proof the account exists at all,
+        # so it never reaches HIGH (as documented), whatever else agrees.
+        weak = r.get("confidence") == "low" or r.get("detection_method") == "status_code"
+        grade = _grade(selectors, "low" if weak else r.get("confidence", "low"), conflict)
+        if weak and not conflict and grade == MEDIUM and _grade(selectors, "high", False) == HIGH:
             evidence.append("capped: detection is status-code only")
-
-        grade = _grade(selectors, r.get("confidence", "low"), conflict)
         r["identity_confidence"] = grade
         r["selectors"] = selectors
         r["evidence"]  = evidence
