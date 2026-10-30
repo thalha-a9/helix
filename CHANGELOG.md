@@ -8,7 +8,7 @@
 - Issue forms for false positives, broken sites, bugs, new sites and feature ideas, plus `CONTRIBUTING.md` and `SECURITY.md` (private vulnerability reports).
 
 ### Changed
-- README: leads with verified username checking across 8,305 sites, shows the laptop timings next to the fast-link run, and recommends `--concurrency 150` to start.
+- README: leads with verified username checking, shows the laptop timings next to the fast-link run, and recommends `--concurrency 150` to start.
 - Release workflow: artifact actions moved to their Node 24 versions, and a release can be started from the Actions tab (Run workflow), which creates the tag and starts the Docker publish.
 
 ### Fixed
