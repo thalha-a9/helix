@@ -10,6 +10,9 @@ yaml = pytest.importorskip("yaml")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FORMS = sorted(glob.glob(os.path.join(ROOT, ".github", "ISSUE_TEMPLATE", "*.yml")))
 
+# .github is in the repository, not in the published source package.
+pytestmark = pytest.mark.skipif(not FORMS, reason="repository files, not in the source package")
+
 
 @pytest.mark.parametrize("path", FORMS, ids=os.path.basename)
 def test_issue_form_is_valid(path):

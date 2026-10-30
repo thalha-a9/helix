@@ -3,7 +3,14 @@
 import os
 import re
 
+import pytest
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# These read repository files (Dockerfile, workflows) that the published
+# source package does not ship; the release tests run from that package.
+pytestmark = pytest.mark.skipif(not os.path.exists(os.path.join(ROOT, "Dockerfile")),
+                                reason="repository files, not in the source package")
 
 
 def _read(name):
