@@ -1,0 +1,76 @@
+{
+  "benchmark": "helix.mockweb.v1",
+  "timestamp": "2026-10-29T18:57:42+00:00",
+  "helix_version": "3.4.0",
+  "git_commit": "6a66c3b",
+  "python": "3.13.17",
+  "host": {
+    "system": "Linux",
+    "machine": "x86_64",
+    "cpus": 4
+  },
+  "params": {
+    "sites": 6000,
+    "seed": 1,
+    "catchall_frac": 0.02,
+    "dead_frac": 0.0,
+    "latency_ms": 50.0,
+    "dead_seconds": 30.0,
+    "control_probe": true,
+    "concurrency": 300,
+    "repeat": 2
+  },
+  "best": {
+    "truly_has_subject": 587,
+    "found": 587,
+    "true_positives": 587,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "catchall_sites": 130,
+    "catchall_reported": [],
+    "control_discarded": 130,
+    "probe_errors": 0,
+    "wall_seconds": 15.503,
+    "scan_seconds": 15.472,
+    "sites_per_second": 387.0,
+    "verifier_purged": 0
+  },
+  "runs": [
+    {
+      "truly_has_subject": 587,
+      "found": 587,
+      "true_positives": 587,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "catchall_sites": 130,
+      "catchall_reported": [],
+      "control_discarded": 130,
+      "probe_errors": 0,
+      "wall_seconds": 15.503,
+      "scan_seconds": 15.472,
+      "sites_per_second": 387.0,
+      "verifier_purged": 0
+    },
+    {
+      "truly_has_subject": 587,
+      "found": 587,
+      "true_positives": 587,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "catchall_sites": 130,
+      "catchall_reported": [],
+      "control_discarded": 130,
+      "probe_errors": 1,
+      "wall_seconds": 15.528,
+      "scan_seconds": 15.48,
+      "sites_per_second": 386.4,
+      "verifier_purged": 0
+    }
+  ]
+}

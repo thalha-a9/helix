@@ -1,31 +1,39 @@
 #!/usr/bin/env python3
 """
-Helix — OSINT Identity Mapper v3.0
+Helix: OSINT Identity Mapper
 Author : Thalha Ahmed (@thalha-a9)
 Repo   : github.com/thalha-a9/helix
 
 Verification stack (runs in order on every scan):
-  1. Local heuristic verifier  — always on, zero dependencies
-  2. AI verifier (--ai)        — optional, multi-provider (claude/openrouter/nvidia)
+  1. Local heuristic verifier : always on, zero dependencies
+  2. AI verifier (--ai)       : optional, multi-provider (claude/openrouter/nvidia)
 """
 
-import asyncio, argparse, os, sys, time, webbrowser
-from datetime import datetime
+import asyncio, argparse, logging, os, sys, time, webbrowser
 
 def _check_deps():
-    try: import aiohttp
-    except ImportError:
-        print("\n[!] Missing: aiohttp  →  pip install -r requirements.txt\n"); sys.exit(1)
+    import importlib.util
+    if importlib.util.find_spec("aiohttp") is None:
+        print("\n[!] Missing: aiohttp  ->  pip install -r requirements.txt\n"); sys.exit(1)
 
-from osint.checker      import check_username, check_email, validate_username, validate_email, HAS_CURL_CFFI
+from osint              import netconfig, __version__
+from osint.checker      import (check_username, check_email, validate_username, validate_email,
+                                HAS_CURL_CFFI, MAX_CONCURRENCY)
+from osint.location     import annotate_locations, flag_conflicts, describe_subject_location, resolve_countries
+from osint.confidence   import score_identity
+from osint.relationships import (annotate_relations, build_relationships, edge_line,
+                                 unconfirmed_declarations)
+from osint.subject      import approved_identifiers, names_on_profiles
+from osint.platform_schema import filter_valid, SEARCH_PROBLEM
 from osint.graph        import generate_graph
 from osint.report       import save_json, save_csv, save_txt
 from osint.platforms    import PLATFORMS, CATEGORY_META
 from osint.permutations import generate_permutations
 from osint.verifier     import run_local_verifier
 from osint.phash        import HAS_PHASH, hash_all_avatars, find_matches
-from osint.email_permutations import generate_email_permutations
 from osint.pdf_report   import generate_pdf_report, HAS_WEASYPRINT
+from osint.email_permutations import generate_email_permutations
+from osint                import evidence, capture
 
 G="\033[92m"; Y="\033[93m"; C="\033[96m"; M="\033[95m"; R="\033[91m"
 DIM="\033[2m"; B="\033[1m"; RST="\033[0m"
@@ -38,7 +46,7 @@ BANNER = f"""{C}{B}
   ██║  ██║███████╗███████╗██║██╔╝ ██╗
   ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═╝{RST}
   {DIM}Decode the digital DNA of any identity{RST}
-  {DIM}v3.4 · @thalha-a9 · github.com/thalha-a9/helix{RST}
+  {DIM}v{__version__} | @thalha-a9 | github.com/thalha-a9/helix{RST}
 """
 
 def banner():
@@ -47,7 +55,7 @@ def banner():
     feats.append(f"{G}curl_cffi{RST}"   if HAS_CURL_CFFI else f"{DIM}aiohttp{RST}")
     feats.append(f"{G}pHash{RST}"       if HAS_PHASH    else f"{DIM}pHash[pip install imagehash Pillow]{RST}")
     feats.append(f"{G}local verifier{RST}")
-    print(f"  {DIM}Engine:{RST} {' · '.join(feats)}\n")
+    print(f"  {DIM}Engine:{RST} {' | '.join(feats)}\n")
 
 
 class Progress:
@@ -55,7 +63,7 @@ class Progress:
         self.total=total; self.start=time.time()
     def update(self, done, total):
         pct  = int((done/total)*38)
-        bar  = f"{G}{'█'*pct}{DIM}{'░'*(38-pct)}{RST}"
+        bar  = f"{G}{'#'*pct}{DIM}{'.'*(38-pct)}{RST}"
         el   = time.time()-self.start
         rate = done/el if el>0 else 0
         eta  = int((total-done)/rate) if rate>0 else 0
@@ -70,16 +78,34 @@ def _sanitize(results: list) -> list:
         "found":False,"error":None,"confidence":"low","bio_links":{},
         "target_type":"username","source":"builtin","status_code":None,
         "og_title":"","avatar_url":"","phash":"","final_url":"",
+        "location_hints":[],"location_countries":[],
+        "location_conflict":False,"location_note":"",
+        "identity_confidence":"","selectors":[],"evidence":[],
+        "declared_bio":"", "detection_method":"",
     }
     safe = []
     for r in results:
         entry = {**defaults, **r}
-        entry.pop("_page_text", None)  # internal only — never written to reports
+        entry.pop("_page_text", None)  # internal only: never written to reports
+        entry.pop("_capture", None)    # raw bytes: saved by osint.capture, never inlined
         for k in ("platform","url","category","error","og_title","final_url"):
             if entry[k] is not None:
                 entry[k] = str(entry[k]).encode("utf-8","replace").decode("utf-8")
         safe.append(entry)
     return safe
+
+
+def _merge_source(platform_map: dict, label: str, loaded: dict) -> None:
+    """Add a database's platforms, dropping definitions that cannot be scanned soundly."""
+    usable, unusable = filter_valid(loaded)
+    added = sum(1 for k in usable if k not in platform_map)
+    platform_map.update({k: v for k, v in usable.items() if k not in platform_map})
+    search = sum(1 for why in unusable.values() if why == [SEARCH_PROBLEM])
+    broken = len(unusable) - search
+    parts = ([f"{broken} malformed entr{'y' if broken == 1 else 'ies'}"] if broken else []) + \
+            ([f"{search} search page{'' if search == 1 else 's'}"] if search else [])
+    note = f"  {DIM}({' and '.join(parts)} skipped){RST}" if parts else ""
+    print(f"  {G}[+]{RST} {label}: +{added} -> total {len(platform_map)}{note}\n")
 
 
 def _print_found(found, note=""):
@@ -90,16 +116,116 @@ def _print_found(found, note=""):
         if r["category"] != cur_cat:
             cur_cat = r["category"]
             lbl = CATEGORY_META.get(cur_cat,{}).get("label",cur_cat).upper()
-            print(f"  {DIM}── {lbl} {'─'*(44-len(lbl))}{RST}")
-        cf  = f" {G}●{RST}" if r.get("confidence")=="high" else ""
-        xl  = f" {C}↔{RST}" if r.get("bio_links")          else ""
-        ph  = f" {M}≅{RST}" if r.get("phash")              else ""
+            print(f"  {DIM}-- {lbl} {'-'*(44-len(lbl))}{RST}")
+        cf  = f" {G}*{RST}" if r.get("confidence")=="high" else ""
+        xl  = f" {C}<->{RST}" if r.get("bio_links")          else ""
+        ph  = f" {M}~{RST}" if r.get("phash")              else ""
         src = {"sherlock":f" {DIM}[S]{RST}","wmn":f" {DIM}[W]{RST}",
+               "maigret":f" {DIM}[M]{RST}","maigret_engine":f" {DIM}[M]{RST}",
                "holehe":f" {M}[H]{RST}"}.get(r.get("source",""),"")
-        print(f"  {G}[+]{RST} {r['platform']:<24}{DIM}{r['url']}{RST}{cf}{xl}{ph}{src}")
+        lc  = f" {R}! location conflict{RST}" if r.get("location_conflict") else ""
+        print(f"  {G}[+]{RST} {r['platform']:<24}{DIM}{r['url']}{RST}{cf}{xl}{ph}{src}{lc}")
+
+
+def _fd_soft_limit() -> int:
+    """Open-file allowance of this process (every in-flight probe holds a socket)."""
+    try:
+        import resource
+        return resource.getrlimit(resource.RLIMIT_NOFILE)[0]
+    except Exception:
+        return 1024
+
+
+def concurrency_warning(requested: int, fd_limit: int = None) -> str:
+    """A warning when --concurrency would run the process out of sockets, else ''."""
+    if not requested:
+        return ""
+    fd_limit = _fd_soft_limit() if fd_limit is None else fd_limit
+    if requested > MAX_CONCURRENCY:
+        return f"--concurrency capped at {MAX_CONCURRENCY}"
+    # Each probe needs a socket plus headroom for DNS threads, files and stdio.
+    if requested * 2 > fd_limit:
+        return (f"--concurrency {requested} needs ~{requested * 2} open files but this shell "
+                f"allows {fd_limit}: raise it (ulimit -n {requested * 4}) or expect "
+                f"connection errors")
+    return ""
+
+
+def output_within_cwd(path: str, cwd: str = None) -> bool:
+    """True when `path` is the working directory or inside it. A string-prefix
+    test is not enough: /work/helix-evil starts with /work/helix."""
+    base = os.path.realpath(cwd or os.getcwd())
+    target = os.path.realpath(path)
+    try:
+        return os.path.commonpath([base, target]) == base
+    except ValueError:          # different drives on Windows
+        return False
+
+
+def scan_health_warning(results: list, threshold: float = 0.5) -> str:
+    """A warning when most sites could not be reached at all, else ''."""
+    if not results:
+        return ""
+    dead = sum(1 for r in results
+               if str(r.get("error") or "") in ("connection_error", "timeout")
+               or str(r.get("error") or "").startswith("Cannot connect"))
+    if dead / len(results) < threshold:
+        return ""
+    return (f"{dead} of {len(results)} sites could not be reached, so these results do not "
+            f"show where the username exists")
+
+
+def _short(text: str, limit: int = 70) -> str:
+    """Trim to `limit` characters on a word boundary, with an ellipsis."""
+    text = " ".join(str(text).split())
+    if len(text) <= limit:
+        return text
+    return text[:limit].rsplit(" ", 1)[0].rstrip(" ,:;([") + "..."
+
+
+def _effective_concurrency(n: int, requested) -> int:
+    from osint.checker import _dynamic_concurrency
+    return _dynamic_concurrency(n, requested)
+
+
+def _print_record(record: dict):
+    """The end-of-run block a screen recording of a record attempt must show."""
+    s, a = record["summary"], record["attempt"]
+    line = "=" * 66
+    print(f"  {C}{B}{line}{RST}")
+    print(f"  {C}{B}  RECORD ATTEMPT | Helix {record['tool']['version']} | @{a['username']}{RST}")
+    print(f"  {C}{B}{line}{RST}")
+    print(f"  Started   {a['started_utc']}   Finished {a['finished_utc']}")
+    print(f"  Duration  {a['wall_seconds']} s")
+    print(f"  Sites     {s['attempted']} attempted | {G}{s['answered']} answered{RST} | "
+          f"{Y}{s['unanswered']} no clear answer{RST}")
+    print(f"  Found     {G}{B}{s['found']}{RST} account{'' if s['found'] == 1 else 's'}, each verified live against two "
+          f"impossible usernames")
+    for why, k in list(s["unanswered_by_reason"].items())[:6]:
+        print(f"  {DIM}            {k:>5}  {why}{RST}")
+    print(f"  Database  {record['database']['sites']} sites | sha256 {record['database']['sha256'][:16]}...")
+    print(f"  Evidence  {record['_paths']['evidence']}")
+    print(f"  {B}FINGERPRINT  {record['fingerprint']}{RST}")
+    print(f"  {DIM}Check it:  {_prog_name()} --verify-evidence {record['_paths']['evidence']} "
+          f"{record['_paths']['sites']}{RST}")
+    print(f"  {C}{B}{line}{RST}\n")
+
+
+
+
+def _quiet_network_noise(loop, context):
+    """Swallow per-site network failures that asyncio would otherwise print."""
+    exc = context.get("exception")
+    if isinstance(exc, (OSError, asyncio.TimeoutError, asyncio.CancelledError)):
+        return
+    loop.default_exception_handler(context)
 
 
 async def run(args):
+    # With thousands of concurrent probes, one site's DNS or socket failure can
+    # surface as an unretrieved-exception traceback; it is already recorded
+    # as that site's error, so keep it off the terminal.
+    asyncio.get_running_loop().set_exception_handler(_quiet_network_noise)
     banner()
 
     if args.providers:
@@ -120,42 +246,35 @@ async def run(args):
 
     platform_map = dict(PLATFORMS)
 
-    # ── WhatsMyName ───────────────────────────────────────────────────────────
+    # WhatsMyName
     if args.wmn:
-        print(f"  {C}[*]{RST} Fetching WhatsMyName database…")
+        print(f"  {C}[*]{RST} Fetching WhatsMyName database...")
         from osint.adapters.wmn_adapter import load_with_fallback as wmn_load
         wmn  = await wmn_load(timeout=args.wmn_timeout, include_nsfw=getattr(args,"nsfw",False))
-        added = sum(1 for k in wmn if k not in platform_map)
-        platform_map.update({k:v for k,v in wmn.items() if k not in platform_map})
-        print(f"  {G}[+]{RST} WhatsMyName: +{added} → total {len(platform_map)}\n")
+        _merge_source(platform_map, "WhatsMyName", wmn)
 
-    # ── Sherlock ──────────────────────────────────────────────────────────────
+    # Sherlock
     if args.sherlock:
-        print(f"  {C}[*]{RST} Fetching Sherlock database…")
+        print(f"  {C}[*]{RST} Fetching Sherlock database...")
         from osint.adapters.sherlock_adapter import load_with_fallback as sh_load
-        sh   = await sh_load(timeout=args.sherlock_timeout)
-        added = sum(1 for k in sh if k not in platform_map)
-        platform_map.update({k:v for k,v in sh.items() if k not in platform_map})
-        print(f"  {G}[+]{RST} Sherlock: +{added} → total {len(platform_map)}\n")
+        sh   = await sh_load(timeout=args.sherlock_timeout, include_nsfw=getattr(args,"nsfw",False))
+        _merge_source(platform_map, "Sherlock", sh)
 
-    # ── Maigret ───────────────────────────────────────────────────────────────
+    # Maigret
     if args.maigret:
-        print(f"  {C}[*]{RST} Fetching Maigret database…")
+        print(f"  {C}[*]{RST} Fetching Maigret database...")
         from osint.adapters.maigret_adapter import load_with_fallback as mg_load
         mg   = await mg_load(timeout=args.maigret_timeout, include_nsfw=getattr(args,"nsfw",False))
-        added = sum(1 for k in mg if k not in platform_map)
-        platform_map.update({k:v for k,v in mg.items() if k not in platform_map})
-        print(f"  {G}[+]{RST} Maigret: +{added} → total {len(platform_map)}\n")
+        _merge_source(platform_map, "Maigret", mg)
 
     # Strip leading dots/underscores so output dir isn't hidden on Linux
-    # e.g. .rxzikhx. → rxzikhx_ 
+    # e.g. .rxzikhx. -> rxzikhx_
     _raw_label = username or email.replace("@","_at_").replace(".","_")
     label = _raw_label.lstrip("._") or _raw_label.replace(".","_").replace("-","_") or "scan"
     _raw_out = args.output or os.path.join("results", label)
     out = os.path.realpath(_raw_out)
-    _cwd = os.path.realpath(os.getcwd())
-    if args.output and not out.startswith(_cwd):
-        print(f"{R}[!] --output path must be within current directory{RST}"); import sys; sys.exit(1)
+    if args.output and not output_within_cwd(out):
+        print(f"{R}[!] --output path must be within current directory{RST}"); sys.exit(1)
     os.makedirs(out, exist_ok=True)
 
     targets = []
@@ -163,25 +282,59 @@ async def run(args):
     if email:    targets.append(f"{M}{email}{RST}")
     print(f"  {DIM}Target   :{RST} {' + '.join(targets)}")
     print(f"  {DIM}Platforms:{RST} {len(platform_map)}")
+    concurrency = getattr(args, "concurrency", None)
+    if concurrency:
+        print(f"  {DIM}Parallel :{RST} {min(concurrency, MAX_CONCURRENCY)} probes in flight")
+        warn = concurrency_warning(concurrency)
+        if warn:
+            print(f"  {Y}[!]{RST} {warn}")
     ver_str = f"{G}Local heuristics{RST}"
     if args.ai: ver_str += f" + {C}AI ({args.ai}){RST}"
-    print(f"  {DIM}Verifier :{RST} {ver_str}\n")
+    print(f"  {DIM}Verifier :{RST} {ver_str}")
+    if args.location:
+        print(f"  {DIM}Location :{RST} {C}{describe_subject_location(args.location)}{RST}")
+    egress = netconfig.describe()
+    if netconfig.get_proxy():
+        why = await netconfig.proxy_reachable()
+        if why:
+            hint = (" (is Tor running? sudo systemctl start tor)"
+                    if netconfig.get_proxy() == netconfig.TOR_PROXY else "")
+            print(f"  {R}[!] Proxy {netconfig.redact(netconfig.get_proxy())} is unreachable: "
+                  f"{why}{hint}{RST}")
+            print(f"  {DIM}      Not scanning: every probe would fail and read as "
+                  f"'no accounts found'.{RST}\n")
+            sys.exit(2)
+    if netconfig.get_proxy():
+        print(f"  {DIM}Network  :{RST} {G}{egress}{RST}\n")
+    elif egress.startswith("env "):
+        # HTTP(S)_PROXY from the environment: traffic does not leave from this
+        # IP, but the analyst did not choose the route on the command line.
+        print(f"  {DIM}Network  :{RST} {G}{egress}{RST}")
+        print(f"  {DIM}           proxy taken from the environment; pass --proxy or --tor "
+              f"to choose the route explicitly{RST}\n")
+    else:
+        print(f"  {DIM}Network  :{RST} {Y}{egress}{RST}")
+        print(f"  {DIM}           every probed platform logs your IP; "
+              f"use --tor or --proxy for real investigations{RST}\n")
 
-    results=[];  email_results=[];  pivot_data={};  phash_matches=[]
+    record=None
+    results=[];  email_results=[];  email_guesses={};  pivot_data={};  phash_matches=[]; loc_conflicts=[]
+    real_name="";  real_name_source="";  identity_counts={}
     wayback_data={}; crt_data={}; paste_data={}; github_intel={}
 
-    # ── Username scan ─────────────────────────────────────────────────────────
+    # Username scan
     if username:
         if args.permutations:
             perms = generate_permutations(username)
             print(f"  {C}[*]{RST} {len(perms)} permutations available")
             try:   choice = input(f"  {DIM}Scan all? [y/N]: {RST}").strip().lower()
-            except: choice = "n"
+            except EOFError: choice = "n"
             if choice == "y":
                 pall = {}
                 for p in perms:
                     pg = Progress(len(platform_map))
-                    pr = await check_username(p,platforms=platform_map,progress_cb=pg.update)
+                    pr = await check_username(p,platforms=platform_map,progress_cb=pg.update,
+                                              concurrency=concurrency)
                     pg.finish()
                     pr = _sanitize(pr)
                     pr, _ = run_local_verifier(pr, p)
@@ -192,28 +345,92 @@ async def run(args):
                     pp = os.path.join(out, f"{label}_permutations.json")
                     with open(pp,"w",encoding="utf-8") as f:
                         json.dump({k:[r["url"] for r in v] for k,v in pall.items()},f,indent=2)
-                    print(f"  {G}[+]{RST} Perms → {pp}\n")
+                    print(f"  {G}[+]{RST} Perms -> {pp}\n")
 
         prog = Progress(len(platform_map))
         _scan_start = time.time()
-        print(f"  {DIM}Scanning @{username} across {len(platform_map)} platforms…{RST}\n")
-        results = _sanitize(await check_username(username,platforms=platform_map,
-                                                  progress_cb=prog.update))
+        _started_utc = evidence.utc_now()
+        print(f"  {DIM}Scanning @{username} across {len(platform_map)} platforms...{RST}\n")
+        raw_results = await check_username(username,platforms=platform_map,
+                                           progress_cb=prog.update,
+                                           control=not args.no_control,
+                                           concurrency=concurrency,
+                                           retry_timeouts=True if getattr(args, "record_attempt", False) else None,
+                                           capture=getattr(args, "save_pages", False),
+                                           retry_cb=lambda k: print(
+                                               f"\n  {DIM}Re-checking {k} site(s) that timed out "
+                                               f"on the fast pass...{RST}", end="", flush=True))
+        # Runs before _sanitize strips the raw page text it reads from.
+        annotate_locations(raw_results)
+        annotate_relations(raw_results)
+        captures = {r["platform"]: r.pop("_capture") for r in raw_results if "_capture" in r}
+        results = _sanitize(raw_results)
         prog.finish()
 
-        # ── Local heuristic verifier ─────────────────────────────────────────
+        ctrl_dropped = sorted(r["platform"] for r in results if r.get("control_failed"))
+        if ctrl_dropped:
+            print(f"\n  {Y}[control]{RST} Discarded {len(ctrl_dropped)} platform(s) that also "
+                  f"'find' a random nonexistent username:")
+            print(f"  {DIM}  {', '.join(ctrl_dropped[:12])}"
+                  f"{f' ... +{len(ctrl_dropped)-12} more' if len(ctrl_dropped) > 12 else ''}{RST}")
+
+        # Local heuristic verifier
         results, purge_log = run_local_verifier(results, username)
         if purge_log:
             print(f"\n  {Y}[heuristic]{RST} Purged {len(purge_log)} false positive(s):")
             for p in purge_log[:5]:
-                print(f"  {DIM}  ✗ {p['platform']}: {p['reason'][:70]}{RST}")
+                print(f"  {DIM}  {p['platform']}: {p['reason'][:70]}{RST}")
             if len(purge_log) > 5:
-                print(f"  {DIM}  … +{len(purge_log)-5} more{RST}")
+                print(f"  {DIM}  ... +{len(purge_log)-5} more{RST}")
 
-        # ── AI verifier ───────────────────────────────────────────────────────
+        # Saved pages: the exact response for every reported account
+        pages = None
+        if getattr(args, "save_pages", False):
+            pages = capture.save(out, label, username, results, captures)
+            if pages:
+                print(f"\n  {G}[+]{RST} Saved {len(pages['pages'])} page(s) as received, each "
+                      f"hashed -> {pages['_dir']}{os.sep}index.html")
+            else:
+                print(f"\n  {DIM}  No pages to save: no account was found{RST}")
+        captures.clear()
+
+        # Record-attempt evidence (the core scan only, nothing added after)
+        if getattr(args, "record_attempt", False):
+            record = evidence.write(out, label, dict(
+                username=username, results=results, platform_map=platform_map,
+                started=_started_utc, finished=evidence.utc_now(),
+                wall_seconds=time.time() - _scan_start, argv=sys.argv,
+                concurrency=_effective_concurrency(len(platform_map), concurrency),
+                control=not args.no_control, pages=pages))
+
+        # Maigret engine (leads only: verified by Helix)
+        if args.maigret_engine:
+            from osint.adapters.maigret_engine import run_engine
+            print(f"\n  {C}[*]{RST} Maigret engine (top {args.maigret_top} sites): "
+                  f"{DIM}this can take several minutes; lower --maigret-top to go faster{RST}")
+            eng = await run_engine(username, known_platforms=platform_map.keys(),
+                                   timeout=args.maigret_timeout, top_sites=args.maigret_top,
+                                   control=not args.no_control)
+            if eng["error"]:
+                print(f"  {Y}[!]{RST} {eng['error']}")
+            else:
+                annotate_locations(eng["results"])
+                annotate_relations(eng["results"])
+                eng_results, eng_purged = run_local_verifier(_sanitize(eng["results"]), username)
+                results.extend(eng_results)
+                kept = sum(1 for r in eng_results if r.get("found"))
+                failed = len(eng_results) - kept - len(eng_purged)
+                print(f"  {G}[+]{RST} Maigret: {eng['leads']} leads | "
+                      f"{eng['skipped_known']} already checked by Helix | "
+                      f"{G}{kept} verified{RST} | {Y}{len(eng_purged)} purged{RST} | "
+                      f"{DIM}{failed} rejected on re-check (blocked, unverifiable or page doesn't name the user){RST}")
+                for p in eng_purged[:5]:
+                    print(f"  {DIM}  {p['platform']}: {p['reason'][:70]}{RST}")
+
+        # AI verifier
         if args.ai:
             from osint.adapters.ai_verifier import verify_with_ai, apply_verdict
-            print(f"\n  {C}[*]{RST} AI verification ({args.ai})…")
+            print(f"\n  {C}[*]{RST} AI verification ({args.ai})...")
             verdict = await verify_with_ai(results, provider=args.ai)
             if verdict.get("error"):
                 print(f"  {Y}[!]{RST} AI error: {verdict['error']}")
@@ -221,41 +438,64 @@ async def run(args):
                 results = apply_verdict(results, verdict)
                 ai_n    = len(verdict.get("purged",[]))
                 print(f"  {G}[+]{RST} AI ({verdict.get('model','?')}): {ai_n} additional purged")
+                for why in verdict.get("fallback_from", []):
+                    print(f"  {DIM}      skipped: {_short(why)}{RST}")
+
+        # Location conflict check
+        loc_conflicts = flag_conflicts(results, args.location) if args.location else []
+        if loc_conflicts:
+            print(f"\n  {R}{B}{'!'*54}{RST}")
+            print(f"  {R}{B}  LOCATION CONFLICT: {len(loc_conflicts)} candidate(s) "
+                  f"contradict the known subject location{RST}")
+            print(f"  {R}{B}{'!'*54}{RST}")
+            for c in loc_conflicts:
+                print(f"  {R}[x]{RST} {B}{c['platform']}{RST} {DIM}{c['url']}{RST}")
+                print(f"      {Y}states{RST} {', '.join(c['stated'])}  "
+                      f"{DIM}|{RST}  {Y}expected{RST} {', '.join(c['expected'])}")
+                if c["hints"]:
+                    print(f"      {DIM}evidence: {' | '.join(c['hints'][:3])}{RST}")
+            print(f"  {DIM}  Verify these before confirming: a conflicting location "
+                  f"often means a different person.{RST}\n")
+
+        unreachable = scan_health_warning(results)
+        if unreachable:
+            print(f"\n  {R}{B}[!] {unreachable}{RST}")
+            print(f"  {DIM}      'Not found' below means 'not reached' for those sites: check the "
+                  f"network or proxy and scan again.{RST}")
 
         found_u  = [r for r in results if r.get("found")]
-        xlinks   = sum(1 for r in found_u if r.get("bio_links"))
+        # Same count as the graph: bio links that point at another found profile
+        # of this username (not "profiles that have any bio link").
+        from osint.graph import _build_cross_links
+        xlinks   = len(_build_cross_links(found_u, {r["platform"]: i for i, r in enumerate(found_u)},
+                                          username))
 
-        # ── Real name extraction from OG-verified profiles ────────────────
-        real_name = ""
-        for r in found_u:
-            og = r.get("og_title","") or ""
-            if og and r.get("confidence") == "high":
-                # Strip platform name suffixes like "- Dribbble", "| Poe"
-                import re as _re
-                clean = _re.sub(r'[|\-\u2013\u2014].*$','',og).strip()
-                if clean and len(clean.split()) >= 2 and not any(
-                    x in clean.lower() for x in ['http','www','.com',username.lower()]
-                ):
-                    real_name = clean
-                    break
-        if real_name:
-            print(f"  {G}[+]{RST} Real name extracted: {C}{real_name}{RST}")
+        # Names stated on OG-verified profiles. A name belongs to that profile,
+        # not yet to the subject: identity confidence decides that later.
+        names = names_on_profiles(found_u, username)
+        if names:
+            real_name = next(iter(names))
+            real_name_source = names[real_name][0]
+            shown = "; ".join(f"{C}{n}{RST} ({', '.join(p)})" for n, p in names.items())
+            print(f"  {G}[+]{RST} Name{'s' if len(names) > 1 else ''} on found profiles: {shown}")
+            if len(names) > 1:
+                print(f"  {DIM}      Different names under one username usually mean different "
+                      f"people: check before using any of them.{RST}")
         elapsed  = time.time()-prog.start
         skipped  = sum(1 for r in results if "curl_cffi" in (r.get("error") or ""))
 
-        print(f"\n  {B}{'─'*54}{RST}")
+        print(f"\n  {B}{'-'*54}{RST}")
         print(f"  {G}{B}Found {len(found_u)}/{len(results)}{RST}  "
               f"{C}Cross-links {xlinks}{RST}  {DIM}Time {elapsed:.1f}s{RST}")
         if skipped:
-            print(f"  {Y}[!]{RST} {DIM}{skipped} WAF platforms skipped — pip install curl-cffi{RST}")
-        print(f"  {B}{'─'*54}{RST}")
+            print(f"  {Y}[!]{RST} {DIM}{skipped} WAF platforms skipped: pip install curl-cffi{RST}")
+        print(f"  {B}{'-'*54}{RST}")
         _print_found(found_u)
-        print(f"\n  {G}●{RST}=OG-verified  {C}↔{RST}=bio  {DIM}[S]{RST}=Sherlock  {DIM}[W]{RST}=WMN  {DIM}[M]{RST}=Maigret  {M}≅{RST}=avatar\n")
+        print(f"\n  {G}*{RST}=OG-verified  {C}<->{RST}=bio  {DIM}[S]{RST}=Sherlock  {DIM}[W]{RST}=WMN  {DIM}[M]{RST}=Maigret  {M}~{RST}=avatar\n")
 
-        # ── Email permutation ────────────────────────────────────────────────────
+        # Email permutation
         if args.email_permute and found_u:
             print(f"  {C}[*]{RST} Generating email permutations...")
-            from osint.email_permutations import generate_email_permutations
             email_perms = generate_email_permutations(username, real_name)
             if email_perms:
                 print(f"  {G}[+]{RST} {len(email_perms)} likely email(s) generated:")
@@ -265,19 +505,29 @@ async def run(args):
                     print(f"  {C}[*]{RST} Running holehe on top permutations...")
                     from osint.adapters.holehe_adapter import load_with_fallback as holehe_run
                     for ep in email_perms[:3]:
-                        ep_res = _sanitize(await holehe_run(ep))
+                        ep_res = _sanitize(await holehe_run(ep, include_nsfw=getattr(args, "nsfw", False)))
                         ep_found = [r for r in ep_res if r.get("found")]
                         if ep_found:
-                            print(f"  {G}[+]{RST} {C}{ep}{RST}: found on {', '.join(r['platform'] for r in ep_found)}")
-                            email_results.extend(ep_res)
+                            # A guessed address may be anyone's: a lead, never
+                            # "email confirmed" for identity scoring or the graph.
+                            print(f"  {Y}[?]{RST} {C}{ep}{RST} (guessed): has accounts on "
+                                  f"{', '.join(r['platform'] for r in ep_found)}")
+                            email_guesses[ep] = [r["platform"] for r in ep_found]
+                    if email_guesses:
+                        print(f"  {DIM}  Guessed addresses can belong to anyone; verify them before "
+                              f"treating them as the subject's.{RST}")
             print()
 
-        # ── pHash ─────────────────────────────────────────────────────────────
+        # pHash
         if args.phash:
             if not HAS_PHASH:
                 print(f"  {Y}[!]{RST} pip install imagehash Pillow\n")
             else:
-                print(f"  {C}[*]{RST} Hashing avatars…")
+                from osint.phash import pillow_warning
+                warn = pillow_warning()
+                if warn:
+                    print(f"  {Y}[!]{RST} {warn}")
+                print(f"  {C}[*]{RST} Hashing avatars...")
                 hashes = await hash_all_avatars(found_u)
                 if hashes:
                     phash_matches = find_matches(hashes)
@@ -286,29 +536,45 @@ async def run(args):
                     if phash_matches:
                         print(f"  {G}[+]{RST} {M}Avatar matches:{RST}")
                         for m in phash_matches:
-                            icon = "🎯" if m["match_type"]=="exact" else "~"
-                            print(f"  {M}[≅]{RST} {icon} {m['platform_a']} ↔ {m['platform_b']}  "
+                            icon = "=" if m["match_type"]=="exact" else "~"
+                            print(f"  {M}[~]{RST} {icon} {m['platform_a']} <-> {m['platform_b']}  "
                                   f"conf:{m['confidence']}")
+                with_avatar = sum(1 for r in found_u if r.get("avatar_url"))
+                if not phash_matches:
+                    print(f"  {DIM}  Hashed {len(hashes)} of {with_avatar} profile picture(s); "
+                          f"no picture appears on two accounts{RST}")
                 print()
 
-        # ── Wayback Machine ───────────────────────────────────────────────────
+        # Wayback Machine
         if args.wayback:
-            print(f"  {C}[*]{RST} Checking Wayback Machine (Archive.org)…")
+            print(f"  {C}[*]{RST} Checking Wayback Machine (Archive.org)...")
+            from osint.modules.wayback import LIMIT as WB_LIMIT
             from osint.modules.wayback import check_profiles as wb_check
-            wayback_data = await wb_check(found_u)
-            if wayback_data:
-                print(f"  {G}[+]{RST} Wayback: {len(wayback_data)} profile(s) archived")
-                for plat, wd in wayback_data.items():
-                    clues = wd.get("identity_clues",[])
-                    print(f"  {DIM}  {plat}: first seen {wd['first_seen']}"
-                          f" · {wd['count']} snapshots"
-                          + (f" · {len(clues)} clue(s)" if clues else "") + RST)
+            if len(found_u) > WB_LIMIT:
+                print(f"  {DIM}  Looking up {WB_LIMIT} of {len(found_u)} found profiles "
+                      f"(social, developer and forum sites first){RST}")
+            wayback_data = await wb_check(found_u, username)
+            archived = {p: w for p, w in wayback_data.items() if not w.get("error")}
+            failed   = {p: w for p, w in wayback_data.items() if w.get("error")}
+            if archived:
+                print(f"  {G}[+]{RST} Wayback: {len(archived)} profile(s) archived")
+                for plat, wd in archived.items():
+                    clues = wd.get("identity_clues", [])
+                    print(f"  {DIM}  {plat}: {wd['first_seen']} -> {wd['last_seen']}"
+                          f" | archived in {wd['months']} month(s)"
+                          + (f" | old bio: {'; '.join(clues[:3])}" if clues else "") + RST)
+            if failed:
+                why = next(iter(failed.values()))["error"].replace("not checked: ", "")
+                print(f"  {Y}[!]{RST} {DIM}Wayback not checked for {len(failed)} profile(s): {_short(why)}{RST}")
+            if not archived and not failed:
+                print(f"  {DIM}  None of the found profiles are archived{RST}")
             print()
 
-        # ── GitHub Deep Recon (auto-runs when GitHub found) ───────────────────
+        # GitHub Deep Recon (auto-runs when GitHub found)
         github_r = next((r for r in found_u if r["platform"] == "GitHub"), None)
         if github_r:
-            print(f"  {C}[*]{RST} GitHub deep recon for @{username}…")
+            print(f"  {C}[*]{RST} GitHub deep recon for github.com/{username}... "
+                  f"{DIM}(facts about that account: it is the subject's only if corroborated below){RST}")
             from osint.modules.github_deep import run as gh_run
             intel = await gh_run(username)
             github_intel = intel
@@ -330,82 +596,184 @@ async def run(args):
                     print(f"  {G}[+]{RST} npm packages: {pkgs}")
             print()
 
-        # ── Certificate Transparency ──────────────────────────────────────────
+        # Certificate Transparency
         if args.crt:
-            print(f"  {C}[*]{RST} Certificate transparency (crt.sh)…")
+            print(f"  {C}[*]{RST} Certificate transparency (crt.sh)...")
             from osint.modules.crt import run as crt_run
             crt_data = await crt_run(username, email)
-            domains  = crt_data.get("all_domains",[])
-            if domains:
-                print(f"  {G}[+]{RST} CRT: {len(domains)} domain(s) found")
-                for d in domains[:8]:
-                    print(f"  {DIM}  {d}{RST}")
-                if len(domains) > 8:
-                    print(f"  {DIM}  … +{len(domains)-8} more{RST}")
-            else:
-                print(f"  {DIM}  No domains found in CT logs{RST}")
+            st = crt_data.get("status", {})
+            if crt_data["email_domains"]:
+                print(f"  {G}[+]{RST} CRT: on certificates listing {email}: "
+                      f"{', '.join(crt_data['email_domains'][:8])}")
+            if crt_data["named_domains"]:
+                nd = crt_data["named_domains"]
+                print(f"  {Y}[?]{RST} CRT: {len(nd)} domain(s) named '{username}' (leads only, "
+                      f"anyone can register a name):")
+                print(f"  {DIM}    {', '.join(nd[:10])}{' ...' if len(nd) > 10 else ''}{RST}")
+            for kind, state in st.items():
+                if state != "ok":
+                    print(f"  {Y}[!]{RST} {DIM}CRT {kind}: {state}{RST}")
+            if not crt_data["all_domains"] and all(v == "ok" for v in st.values()):
+                print(f"  {DIM}  No matching domains in CT logs{RST}")
             print()
 
-        # ── Paste Intelligence ────────────────────────────────────────────────
+        # Paste Intelligence
         if args.paste:
-            print(f"  {C}[*]{RST} Paste intelligence (Gist + Pastebin)…")
+            print(f"  {C}[*]{RST} Paste intelligence (GitHub Gists)...")
             from osint.modules.paste import run as paste_run
             paste_data = await paste_run(username, email)
-            total = paste_data.get("total",0)
-            if total:
-                print(f"  {G}[+]{RST} Paste: {total} result(s)")
-                for g in paste_data.get("gists",[])[:3]:
-                    print(f"  {DIM}  [gist] {g['description'][:50]} — {g['url']}{RST}")
-                for p in paste_data.get("username_pastes",[])[:3]:
-                    print(f"  {DIM}  [paste] {p['url']}{RST}")
-            else:
-                print(f"  {DIM}  No mentions found{RST}")
+            for g in paste_data.get("gists", [])[:3]:
+                print(f"  {G}[+]{RST} {DIM}[gist of github.com/{username}] {g['description'][:50]}: {g['url']}{RST}")
+            for key, what in (("username_pastes", username), ("email_pastes", email)):
+                for p in paste_data.get(key, [])[:3]:
+                    print(f"  {Y}[?]{RST} {DIM}[paste mentioning {what}] {p['url']}{RST}")
+            for src, state in paste_data.get("status", {}).items():
+                if state != "ok":
+                    print(f"  {Y}[!]{RST} {DIM}Paste {src}: {state}{RST}")
+            if not paste_data.get("total") and paste_data.get("status", {}).get("gists") == "ok":
+                print(f"  {DIM}  No public gists found{RST}")
             print()
 
-        # ── Pivot ─────────────────────────────────────────────────────────────
+        # Pivot
         if args.pivot:
             from osint.pivot import pivot_scan
             depth = min(args.pivot_depth, 4)
-            print(f"  {C}[*]{RST} Recursive pivot (depth {depth})…")
+            print(f"  {C}[*]{RST} Recursive pivot (depth {depth})...")
             def pcb(alias, d, n):
-                print(f"  {G}[↻]{RST} @{alias} depth={d} → {n} profiles")
-            pivot_data = await pivot_scan(username,results,platform_map,depth,pcb)
+                print(f"  {G}[>]{RST} @{alias} depth={d} -> {n} profiles")
+            pivot_data = await pivot_scan(username,results,platform_map,depth,pcb,
+                                          concurrency=concurrency)
             if pivot_data:
                 for alias, pd in pivot_data.items():
                     print(f"\n  {C}@{alias}{RST} {DIM}(depth {pd['depth']}, via {pd['discovered_via']}){RST}")
                     _print_found(pd["found"])
+            else:
+                print(f"  {DIM}  No aliases to follow: none of the found profiles declares "
+                      f"another handle{RST}")
             print()
 
-    # ── Email scan ────────────────────────────────────────────────────────────
+    # Email scan
     if email:
         if args.holehe:
-            print(f"  {C}[*]{RST} holehe deep email scan…")
+            print(f"  {C}[*]{RST} holehe deep email scan...")
             from osint.adapters.holehe_adapter import load_with_fallback as holehe_run
             pg = Progress(120)
-            email_results = _sanitize(await holehe_run(email, progress_cb=pg.update))
+            email_results = _sanitize(await holehe_run(email, progress_cb=pg.update,
+                                                        include_nsfw=getattr(args, "nsfw", False)))
             pg.finish()
         else:
             print(f"  {DIM}Email scan: Gravatar only without --holehe{RST}")
             email_results = _sanitize(await check_email(email))
 
         ef = [r for r in email_results if r.get("found")]
-        print(f"  {G}[+]{RST} Email: {len(ef)} profile(s) found")
+        unchecked = sum(1 for r in email_results if (r.get("error") or "").startswith("not checked"))
+        print(f"  {G}[+]{RST} Email: {len(ef)} site(s) with an account for this address"
+              + (f"  {DIM}({unchecked} not checked: rate-limited or blocked){RST}" if unchecked else ""))
         for r in ef:
             print(f"  {M}[e]{RST} {r['platform']:<24}{DIM}{r['url']}{RST}")
         if not args.holehe:
             print(f"  {Y}[tip]{RST} {DIM}--holehe checks 120+ platforms by email{RST}")
         print()
 
-        if args.breach:
-            print(f"  {C}[*]{RST} Checking breach databases for {email}…")
-            from osint.adapters.breach_adapter import check_breaches, format_breach_report
-            bd    = await check_breaches(email)
-            lines = format_breach_report(bd)
-            if bd.get("found"):
-                print(f"  {R}[!]{RST} Found in {bd['count']} breach(es):")
-            for line in lines: print(line)
+    # Identity confidence
+    if username:
+        identity_counts = score_identity(
+            results, username,
+            phash_matches=phash_matches, email_results=email_results,
+            real_name=real_name, real_name_source=real_name_source,
+            subject_countries=resolve_countries(args.location or ""),
+        )
+        scored = [r for r in results if r.get("identity_confidence")]
+        if scored:
+            print(f"  {B}Identity confidence{RST}  "
+                  f"{G}HIGH {identity_counts['HIGH']}{RST}  "
+                  f"{C}MEDIUM {identity_counts['MEDIUM']}{RST}  "
+                  f"{DIM}LOW {identity_counts['LOW']}{RST}")
+            colour = {"HIGH": G, "MEDIUM": C, "LOW": DIM}
+            order  = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+            for r in sorted(scored, key=lambda x: (order[x["identity_confidence"]], x["platform"])):
+                g = r["identity_confidence"]
+                print(f"  {colour[g]}[{g:<6}]{RST} {r['platform']:<22}"
+                      f"{DIM}{'; '.join(r['evidence'])}{RST}")
+            if identity_counts["LOW"] and not (identity_counts["HIGH"] or identity_counts["MEDIUM"]):
+                tips = [t for t, used in (("--phash", args.phash), ("-e EMAIL", email),
+                                          ("--location", args.location)) if not used]
+                print(f"  {DIM}  A username match alone does not show these accounts are "
+                      f"one person{': add ' + ', '.join(tips) + ' to corroborate' if tips else ''}.{RST}")
+            print()
 
-    # ── PDF/HTML Report ──────────────────────────────────────────────────────
+    # Relationship map (declared only: no extra requests)
+    relationships = build_relationships(results, username or "", github_intel) if username else []
+    unconfirmed = unconfirmed_declarations(results, username) if username else 0
+    if unconfirmed and not relationships:
+        print(f"  {DIM}Relationships: {unconfirmed} declaration(s) on accounts not yet tied to "
+              f"the subject: not mapped. Corroborate the accounts (--phash, -e) to include them.{RST}\n")
+    if relationships:
+        print(f"  {B}Relationships{RST}  {DIM}declared by the subject's own accounts: "
+              f"never inferred{RST}")
+        for e in relationships[:15]:
+            print(f"  {C}[<->]{RST} {edge_line(e)}")
+        if len(relationships) > 15:
+            print(f"  {DIM}  ... +{len(relationships)-15} more in the report{RST}")
+        print()
+
+    # Breach sweep + Robin dark-web leads (approved identifiers only)
+    breach_verdicts = [];  darkweb = {}
+    if args.breach or args.darkweb:
+        approved, held_back = approved_identifiers(email, username, results, github_intel,
+                                                   real_name, real_name_source)
+        for why in held_back:
+            print(f"  {DIM}  not queried: {why}{RST}")
+        if args.breach or approved["emails"]:
+            from osint.adapters.breachdb import check_identifiers, format_lines
+            if approved["emails"]:
+                print(f"  {C}[*]{RST} Breach sweep: {', '.join(approved['emails'])}...")
+                breach_verdicts = await check_identifiers(approved["emails"])
+                for v in breach_verdicts:
+                    colour = R if v["exposed"] else (G if v["exposed"] is False else Y)
+                    lines = format_lines(v, limit=8)
+                    print(f"  {colour}[{'!' if v['exposed'] else '-'}]{RST} {lines[0]}")
+                    for line in lines[1:]:
+                        print(f"  {DIM}  {line}{RST}")
+                print(f"  {DIM}  Breach hits confirm an identifier leaked, not who owns it.{RST}\n")
+            elif args.breach:
+                print(f"  {Y}[!]{RST} --breach needs an email: pass -e, or confirm a GitHub "
+                      f"account that exposes one\n")
+        if args.darkweb:
+            from osint.modules.robin import run as robin_run
+            print(f"  {C}[*]{RST} Robin: Ahmia .onion search for "
+                  f"{', '.join(repr(t) for t in approved['terms'])}...")
+            darkweb = await robin_run(approved["terms"], approved["emails"],
+                                      ai_provider=args.ai, breach_verdicts=breach_verdicts)
+            for blk in darkweb["ahmia"]:
+                if blk["status"] != "ok":
+                    if blk["status"] == "skipped":
+                        print(f"  {DIM}  Ahmia '{blk['term']}': skipped: {blk['detail']}{RST}")
+                    else:
+                        print(f"  {Y}[!]{RST} Ahmia '{blk['term']}': {blk['detail']}: not checked")
+                    continue
+                note = f" {DIM}({blk['dropped']} unconfirmed match(es) dropped: term not in title or description){RST}" if blk["dropped"] else ""
+                print(f"  {M}[onion]{RST} '{blk['term']}': {len(blk['hits'])} lead(s){note}")
+                for h in blk["hits"][:5]:
+                    print(f"  {DIM}    {h['onion']}  {h['title'][:60]}"
+                          f"{'  seen ' + h['last_seen'] if h['last_seen'] else ''}{RST}")
+            an = darkweb.get("analysis")
+            if an:
+                if an.get("error"):
+                    print(f"  {Y}[!]{RST} AI analysis: {an['error']}")
+                elif an.get("skipped"):
+                    print(f"  {DIM}    AI analysis: {an['skipped']}{RST}")
+                elif an.get("findings"):
+                    print(f"  {G}[+]{RST} AI analysis ({an.get('model')}): cited findings only:")
+                    for f in an["findings"]:
+                        print(f"  {DIM}    [{f['confidence']}] {f['statement']} "
+                              f"[{', '.join(f['sources'])}]{RST}")
+                if an.get("rejected"):
+                    print(f"  {DIM}    {an['rejected']} uncited statement(s) discarded{RST}")
+            print(f"  {DIM}  Dark-web hits are leads: a page naming a handle is not "
+                  f"proof the subject wrote it.{RST}\n")
+
+    # PDF/HTML Report
     if getattr(args,'report',False):
         _st = _scan_start if '_scan_start' in dir() else time.time()
         rp = generate_pdf_report(
@@ -414,24 +782,28 @@ async def run(args):
             wayback_data=wayback_data, github_intel=github_intel,
             crt_data=crt_data, paste_data=paste_data,
             phash_matches=phash_matches, pivot_data=pivot_data,
+            breach_verdicts=breach_verdicts, darkweb=darkweb,
+            relationships=relationships,
             scan_time=time.time()-_st,
         )
-        print(f"  {G}[✓]{RST} {B}Report{RST}   → {rp['html']}")
+        print(f"  {G}[+]{RST} {B}Report{RST}   -> {rp['html']}")
         if rp.get('pdf'):
-            print(f"  {G}[✓]{RST} {B}PDF{RST}      → {rp['pdf']}")
+            print(f"  {G}[+]{RST} {B}PDF{RST}      -> {rp['pdf']}")
         elif not HAS_WEASYPRINT:
             print(f"  {Y}[!]{RST} {DIM}pip install weasyprint for PDF output{RST}")
 
-    # ── Graph ─────────────────────────────────────────────────────────────────
+    # Graph
     gpath = os.path.join(out, f"{label}_graph.html")
     generate_graph(
         username=username or "", results=results, output_path=gpath,
         email=email, email_results=email_results,
         pivot_data=pivot_data, phash_matches=phash_matches,
+        relationships=relationships, breach_verdicts=breach_verdicts,
+        darkweb=darkweb,
     )
-    print(f"  {G}[✓]{RST} {B}Graph{RST}    → {gpath}")
+    print(f"  {G}[+]{RST} {B}Graph{RST}    -> {gpath}")
 
-    # ── Reports ───────────────────────────────────────────────────────────────
+    # Reports
     all_r = results + email_results
     fmt   = args.format.lower()
     # Enrich JSON report with new intel
@@ -440,27 +812,49 @@ async def run(args):
         "github_deep": github_intel,
         "crt":         {k: v for k, v in crt_data.items() if k != "all_domains"},
         "paste":       paste_data,
+        "location":    {
+            "subject":   args.location or "",
+            "conflicts": loc_conflicts,
+        },
+        "identity_confidence": identity_counts,
+        "email_guesses": email_guesses,
+        "relationships": relationships,
+        "breaches":      breach_verdicts,
+        "darkweb":       darkweb,
     }
-    if fmt in ("json","all"): print(f"  {G}[✓]{RST} JSON     → {save_json(label, all_r, out, extra=intel_bundle)}")
-    if fmt in ("csv", "all"): print(f"  {G}[✓]{RST} CSV      → {save_csv(label, all_r, out)}")
-    if fmt in ("txt", "all"): print(f"  {G}[✓]{RST} Text     → {save_txt(label, all_r, out)}")
+    if fmt in ("json","all"): print(f"  {G}[+]{RST} JSON     -> {save_json(label, all_r, out, extra=intel_bundle)}")
+    if fmt in ("csv", "all"): print(f"  {G}[+]{RST} CSV      -> {save_csv(label, all_r, out, extra=intel_bundle)}")
+    if fmt in ("txt", "all"): print(f"  {G}[+]{RST} Text     -> {save_txt(label, all_r, out, extra=intel_bundle)}")
     print()
+
+    if record:
+        _print_record(record)
 
     if not args.no_browser:
         webbrowser.open(f"file://{os.path.abspath(gpath)}")
 
 
+def _prog_name() -> str:
+    """'helix-osint' or 'helix', whichever command the user typed."""
+    name = os.path.basename(sys.argv[0] or "")
+    return name if name in ("helix", "helix-osint") else "helix"
+
+
 def main():
     _check_deps()  # check at CLI entry, not import time
+    from osint.termsafe import install as _safe_terminal
+    _safe_terminal()
     p = argparse.ArgumentParser(
-        prog="helix",
-        description="Helix v3.4 — OSINT Identity Mapper",
+        prog=_prog_name(),
+        allow_abbrev=False,       # "--prox" would slip past credential redaction
+        description=f"Helix v{__version__}: OSINT Identity Mapper",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 AI Providers (--ai):
-  claude      Anthropic Claude  (ANTHROPIC_API_KEY)
-  openrouter  Llama 3.1 free    (OPENROUTER_API_KEY — openrouter.ai)
-  nvidia      Llama 3.1 free    (NVIDIA_API_KEY     — build.nvidia.com)
+  claude      Claude Sonnet 5.5          (ANTHROPIC_API_KEY)
+  openrouter  Nemotron 3.5 Super, free (OPENROUTER_API_KEY: openrouter.ai)
+  nvidia      Nemotron 3.5 Super, free (NVIDIA_API_KEY    : build.nvidia.com)
+  HELIX_AI_MODEL=<model id> picks another model when a default is retired.
 
 Examples:
   python helix.py -u johndoe
@@ -471,6 +865,11 @@ Examples:
   python helix.py -u johndoe --wmn --sherlock --wayback --crt --paste --pivot --phash --format all
   python helix.py -u johndoe --report              # PDF/HTML investigation report
   python helix.py -u johndoe --email-permute       # generate likely emails + check with holehe
+
+Operational security:
+  python helix.py -u johndoe --tor                 # route every probe over local Tor
+  python helix.py -u johndoe --proxy socks5://127.0.0.1:1080
+  python helix.py -u johndoe --location "Wellington, New Zealand"
         """
     )
     p.add_argument("-u","--username",    default=None)
@@ -478,18 +877,37 @@ Examples:
     p.add_argument("--providers",        action="store_true")
 
     g = p.add_argument_group("platform sources")
+    g.add_argument("--all",             action="store_true",  dest="all_sources",
+        help="Full coverage: builtin + WhatsMyName + Sherlock + Maigret databases (8,000+ sites; about 7 to 9 minutes)")
+    g.add_argument("--no-control",      action="store_true",  dest="no_control",
+        help="Skip the control probe that discards platforms which also 'find' a random "
+             "nonexistent username (faster, but lets catch-all pages through)")
+    g.add_argument("--concurrency",     type=int, default=None, metavar="N",
+        help=f"Probes in flight at once (default: 20 to 60 scaled to the scan size, "
+             f"max {MAX_CONCURRENCY}). Higher is faster on big databases; the sites "
+             f"see the same requests either way, just sooner")
     g.add_argument("--wmn",             action="store_true")
     g.add_argument("--wmn-timeout",     type=int,default=30,  dest="wmn_timeout")
     g.add_argument("--sherlock",        action="store_true")
     g.add_argument("--sherlock-timeout",type=int,default=30,  dest="sherlock_timeout")
     g.add_argument("--maigret",         action="store_true",  help="Load Maigret database (github.com/soxoj/maigret)")
     g.add_argument("--maigret-timeout", type=int,default=30,  dest="maigret_timeout")
+    g.add_argument("--maigret-engine",  action="store_true",  dest="maigret_engine",
+        help="Run the installed Maigret engine as a lead source, every hit is "
+             "re-fetched and verified by Helix before it is reported (pip install maigret)")
+    g.add_argument("--maigret-top",     type=int,default=500, dest="maigret_top",
+        help="Sites the Maigret engine checks, by popularity rank (default 500)")
 
     g2 = p.add_argument_group("intelligence modules")
-    g2.add_argument("--wayback",        action="store_true",  help="Wayback Machine — profile history + archived bios")
-    g2.add_argument("--crt",            action="store_true",  help="Certificate Transparency — find owned domains")
-    g2.add_argument("--paste",          action="store_true",  help="Paste Intelligence — Gists + Pastebin mentions")
-    g2.add_argument("--breach",         action="store_true",  help="Email breach check")
+    g2.add_argument("--wayback",        action="store_true",  help="Wayback Machine: profile history + archived bios")
+    g2.add_argument("--crt",            action="store_true",  help="Certificate Transparency: find owned domains")
+    g2.add_argument("--paste",          action="store_true",  help="Paste Intelligence: Gists + Pastebin mentions")
+    g2.add_argument("--breach",         action="store_true",
+                    help="Breach sweep of confirmed emails: XposedOrNot, plus Have I Been Pwned "
+                         "when HIBP_API_KEY is set (metadata only)")
+    g2.add_argument("--darkweb", "--robin", action="store_true", dest="darkweb",
+                    help="Robin dark-web leads: Ahmia .onion search for the subject + breach "
+                         "sweep; with --ai, a cited analysis of the results")
     g2.add_argument("--holehe",         action="store_true",  help="Deep email scan via holehe (pip install holehe)")
 
     g3 = p.add_argument_group("advanced recon")
@@ -502,22 +920,67 @@ Examples:
         choices=["claude","openrouter","nvidia"],metavar="PROVIDER",
         help="AI false-positive filter: claude | openrouter | nvidia  (case-insensitive)")
 
+    g4 = p.add_argument_group("operational security")
+    g4.add_argument("--proxy", default=None, metavar="URL",
+        help="Route every probe through a proxy "
+             "(http://, https://, socks4://, socks5://; socks needs aiohttp-socks)")
+    g4.add_argument("--tor", action="store_true",
+        help=f"Shorthand for --proxy {netconfig.TOR_PROXY} (local Tor SOCKS port)")
+    g4.add_argument("--location", default=None, metavar="PLACE",
+        help="Known subject location (e.g. \"Wellington, New Zealand\"): "
+             "candidate profiles stating a conflicting location are flagged before confirmation")
+
     p.add_argument("--format",    default="json", choices=["json","csv","txt","all"])
     p.add_argument("--report",    action="store_true", help="Generate PDF/HTML investigation report")
     p.add_argument("--email-permute", action="store_true", dest="email_permute",
                    help="Generate likely email permutations from username + check with holehe")
     p.add_argument("--output",    default=None)
     p.add_argument("--no-browser",action="store_true", dest="no_browser")
-    p.add_argument("--nsfw",      action="store_true", help="Include adult/NSFW platforms from WMN/Maigret (excluded by default)")
-    p.add_argument("--version",   action="version", version="Helix v3.4.0")
+    p.add_argument("--record-attempt", action="store_true", dest="record_attempt",
+                   help="Write sealed evidence of this scan (witnessed tests, audits): UTC times, "
+                        "the exact site database (with its SHA-256), per-site outcomes and a "
+                        "fingerprint of the whole file, printed at the end for the video")
+    p.add_argument("--save-pages", action="store_true", dest="save_pages",
+                   help="Keep the exact page received for every reported account: raw bytes, "
+                        "headers and UTC time, each SHA-256 hashed, in <name>_pages/ with an "
+                        "index.html. Pages are saved as text so they can never run scripts")
+    p.add_argument("--verify-pages", metavar="DIR", dest="verify_pages",
+                   help="Re-hash every page in a --save-pages folder against its manifest and exit")
+    p.add_argument("--verify-evidence", nargs="+", metavar=("EVIDENCE", "SITES"),
+                   dest="verify_evidence",
+                   help="Check a --record-attempt evidence file (and its sites file) and exit")
+    p.add_argument("--nsfw",      action="store_true", help="Include adult/NSFW sites from WhatsMyName, Sherlock and Maigret, and holehe's adult-site email checks (excluded by default)")
+    p.add_argument("--version",   action="version", version=f"Helix v{__version__}")
 
     args = p.parse_args()
+    if args.verify_evidence:
+        sys.exit(evidence.main(args.verify_evidence[:2]))
+    if args.verify_pages:
+        problems = capture.verify(args.verify_pages)
+        for prob in problems:
+            print(f"FAIL: {prob}")
+        if not problems:
+            print(f"OK: every saved page in {args.verify_pages} matches its manifest")
+        sys.exit(1 if problems else 0)
     args.pivot_depth = min(max(getattr(args,"pivot_depth",3),1),4)
+    if args.all_sources:
+        args.wmn = args.sherlock = args.maigret = True
+
+    if args.tor and args.proxy:
+        print(f"{R}[!] Use either --tor or --proxy, not both{RST}\n"); sys.exit(1)
+    try:
+        netconfig.set_proxy(netconfig.TOR_PROXY if args.tor else args.proxy)
+    except ValueError as e:
+        print(f"{R}[!] {e}{RST}\n"); sys.exit(1)
 
     try:
         asyncio.run(run(args))
     except KeyboardInterrupt:
-        print(f"\n\n  {Y}[!] Interrupted.{RST}\n"); sys.exit(0)
+        # Pending probes are torn down at exit; don't print one line per task.
+        logging.getLogger("asyncio").setLevel(logging.CRITICAL)
+        print(f"\n\n  {Y}[!] Interrupted.{RST}\n")
+        sys.stdout.flush()
+        os._exit(130)
 
 if __name__=="__main__":
     main()

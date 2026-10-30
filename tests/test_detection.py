@@ -1,0 +1,238 @@
+"""Detection-method correctness: one positive and one negative per method."""
+
+import pytest
+
+from osint import checker
+
+pytestmark = pytest.mark.asyncio
+
+
+async def apply(base_result, platform, status, text, final_url="", username="janeroe"):
+    await checker._apply(base_result, platform, username, status, text,
+                         final_url or platform["url"], platform["url"])
+    return base_result
+
+
+# status_code
+
+async def test_status_code_found(base_result):
+    plat = {"url": "https://x.com/u", "method": "status_code", "found": [200]}
+    r = await apply(base_result, plat, 200, "<html>janeroe's profile</html>")
+    assert r["found"] and r["confidence"] == "medium"
+
+
+async def test_status_code_200_without_the_username_is_a_catch_all(base_result):
+    """cigarpass.com / gitlab sign-in redirects answer 200 for any name (live --all scan)."""
+    plat = {"url": "https://x.com/u", "method": "status_code", "found": [200]}
+    r = await apply(base_result, plat, 200, "<html><title>Cigar Forums</title>Welcome!</html>")
+    assert not r["found"]
+
+
+async def test_status_code_login_wall_platform_can_opt_out(base_result):
+    plat = {"url": "https://vk.com/u", "method": "status_code", "found": [200], "name_in_page": False}
+    r = await apply(base_result, plat, 200, "<html>Log in to VK</html>")
+    assert r["found"]
+
+
+async def test_status_code_not_found(base_result):
+    plat = {"url": "https://x.com/u", "method": "status_code", "found": [200]}
+    r = await apply(base_result, plat, 404, "")
+    assert not r["found"]
+
+
+async def test_status_code_soft404_body_overrides_when_flagged(base_result):
+    plat = {"url": "https://x.com/u", "method": "status_code",
+            "found": [200], "wmn_soft404_risk": True}
+    r = await apply(base_result, plat, 200, "<h1>User janeroe not found</h1>")
+    assert not r["found"]
+    assert "soft404" in r["error"]
+
+
+# text_not_present
+
+async def test_text_not_present_found(base_result):
+    plat = {"url": "https://x.com/u", "method": "text_not_present",
+            "not_found_text": "This account doesn't exist"}
+    r = await apply(base_result, plat, 200, "<html>Jane Roe's profile (@janeroe)</html>")
+    assert r["found"]
+
+
+async def test_text_not_present_needs_the_username_on_the_page(base_result):
+    """A rate-limit or error page lacks the not-found text too, live Steam/HN lesson."""
+    plat = {"url": "https://x.com/u", "method": "text_not_present",
+            "not_found_text": "This account doesn't exist"}
+    r = await apply(base_result, plat, 200, "<html>Too many requests, slow down</html>")
+    assert not r["found"]
+
+
+async def test_text_not_present_absent_when_marker_present(base_result):
+    plat = {"url": "https://x.com/u", "method": "text_not_present",
+            "not_found_text": "This account doesn't exist"}
+    r = await apply(base_result, plat, 200, "<html>This account doesn't exist</html>")
+    assert not r["found"]
+
+
+async def test_text_not_present_requires_200(base_result):
+    plat = {"url": "https://x.com/u", "method": "text_not_present",
+            "not_found_text": "nope"}
+    r = await apply(base_result, plat, 500, "<html>server error</html>")
+    assert not r["found"]
+
+
+# text_present
+
+async def test_text_present_found_with_username_substitution(base_result):
+    plat = {"url": "https://x.com/u", "method": "text_present",
+            "found_text": "@{username}"}
+    r = await apply(base_result, plat, 200, "<html>Welcome @janeroe</html>")
+    assert r["found"]
+
+
+async def test_text_present_not_found(base_result):
+    plat = {"url": "https://x.com/u", "method": "text_present",
+            "found_text": "@{username}"}
+    r = await apply(base_result, plat, 200, "<html>Nobody here</html>")
+    assert not r["found"]
+
+
+# response_url
+
+async def test_response_url_found_when_not_redirected_to_error(base_result):
+    plat = {"url": "https://x.com/u", "method": "response_url",
+            "error_url": "https://x.com/404"}
+    r = await apply(base_result, plat, 200, "<html>ok</html>",
+                    final_url="https://x.com/u")
+    assert r["found"]
+
+
+async def test_response_url_absent_when_redirected_to_error(base_result):
+    plat = {"url": "https://x.com/u", "method": "response_url",
+            "error_url": "https://x.com/404"}
+    r = await apply(base_result, plat, 200, "<html>gone</html>",
+                    final_url="https://x.com/404")
+    assert not r["found"]
+
+
+# og_meta
+
+async def test_og_meta_found_via_og_not_found_list(base_result, profile_html):
+    plat = {"url": "https://x.com/u", "method": "og_meta",
+            "og_not_found": ["Page not found"]}
+    r = await apply(base_result, plat, 200, profile_html)
+    assert r["found"] and r["confidence"] == "high"
+    assert r["og_title"] == "Jane Roe (@janeroe)"
+
+
+async def test_og_meta_absent_when_not_found_marker_in_title(base_result):
+    plat = {"url": "https://x.com/u", "method": "og_meta",
+            "og_not_found": ["Page not found"]}
+    html = '<meta property="og:title" content="Page not found">'
+    r = await apply(base_result, plat, 200, html)
+    assert not r["found"]
+
+
+async def test_og_meta_absent_when_no_og_title_at_all(base_result):
+    """A page with no og:title cannot confirm a profile."""
+    plat = {"url": "https://x.com/u", "method": "og_meta",
+            "og_not_found": ["Page not found"]}
+    r = await apply(base_result, plat, 200, "<html><body>nothing</body></html>")
+    assert not r["found"]
+
+
+async def test_og_meta_found_via_og_found_list(base_result, profile_html):
+    plat = {"url": "https://x.com/u", "method": "og_meta",
+            "og_found": ["@{username}"]}
+    r = await apply(base_result, plat, 200, profile_html)
+    assert r["found"]
+
+
+async def test_og_meta_non_200_is_never_found(base_result, profile_html):
+    """Regression guard for the always-match false positive in issue #9."""
+    plat = {"url": "https://x.com/u", "method": "og_meta",
+            "og_not_found": ["Page not found"]}
+    r = await apply(base_result, plat, 404, profile_html)
+    assert not r["found"]
+
+
+# Platform regressions
+
+async def test_gitlab_group_is_not_reported_as_a_user(base_result):
+    """gitlab.com/torvalds is a group; the users API returns [] for it."""
+    from osint.platforms import PLATFORMS
+    plat = PLATFORMS["GitLab"]
+    r = await apply(base_result, plat, 200, "[]", username="torvalds")
+    assert not r["found"]
+
+
+async def test_gitlab_real_user_is_found(base_result):
+    from osint.platforms import PLATFORMS
+    plat = PLATFORMS["GitLab"]
+    body = '[{"id":1786152,"username":"gitlab-bot","name":"GitLab Bot","state":"active"}]'
+    r = await apply(base_result, plat, 200, body, username="gitlab-bot")
+    assert r["found"]
+
+
+async def test_gitlab_username_match_is_exact_not_prefix(base_result):
+    from osint.platforms import PLATFORMS
+    plat = PLATFORMS["GitLab"]
+    body = '[{"id":1,"username":"janeroe2","state":"active"}]'
+    r = await apply(base_result, plat, 200, body, username="janeroe")
+    assert not r["found"]
+
+
+# Cross-cutting behaviour
+
+async def test_waf_page_short_circuits_every_method(base_result):
+    plat = {"url": "https://x.com/u", "method": "status_code", "found": [200]}
+    r = await apply(base_result, plat, 200,
+                    "<html><title>Just a moment...</title>Checking your browser</html>")
+    assert not r["found"]
+    assert "waf_blocked" in r["error"]
+
+
+async def test_avatar_url_extracted_on_found(base_result, profile_html):
+    plat = {"url": "https://x.com/u", "method": "og_meta", "og_not_found": ["nope"]}
+    r = await apply(base_result, plat, 200, profile_html)
+    assert r["avatar_url"] == "https://cdn.example.com/a.jpg"
+
+
+async def test_bio_links_extracted_only_when_enabled(base_result, profile_html):
+    plat = {"url": "https://x.com/u", "method": "og_meta", "og_not_found": ["nope"],
+            "bio_extract": True,
+            "bio_patterns": {"github": r"github\.com/([a-zA-Z0-9_\-]{1,100})"}}
+    r = await apply(base_result, plat, 200, profile_html)
+    assert r["bio_links"] == {"github": "janeroe"}
+
+
+async def test_page_text_retained_for_verifier(base_result, profile_html):
+    plat = {"url": "https://x.com/u", "method": "og_meta", "og_not_found": ["nope"]}
+    r = await apply(base_result, plat, 200, profile_html)
+    assert r["_page_text"].startswith("<html>")
+
+
+
+@pytest.mark.parametrize("text,ok", [
+    ('<title>jack - RapPad</title>', True), ('"handle":"jack"', True), ("User:Jack", True),
+    ("https://jack.statuspage.io", True), ("/u/jack/", True), ("@jack_", True),
+    ("Cjacker Jackie jackson", False), ("", False),
+])
+async def test_names_user_matches_whole_names_only(text, ok):
+    assert checker.names_user(text, "jack") is ok
+
+
+async def test_search_page_listing_a_longer_name_is_not_a_hit(base_result):
+    plat = {"url": "https://x.com/u", "method": "text_not_present", "not_found_text": "No results"}
+    r = await apply(base_result, plat, 200, "<html>Users: janeroe2000, xjaneroe</html>")
+    assert not r["found"]
+
+
+@pytest.mark.parametrize("title,found", [
+    ("Removed | Patreon", False),             # patreon.com/jack, laptop run Oct 2026
+    ("Not found | Patreon", False),
+    ("Jack | creating podcasts | Patreon", True),
+])
+async def test_patreon_removed_account_is_not_a_profile(base_result, title, found):
+    from osint.platforms import PLATFORMS
+    html = f'<meta property="og:title" content="{title}">'
+    r = await apply(base_result, PLATFORMS["Patreon"], 200, html, username="jack")
+    assert r["found"] is found

@@ -1,8 +1,22 @@
-"""Helix v3.0 — D3.js Network Graph Generator"""
+"""Helix: D3.js Network Graph Generator"""
 import json
 import html as _html
+import re
 from datetime import datetime
 from osint.platforms import CATEGORY_META
+
+
+# Breach nodes per identifier before the rest collapse into one summary node:
+# a widely leaked address has hundreds, which would bury the profile graph.
+GRAPH_BREACH_NODES = 12
+
+
+def _script_json(obj):
+    """JSON safe to inline in <script>: profile text like "</script>" from a
+    scanned page must not be able to close the block and inject markup."""
+    s=json.dumps(obj, default=lambda o: int(o) if hasattr(o,'item') else str(o))
+    return (s.replace("<","\\u003c").replace(">","\\u003e").replace("&","\\u0026")
+             .replace("\u2028","\\u2028").replace("\u2029","\\u2029"))
 
 
 def _build_cross_links(found, node_id_by_platform, username):
@@ -27,7 +41,8 @@ def _build_cross_links(found, node_id_by_platform, username):
 
 def generate_graph(username, results, output_path,
                    email=None, email_results=None,
-                   pivot_data=None, phash_matches=None):
+                   pivot_data=None, phash_matches=None,
+                   relationships=None, breach_verdicts=None, darkweb=None):
 
     found        = [r for r in results if r.get("found")]
     not_found    = [r for r in results if not r.get("found") and not r.get("error")]
@@ -48,6 +63,8 @@ def generate_graph(username, results, output_path,
         nodes.append({"id":nid,"label":email,"type":"target","category":"target",
                       "color":"#fbbf24","url":"","size":22,"root_type":"email"})
         email_root_id=nid; nid+=1
+        # Same subject: keep the two roots together even when one has no hits.
+        links.append({"source":0,"target":email_root_id,"type":"email_also"})
 
     # Category nodes
     cats_found = list({r["category"] for r in found})
@@ -115,6 +132,63 @@ def generate_graph(username, results, output_path,
             links.append({"source":s,"target":t,"type":"phash_match",
                           "confidence":m["confidence"],"distance":m["distance"]})
 
+    # Relationship nodes: declared edges only (osint/relationships.py)
+    rel_colors={"employer":"#fbbf24","former_employer":"#a3a3a3","education":"#60a5fa",
+                "organization":"#34d399",
+                "family":"#f472b6","mentioned":"#94a3b8"}
+    rel_names={"employer":"works at","former_employer":"formerly at",
+               "education":"studies at","organization":"member of","family":"family",
+               "mentioned":"mentions"}
+    for e in (relationships or []):
+        via="; ".join(f"{x['platform']}: \u201c{x['quote']}\u201d" for x in e["sources"])
+        nodes.append({"id":nid,"label":e["target"],"type":"relation","category":"relation",
+                      "color":rel_colors.get(e["relation"],"#94a3b8"),
+                      "url":e["sources"][0]["url"] if e["sources"] else "","size":11,
+                      "confidence":e["confidence"],
+                      "source":f"{rel_names.get(e['relation'],e['relation'])} | declared",
+                      "og_title":via[:220],"phash":False})
+        links.append({"source":0,"target":nid,"type":"relation"})
+        nid+=1
+
+    # Breach exposure: hung off the identifier that leaked
+    for v in (breach_verdicts or []):
+        if not v.get("breaches"): continue
+        if email_root_id is not None and email and v["identifier"]==email.lower():
+            anchor_id=email_root_id
+        else:
+            anchor_id=nid
+            nodes.append({"id":nid,"label":v["identifier"],"type":"identifier","category":"breach",
+                          "color":"#fbbf24","url":"","size":14})
+            links.append({"source":0,"target":nid,"type":"identifier"})
+            nid+=1
+        shown=v["breaches"][:GRAPH_BREACH_NODES]          # newest first
+        rest=v["breaches"][GRAPH_BREACH_NODES:]
+        if rest:
+            names=", ".join(b["name"] for b in rest)
+            nodes.append({"id":nid,"label":f"\u26a0 +{len(rest)} older breaches","type":"breach",
+                          "category":"breach","color":"#f87171","url":"","size":12,
+                          "source":"full list in the report / JSON / CSV / TXT",
+                          "og_title":names[:400]+("\u2026" if len(names)>400 else ""),"phash":False})
+            links.append({"source":anchor_id,"target":nid,"type":"breach"})
+            nid+=1
+        for b in shown:
+            nodes.append({"id":nid,"label":f"\u26a0 {b['name']}","type":"breach","category":"breach",
+                          "color":"#f87171","url":"","size":9,
+                          "source":f"breach {b['date']} | via {', '.join(b['sources'])}",
+                          "og_title":"exposed: "+", ".join(b["data_classes"]),"phash":False})
+            links.append({"source":anchor_id,"target":nid,"type":"breach"})
+            nid+=1
+
+    # Dark-web leads (Ahmia)
+    for blk in ((darkweb or {}).get("ahmia") or []):
+        for h in blk.get("hits") or []:
+            nodes.append({"id":nid,"label":h["onion"][:16]+"\u2026.onion","type":"onion",
+                          "category":"darkweb","color":"#a78bfa","url":h["url"],"size":8,
+                          "source":f"Ahmia lead | mentions '{h['term']}'",
+                          "og_title":h["title"][:160],"phash":False})
+            links.append({"source":0,"target":nid,"type":"onion"})
+            nid+=1
+
     ghost_nodes=[{"platform":r["platform"],"url":r["url"],"category":r["category"]}
                  for r in not_found]
 
@@ -146,17 +220,21 @@ def generate_graph(username, results, output_path,
     for src, cnt in sorted(src_breakdown.items(), key=lambda x:-x[1]):
         src_rows+=f'<div class="src-row"><span class="src-badge">{src}</span><span class="src-cnt">{cnt}</span></div>\n'
 
-    nodes_json=json.dumps(nodes, default=lambda o: int(o) if hasattr(o,'item') else str(o))
-    links_json=json.dumps(links, default=lambda o: int(o) if hasattr(o,'item') else str(o))
-    ghosts_json=json.dumps(ghost_nodes, default=lambda o: int(o) if hasattr(o,'item') else str(o))
+    nodes_json=_script_json(nodes)
+    links_json=_script_json(links)
+    ghosts_json=_script_json(ghost_nodes)
 
+    # Validated by the CLI, but generate_graph is also a library call: escape.
+    u_html = _html.escape(username or "")
+    e_html = _html.escape(email or "")
+    u_file = re.sub(r"[^A-Za-z0-9._-]", "_", username or "graph")
     html=f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Helix — {username}</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js" integrity="sha512-MefNfAGJ/pEy89xLOFs3V6pYPs6AmUhXOXCBDc3V7xSdX2jSCp2l0vEdBkCXSHtdMPFCMZs+8ElEMkTFVoNw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<title>Helix: {u_html}</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js" integrity="sha512-M7nHCiNUOwFt6Us3r8alutZLm9qMt4s9951uo8jqO4UwJ1hziseL6O3ndFyigx6+LREfZqnhHxYjKRJ8ZQ69DQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
 :root{{--bg:#050508;--panel:#0a0a0f;--panel2:#0f0f18;--border:#1a1a2e;
   --accent:#00ff88;--accent2:#f59e0b;--accent3:#a78bfa;--accent4:#f472b6;
@@ -164,7 +242,7 @@ def generate_graph(username, results, output_path,
 *{{box-sizing:border-box;margin:0;padding:0;}}
 body{{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;overflow:hidden;height:100vh;display:flex;flex-direction:column;}}
 
-/* ── Top bar ── */
+/* -- Top bar -- */
 #topbar{{
   background:rgba(5,5,8,0.98);border-bottom:1px solid var(--border);
   padding:0 16px;height:44px;display:flex;align-items:center;justify-content:space-between;
@@ -187,10 +265,10 @@ body{{background:var(--bg);color:var(--text);font-family:'Courier New',monospace
 .tb-btn:hover,.tb-btn.active{{border-color:var(--accent);color:var(--accent);}}
 .tb-btn.red:hover{{border-color:var(--red);color:var(--red);}}
 
-/* ── Layout ── */
+/* -- Layout -- */
 #main{{display:flex;flex:1;overflow:hidden;}}
 
-/* ── Side panel ── */
+/* -- Side panel -- */
 #sidepanel{{
   width:240px;background:var(--panel);border-right:1px solid var(--border);
   overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;
@@ -226,7 +304,7 @@ body{{background:var(--bg);color:var(--text);font-family:'Courier New',monospace
 .src-badge{{font-size:9px;background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:1px 6px;color:var(--dim);}}
 .src-cnt{{font-size:11px;color:var(--accent);}}
 
-/* ── Filter panel ── */
+/* -- Filter panel -- */
 #filterpanel{{
   position:absolute;top:56px;left:248px;z-index:90;
   background:var(--panel);border:1px solid var(--border);border-radius:4px;
@@ -238,11 +316,11 @@ body{{background:var(--bg);color:var(--text);font-family:'Courier New',monospace
 .fp-row{{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:11px;cursor:pointer;}}
 .fp-row input{{accent-color:var(--accent);}}
 
-/* ── Graph canvas ── */
+/* -- Graph canvas -- */
 #graph-wrap{{flex:1;position:relative;overflow:hidden;}}
 svg#graph{{width:100%;height:100%;}}
 
-/* ── Links ── */
+/* -- Links -- */
 .link{{stroke-opacity:.3;}}
 .link.category{{stroke:#1a1a2e;stroke-width:2px;stroke-dasharray:6,4;}}
 .link.platform{{stroke:#1e2435;stroke-width:1px;}}
@@ -251,11 +329,15 @@ svg#graph{{width:100%;height:100%;}}
 .link.pivot_platform{{stroke:#f59e0b44;stroke-width:1px;}}
 .link.cross_link{{stroke:var(--accent);stroke-width:2.5px;stroke-opacity:.9;
   animation:lp 3s ease-in-out infinite;}}
+.link.relation{{stroke:#fbbf24;stroke-width:1.5px;stroke-opacity:.55;}}
+.link.identifier{{stroke:#fbbf24;stroke-width:1px;stroke-dasharray:3,3;}}
+.link.breach{{stroke:#f87171;stroke-width:1px;stroke-opacity:.5;}}
+.link.onion{{stroke:#a78bfa;stroke-width:1px;stroke-dasharray:2,4;stroke-opacity:.45;}}
 .link.phash_match{{stroke:var(--accent4);stroke-width:2px;stroke-dasharray:4,2;stroke-opacity:.8;
   animation:lp 2s ease-in-out infinite;}}
 @keyframes lp{{0%,100%{{stroke-opacity:.9;}}50%{{stroke-opacity:.3;}}}}
 
-/* ── Nodes ── */
+/* -- Nodes -- */
 .node circle{{stroke-width:1.5px;cursor:pointer;}}
 .node text{{font-family:'Courier New',monospace;font-size:9px;fill:#8899aa;pointer-events:none;text-anchor:middle;}}
 .conf-ring{{fill:none;stroke-width:1.5px;stroke-dasharray:3,2;pointer-events:none;opacity:.6;}}
@@ -267,7 +349,7 @@ svg#graph{{width:100%;height:100%;}}
 .node-email-target circle{{animation:pulse-amber 2.5s infinite;}}
 .node-pivot-root circle{{animation:pulse-pivot 2.5s infinite;}}
 
-/* ── Tooltip ── */
+/* -- Tooltip -- */
 #tooltip{{
   position:fixed;background:var(--panel);border:1px solid var(--accent);
   border-radius:4px;padding:10px 14px;font-size:11px;pointer-events:none;
@@ -285,7 +367,7 @@ svg#graph{{width:100%;height:100%;}}
 .tt-url{{color:var(--dim);font-size:9px;margin-top:5px;word-break:break-all;}}
 .tt-open{{color:#60a5fa;font-size:9px;margin-top:4px;}}
 
-/* ── Search ── */
+/* -- Search -- */
 #searchbar{{
   position:absolute;top:10px;left:50%;transform:translateX(-50%);
   background:var(--panel);border:1px solid var(--border);border-radius:4px;
@@ -297,13 +379,13 @@ svg#graph{{width:100%;height:100%;}}
   font-family:'Courier New',monospace;font-size:12px;width:200px;}}
 #searchinput::placeholder{{color:var(--dim);}}
 
-/* ── Ghost overlay ── */
+/* -- Ghost overlay -- */
 #ghost-label{{
   position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
   font-size:9px;color:var(--dim);letter-spacing:1px;pointer-events:none;display:none;
 }}
 
-/* ── Legend ── */
+/* -- Legend -- */
 #legend{{
   position:absolute;bottom:16px;right:16px;background:rgba(5,5,8,.92);
   border:1px solid var(--border);border-radius:4px;padding:10px 14px;font-size:10px;z-index:50;
@@ -320,7 +402,7 @@ svg#graph{{width:100%;height:100%;}}
 <div id="topbar">
   <div class="tb-left">
     <span class="tb-logo">HELIX</span>
-    <span class="tb-target">{username}{(' · ' + email) if email else ''}</span>
+    <span class="tb-target">{u_html}{(' | ' + e_html) if email else ''}</span>
     <div class="tb-pills">
       <span class="pill green">{found_cnt} found</span>
       {'<span class="pill amber">' + str(pivot_cnt) + ' pivots</span>' if pivot_cnt else ''}
@@ -329,13 +411,13 @@ svg#graph{{width:100%;height:100%;}}
     </div>
   </div>
   <div class="tb-right">
-    <button class="tb-btn" onclick="togglePanel()" id="btn-panel">◧ Panel</button>
-    <button class="tb-btn" onclick="toggleFilter()" id="btn-filter">⊞ Filter</button>
-    <button class="tb-btn" onclick="toggleSearch()" id="btn-search">⌕ Search</button>
-    <button class="tb-btn" onclick="toggleGhosts()" id="btn-ghost">◌ Not found</button>
-    <button class="tb-btn" onclick="toggleLabels()" id="btn-labels">☰ Labels</button>
-    <button class="tb-btn" onclick="exportSVG()">↓ Export</button>
-    <button class="tb-btn" onclick="resetZoom()">⟳ Reset</button>
+    <button class="tb-btn" onclick="togglePanel()" id="btn-panel">Panel</button>
+    <button class="tb-btn" onclick="toggleFilter()" id="btn-filter">Filter</button>
+    <button class="tb-btn" onclick="toggleSearch()" id="btn-search">Search</button>
+    <button class="tb-btn" onclick="toggleGhosts()" id="btn-ghost">Not found</button>
+    <button class="tb-btn" onclick="toggleLabels()" id="btn-labels">Labels</button>
+    <button class="tb-btn" onclick="exportSVG()">Export</button>
+    <button class="tb-btn" onclick="resetZoom()">Reset</button>
   </div>
 </div>
 
@@ -371,8 +453,8 @@ svg#graph{{width:100%;height:100%;}}
     <div class="sp-section">
       <div class="sp-title">Scan Info</div>
       <div style="font-size:9px;color:var(--dim);line-height:1.7">
-        <div>Target: <span style="color:var(--text)">@{username}</span></div>
-        {'<div>Email: <span style="color:var(--accent2)">'+email+'</span></div>' if email else ''}
+        <div>Target: <span style="color:var(--text)">@{u_html}</span></div>
+        {'<div>Email: <span style="color:var(--accent2)">'+e_html+'</span></div>' if email else ''}
         <div>Time: <span style="color:var(--text)">{ts}</span></div>
         <div>Pivots: <span style="color:var(--accent2)">{pivot_cnt}</span></div>
         <div>pHash: <span style="color:var(--accent4)">{phash_cnt} match(es)</span></div>
@@ -391,11 +473,11 @@ svg#graph{{width:100%;height:100%;}}
     </div>
 
     <div id="searchbar">
-      <span style="color:var(--dim);font-size:11px">⌕</span>
+      <span style="color:var(--dim);font-size:11px"></span>
       <input id="searchinput" placeholder="filter platforms..." autocomplete="off">
     </div>
 
-    <div id="ghost-label">◌ NOT FOUND PLATFORMS</div>
+    <div id="ghost-label">NOT FOUND PLATFORMS</div>
 
     <div id="legend">
       <div class="leg-row"><div class="leg-line" style="background:var(--accent)"></div>Bio cross-link</div>
@@ -404,6 +486,9 @@ svg#graph{{width:100%;height:100%;}}
       <div class="leg-row"><div class="leg-dot" style="background:#ffffff;box-shadow:0 0 6px #fff"></div>Username root</div>
       {'<div class="leg-row"><div class="leg-dot" style="background:var(--accent2);box-shadow:0 0 6px var(--accent2)"></div>Email root</div>' if email else ''}
       <div class="leg-row"><div class="leg-dot" style="border:1.5px solid var(--accent);background:transparent"></div>High confidence</div>
+      {'<div class="leg-row"><div class="leg-line" style="background:#fbbf24"></div>Declared relationship</div>' if relationships else ''}
+      {'<div class="leg-row"><div class="leg-dot" style="background:#f87171"></div>Breach exposure (lead)</div>' if any(v.get("breaches") for v in (breach_verdicts or [])) else ''}
+      {'<div class="leg-row"><div class="leg-dot" style="background:#a78bfa"></div>Dark-web lead</div>' if any(b.get("hits") for b in ((darkweb or {}).get("ahmia") or [])) else ''}
     </div>
   </div>
 </div>
@@ -437,11 +522,36 @@ const sim=d3.forceSimulation(NODES)
       if(d.type==="category") return 200;
       if(d.type==="cross_link"||d.type==="phash_match") return 120;
       if(d.type==="pivot") return 180;
+      if(d.type==="relation") return 140;
+      if(d.type==="onion") return 160;
       return 80;
     }}).strength(d=>d.type==="cross_link"||d.type==="phash_match"?.7:.8))
   .force("charge",d3.forceManyBody().strength(-350))
   .force("center",d3.forceCenter(W()/2,H()/2))
-  .force("collide",d3.forceCollide().radius(d=>d.size+12));
+  .force("collide",d3.forceCollide().radius(d=>d.size+12))
+  .force("x",d3.forceX(W()/2).strength(.04))
+  .force("y",d3.forceY(H()/2).strength(.04));
+
+// Large graphs settle wider than the window, zoom out to fit everything
+// once the layout has settled (and on Reset), never zoom in past 1:1.
+function fitView(ms){{
+  const xs=NODES.map(n=>n.x), ys=NODES.map(n=>n.y);
+  if(!xs.length) return;
+  const pad=60, x0=Math.min(...xs)-pad, x1=Math.max(...xs)+pad, y0=Math.min(...ys)-pad, y1=Math.max(...ys)+pad;
+  const k=Math.min(1, W()/(x1-x0), H()/(y1-y0));
+  const t=d3.zoomIdentity.translate(W()/2-k*(x0+x1)/2, H()/2-k*(y0+y1)/2).scale(k);
+  svg.transition().duration(ms).call(zoom.transform,t);
+}}
+let fitted=false, userMoved=false;
+svg.on("wheel.fit mousedown.fit touchstart.fit",()=>{{ userMoved=true; }});
+sim.on("end",()=>{{ if(!fitted){{ fitted=true; if(!userMoved) fitView(400); }} }});
+// Hundreds of nodes take ~20 s to settle, and until then most sit off-screen,
+// so a big scan looked empty. Keep the whole graph in view while it expands,
+// and stop the moment the person zooms, drags or touches it.
+const fitTimer=setInterval(()=>{{
+  if(fitted||userMoved){{ clearInterval(fitTimer); return; }}
+  if(NODES.length>60) fitView(250);
+}},1000);
 
 const link=zoomG.append("g").selectAll("line")
   .data(LINKS).join("line")
@@ -505,19 +615,19 @@ node.on("mouseover",(e,d)=>{{
   document.getElementById("tt-og").textContent=d.og_title?`"${{d.og_title}}"`:'' ;
   const xl=document.getElementById("tt-xlink");
   const partners=(xMap[d.id]||[]).map(id=>nodeById[id]?.label).filter(Boolean);
-  xl.textContent=partners.length?`↔ bio-linked: ${{partners.join(", ")}}`:'' ;
+  xl.textContent=partners.length?`<-> bio-linked: ${{partners.join(", ")}}`:'' ;
   xl.style.display=partners.length?"":"none";
   const ph=document.getElementById("tt-phash");
   const phPartners=(phMap[d.id]||[]);
-  ph.textContent=phPartners.length?`≅ avatar match: ${{phPartners.map(p=>nodeById[p.id]?.label+"("+p.conf+")").join(", ")}}`:'' ;
+  ph.textContent=phPartners.length?`~ avatar match: ${{phPartners.map(p=>nodeById[p.id]?.label+"("+p.conf+")").join(", ")}}`:'' ;
   ph.style.display=phPartners.length?"":"none";
   document.getElementById("tt-url").textContent=d.url;
-  document.getElementById("tt-open").textContent=d.url?"click to open →":"";
+  document.getElementById("tt-open").textContent=d.url?"click to open ->":"";
   tt.style.opacity="1";
 }})
 .on("mousemove",e=>{{tt.style.left=(e.clientX+16)+"px";tt.style.top=(e.clientY-10)+"px";}})
 .on("mouseout",()=>tt.style.opacity="0")
-.on("click",(e,d)=>{{if(d.url)window.open(d.url,"_blank");}});
+.on("click",(e,d)=>{{if(d.url&&/^https?:\\/\\//i.test(d.url))window.open(d.url,"_blank","noopener,noreferrer");}});
 
 sim.on("tick",()=>{{
   link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y)
@@ -569,7 +679,7 @@ function doSearch(q){{
   link.style("opacity",d=>(!lq?null:.04));
 }}
 document.getElementById("searchinput").addEventListener("input",e=>doSearch(e.target.value));
-document.addEventListener("keydown",e=>{{if(e.key==="Escape"){{if(searchOpen)toggleSearch();if(filterOpen)toggleFilter();}}}}); 
+document.addEventListener("keydown",e=>{{if(e.key==="Escape"){{if(searchOpen)toggleSearch();if(filterOpen)toggleFilter();}}}});
 
 // Ghosts
 let ghostsOn=false,ghostG=null;
@@ -603,11 +713,11 @@ function exportSVG(){{
   const blob=new Blob([s],{{type:"image/svg+xml"}});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
-  a.download="helix_{username}.svg";
+  a.download="helix_{u_file}.svg";
   a.click();
 }}
 
-function resetZoom(){{svg.transition().duration(500).call(zoom.transform,d3.zoomIdentity);}}
+function resetZoom(){{fitView(500);}}
 
 window.addEventListener("resize",()=>{{
   svg.attr("width",W()).attr("height",H());

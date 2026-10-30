@@ -1,12 +1,13 @@
 """
-Helix — Sherlock Adapter  (with 24-hour local cache)
-Cache: ~/.cache/helix/sherlock_data.json — avoids re-downloading on every run.
+Helix: Sherlock Adapter  (with 24-hour local cache)
+Cache: ~/.cache/helix/sherlock_data_v2.json: avoids re-downloading on every run.
 """
 import aiohttp, json, time
 from pathlib import Path
 from typing import Dict, Optional
+from osint import netconfig
 
-# Multiple fallback URLs — Sherlock relocated data.json across releases
+# Multiple fallback URLs: Sherlock relocated data.json across releases
 SHERLOCK_URLS = [
     # Current location (sherlock >= 0.16.0 - renamed to sherlock_project)
     "https://raw.githubusercontent.com/sherlock-project/sherlock/master/sherlock_project/resources/data.json",
@@ -17,7 +18,13 @@ SHERLOCK_URLS = [
 ]
 SHERLOCK_URL = SHERLOCK_URLS[0]  # kept for backward compat
 _CACHE_DIR  = Path.home() / ".cache" / "helix"
-_CACHE_FILE = _CACHE_DIR / "sherlock_data.json"
+# v2: entries carry Sherlock's isNSFW flag as "nsfw"; version-1 caches dropped
+# it, so the 19 adult sites were scanned even without --nsfw.
+_CACHE_FILE = _CACHE_DIR / "sherlock_data_v2.json"
+
+
+def without_nsfw(platforms: Dict[str, dict], include_nsfw: bool) -> Dict[str, dict]:
+    return platforms if include_nsfw else {k: v for k, v in platforms.items() if not v.get("nsfw")}
 _CACHE_TTL  = 86_400   # 24 hours
 
 _METHOD_MAP = {
@@ -47,15 +54,15 @@ def _save_cache(data: dict):
 
 
 async def fetch_sherlock_platforms(timeout: int = 30) -> Dict[str, dict]:
-    # ── Try cache first ───────────────────────────────────────────────────────
+    # Try cache first
     cached = _load_cache()
     if cached:
         return cached
 
-    # ── Fetch from GitHub (try each URL in order) ─────────────────────────────
+    # Fetch from GitHub (try each URL in order)
     raw = None
     last_error = None
-    async with aiohttp.ClientSession() as session:
+    async with netconfig.new_session() as session:
         for url in SHERLOCK_URLS:
             try:
                 async with session.get(
@@ -71,7 +78,7 @@ async def fetch_sherlock_platforms(timeout: int = 30) -> Dict[str, dict]:
                 last_error = f"{e} (trying {url})"
                 continue
     if raw is None:
-        raise RuntimeError(f"Sherlock fetch failed — all URLs tried. Last error: {last_error}")
+        raise RuntimeError(f"Sherlock fetch failed: all URLs tried. Last error: {last_error}")
 
     platforms = {}
     for name, info in raw.items():
@@ -95,24 +102,26 @@ async def fetch_sherlock_platforms(timeout: int = 30) -> Dict[str, dict]:
             pdef["not_found_text"] = em[0] if isinstance(em, list) else em
         elif method == "response_url":
             pdef["error_url"] = info.get("errorUrl", "")
+        if info.get("isNSFW"):
+            pdef["nsfw"] = True
         platforms[name] = pdef
 
     _save_cache(platforms)
     return platforms
 
 
-async def load_with_fallback(timeout: int = 30) -> Dict[str, dict]:
+async def load_with_fallback(timeout: int = 30, include_nsfw: bool = False) -> Dict[str, dict]:
     cached = _load_cache()
     if cached:
         age = int(time.time() - _CACHE_FILE.stat().st_mtime)
         print(f"  [cache] Sherlock data loaded from cache ({age}s old)")
-        return cached
+        return without_nsfw(cached, include_nsfw)
     try:
         p = await fetch_sherlock_platforms(timeout=timeout)
         _save_cache(p)
         print(f"  [cache] Sherlock data downloaded and cached ({len(p)} platforms)")
-        return p
+        return without_nsfw(p, include_nsfw)
     except Exception as e:
         print(f"\n  [!] Sherlock adapter warning: {e}")
-        print(f"  [!] Try --sherlock-timeout 60 or check your network connection\n")
+        print("  [!] Try --sherlock-timeout 60 or check your network connection\n")
         return {}

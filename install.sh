@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Helix — One-Click Installer
+# Helix: One-Click Installer
 # curl -sSL https://raw.githubusercontent.com/thalha-a9/helix/main/install.sh | bash
 
 set -e
@@ -10,10 +10,10 @@ warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 err()  { echo -e "${RED}[!]${NC} $1"; exit 1; }
 
 echo ""
-echo -e "${CYAN}╔══════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║   Helix — Installer              ║${NC}"
-echo -e "${CYAN}║   github.com/thalha-a9/helix     ║${NC}"
-echo -e "${CYAN}╚══════════════════════════════════════════╝${NC}"
+echo -e "${CYAN}|==========================================|${NC}"
+echo -e "${CYAN}|   Helix: Installer              |${NC}"
+echo -e "${CYAN}|   github.com/thalha-a9/helix     |${NC}"
+echo -e "${CYAN}|==========================================|${NC}"
 echo ""
 
 # Python check
@@ -41,7 +41,7 @@ fi
 # Clone
 REPO_DIR="helix"
 if [ -d "$REPO_DIR" ]; then
-    warn "Directory exists — pulling latest..."
+    warn "Directory exists: pulling latest..."
     cd "$REPO_DIR" && git pull && cd ..
 else
     info "Cloning helix..."
@@ -57,9 +57,9 @@ pip3 install -r requirements.txt --break-system-packages --quiet
 ok "Dependencies installed"
 
 echo ""
-echo -e "${GREEN}╔══════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║   Done! Run Helix:               ║${NC}"
-echo -e "${GREEN}╚══════════════════════════════════════════╝${NC}"
+echo -e "${GREEN}|==========================================|${NC}"
+echo -e "${GREEN}|   Done! Run Helix:               |${NC}"
+echo -e "${GREEN}|==========================================|${NC}"
 echo ""
 echo -e "  ${CYAN}cd helix${NC}"
 echo -e "  ${CYAN}python3 helix.py -u <username>${NC}"

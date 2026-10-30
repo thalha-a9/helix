@@ -1,4 +1,4 @@
-"""Helix — WhatsMyName Adapter (v1.2.0)
+"""Helix: WhatsMyName Adapter (v1.2.0)
 
 Key improvements over v1.1:
   - Pre-flight filter: registration/availability API URLs are blocked before
@@ -10,10 +10,10 @@ Key improvements over v1.1:
     status_code fallback (the root cause of most WMN false positives) is
     used only when no content-based signal is available.
 """
-import re
 import aiohttp
 from typing import Dict
 from urllib.parse import urlparse
+from osint import netconfig
 
 WMN_URL = (
     "https://raw.githubusercontent.com/WebBreacher/WhatsMyName/"
@@ -26,6 +26,7 @@ _CATEGORY_MAP = {
     "music":    "content",
     "video":    "content",
     "photo":    "content",
+    "images":   "content",
     "art":      "content",
     "blog":     "content",
     "news":     "content",
@@ -40,7 +41,7 @@ _CATEGORY_MAP = {
     "general":  "other",
 }
 
-# ── Registration / availability API URLs — block these entirely ───────────────
+# Registration / availability API URLs: block these entirely
 # A 200 on these means the username is FREE, not that a profile exists.
 _BLOCKED_URL_PATTERNS = [
     "checkusername",
@@ -56,19 +57,19 @@ _BLOCKED_URL_PATTERNS = [
     "api-proxy/bbc/get",          # BodyBuilding.com
     "api/accounts/validate",      # BoardGameGeek
     "wp-json/wporg/v1/username",  # WordPress.org
-    "GetCard/",                   # visnesscard — returns 422 for all requests
-    "tapitag/api/v1/",            # TAPiTAG — RF number, not user profile
+    "GetCard/",                   # visnesscard: returns 422 for all requests
+    "tapitag/api/v1/",            # TAPiTAG: RF number, not user profile
     "api/user/exist/",            # TryHackMe
     "webapi/3.2/users/check",     # Quizlet
     "/graphql",                   # GraphQL availability endpoints (Znanija etc.)
-    "NickAvailability",           # Znanija specific — isAvailable:false ≠ profile exists
+    "NickAvailability",           # Znanija specific: isAvailable:false != profile exists
     "operationName=NickAvailability", # Znanija full pattern
-    # Search pages masquerading as profile URLs — these return results for any query
+    # Search pages masquerading as profile URLs, these return results for any query
     "search?q=",             # generic search pages
-    "summoners/search",      # OP.GG search — not a profile
+    "summoners/search",      # OP.GG search: not a profile
     "quick=1&type=core_members", # search pages
     "/search/query",         # Scribd search
-    "userid=",               # Yelp by ID — not a real profile lookup
+    "userid=",               # Yelp by ID: not a real profile lookup
     "yandex.ru/collections/api/users/", # Yandex collections API
     "showuser=",             # forum search by user
     "PAGE_NAME=profile_view&UID=", # forum profile by numeric ID
@@ -78,7 +79,7 @@ _BLOCKED_URL_PATTERNS = [
     "/search/?q=",           # search pages
 ]
 
-# ── Known dead / permanently down hostnames ───────────────────────────────────
+# Known dead / permanently down hostnames
 _DEAD_HOSTS = {
     "taringa.net",         # shut down 2024
     "lor.sh",              # dead Mastodon instance
@@ -89,13 +90,12 @@ _DEAD_HOSTS = {
     "ultrasdiary.pl",      # dead
     "wego.social",         # parked
     "mini.zbiornik.com",   # adult, consistently broken
-    "codeproject.com",     # GoDaddy parked — no active user profiles
+    "codeproject.com",     # GoDaddy parked: no active user profiles
     "visnesscard.com",     # API 422 for all requests
-    "kipin.app",           # 404 for all profiles — stale WMN entry
+    "kipin.app",           # 404 for all profiles: stale WMN entry
     "paypal.com",          # paypal.me CAPTCHA on any URL, real or not
     "tinder.com",          # login gate, profiles not publicly viewable
     "zbiornik.com",        # adult login gate
-    "mini.zbiornik.com",   # adult login gate
     "bentbox.co",          # age-verify redirect for all visitors
     "my.flightradar24.com",# login gate
     "voices.com",          # redirects to talent search
@@ -107,11 +107,11 @@ _DEAD_HOSTS = {
     "blog.myfitnesspal.com",# empty author page
     "kwork.ru",            # login / maintenance gate
     "slideshare.net",      # page no longer exists for all non-existent users
-    "scribd.com",          # search page — not a profile URL
+    "scribd.com",          # search page: not a profile URL
     "search.ddosecrets.com",# redirects to unrelated domain
     "ddosecrets.com",      # same
-    # Confirmed soft-404 platforms — username with ._ always returns 200 but no profile
-    "ebay.com",            # JS-rendered soft-404 — username format invalid for eBay
+    # Confirmed soft-404 platforms: username with ._ always returns 200 but no profile
+    "ebay.com",            # JS-rendered soft-404: username format invalid for eBay
     "brickset.com",        # soft-404 as 200
     "hosted.weblate.org",  # soft-404 as 200
     "weblate.org",         # same
@@ -124,7 +124,7 @@ _DEAD_HOSTS = {
     "patriots.win",        # "invalid user" served as 200 OK
 }
 
-# ── Known bad e_code=200 + no content check platforms — mark unverifiable ────
+# Known bad e_code=200 + no content check platforms, mark unverifiable
 # These use pure status_code method but the 200 is meaningless (soft-404).
 # We keep them but mark source so the verifier can apply extra scrutiny.
 _STATUS_CODE_ONLY_SUSPICIOUS = {
@@ -161,11 +161,22 @@ def _is_suspicious_host(url: str) -> bool:
         return False
 
 
-# NSFW categories to filter by default
-_NSFW_CATEGORIES = {"adult"}
+# NSFW categories to filter by default. WhatsMyName files adult sites under
+# "xx NSFW xx" in its "cat" field; this filter looked for "adult" in a
+# "category" field, so it never matched and adult sites were always scanned.
+_NSFW_CATEGORIES = {"xx nsfw xx", "nsfw", "adult"}
+
+
+def site_category(site: dict) -> str:
+    """WhatsMyName's category, lower-cased ('cat' in the current schema)."""
+    return str(site.get("cat") or site.get("category") or "").strip().lower()
+
+
+def is_nsfw(site: dict) -> bool:
+    return site_category(site) in _NSFW_CATEGORIES
 
 async def fetch_wmn_platforms(timeout: int = 30, include_nsfw: bool = False) -> Dict[str, dict]:
-    async with aiohttp.ClientSession() as session:
+    async with netconfig.new_session() as session:
         try:
             async with session.get(
                 WMN_URL, timeout=aiohttp.ClientTimeout(total=timeout)
@@ -174,7 +185,7 @@ async def fetch_wmn_platforms(timeout: int = 30, include_nsfw: bool = False) -> 
                     raise RuntimeError(f"HTTP {resp.status}")
                 data = await resp.json(content_type=None)
         except Exception as e:
-            raise RuntimeError(f"WhatsMyName fetch failed: {e}")
+            raise RuntimeError(f"WhatsMyName fetch failed: {e}") from e
 
     sites = data.get("sites", [])
     if not sites:
@@ -190,14 +201,14 @@ async def fetch_wmn_platforms(timeout: int = 30, include_nsfw: bool = False) -> 
         e_string = site.get("e_string", "")
         m_string = site.get("m_string", "")
         e_code   = site.get("e_code", 200)
-        raw_cat  = site.get("category", "").lower()
+        raw_cat  = site_category(site)
         category = _CATEGORY_MAP.get(raw_cat, "other")
 
         if not name or not uri or "{account}" not in uri:
             continue
 
         # Filter NSFW by default
-        if not include_nsfw and raw_cat in _NSFW_CATEGORIES:
+        if not include_nsfw and is_nsfw(site):
             continue
 
         url = uri.replace("{account}", "{username}")
@@ -232,7 +243,7 @@ async def fetch_wmn_platforms(timeout: int = 30, include_nsfw: bool = False) -> 
                 "source":     "wmn",
             }
         else:
-            # Pure status_code — note this is the most error-prone method.
+            # Pure status_code: note this is the most error-prone method.
             # Tag suspicious hosts so the verifier applies extra scrutiny.
             extra = {"wmn_status_only": True}
             if _is_suspicious_host(url):
@@ -249,7 +260,7 @@ async def fetch_wmn_platforms(timeout: int = 30, include_nsfw: bool = False) -> 
 
         platforms[name] = pdef
 
-    # ── Post-process: fix known WMN URL issues ───────────────────────────────
+    # Post-process: fix known WMN URL issues
     # Bluesky: WMN sends bsky.app/profile/{username} (SPA, unreliable).
     # Override to use AT Protocol API which gives true 200/400.
     if "Bluesky" in platforms or "Bluesky 1" in platforms:

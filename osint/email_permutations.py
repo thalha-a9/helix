@@ -1,5 +1,5 @@
 """
-Helix v3 — Email Permutation Engine
+Helix v3: Email Permutation Engine
 Given a username (and optional real name from confirmed profiles),
 generates likely email addresses to check with holehe/breach.
 """
@@ -19,15 +19,15 @@ def _base_parts(username: str, real_name: str = "") -> List[str]:
     """Extract base parts from username and real name."""
     bases = set()
     u = username.lower()
-    
+
     # Username as-is (cleaned)
     clean_u = re.sub(r'[^a-z0-9._\-]', '', u)
     if clean_u: bases.add(clean_u)
-    
+
     # Username stripped of special chars
     stripped = _clean(u)
     if stripped: bases.add(stripped)
-    
+
     # If real name provided (e.g. "Mohammad Aqib" from Dribbble)
     if real_name:
         parts = real_name.lower().split()
@@ -42,8 +42,8 @@ def _base_parts(username: str, real_name: str = "") -> List[str]:
                     f"{f[0]}.{l}",       # m.aqib
                     f"{l}{f}",           # aqibmohammad
                     f"{l}.{f}",          # aqib.mohammad
-                    f"{f}",              # mohammad
-                    f"{l}",              # aqib
+                    # A bare first or last name (mohammad@, aqib@) is someone
+                    # else's address far more often than the subject's.
                 ])
     return list(bases)
 
@@ -60,16 +60,22 @@ def generate_email_permutations(username: str,
         providers = _COMMON_PROVIDERS[:6]  # top 6 by default
 
     bases = _base_parts(username, real_name)
-    
+
     # Score bases by likelihood (shorter + matching username = higher priority)
     clean_u = _clean(username)
     def score(b):
-        s = 0
-        if b == clean_u: s += 10
-        if b.replace('.','').replace('_','') == clean_u: s += 5
-        s -= len(b)  # prefer shorter
-        return s
-    
+        # The username first, then full-name patterns in their usual order of
+        # popularity (first.last, firstlast, f.last ...): never "shortest".
+        if b == clean_u: return 100
+        if b.replace('.','').replace('_','') == clean_u: return 90
+        order = ["{f}.{l}", "{f}{l}", "{f}_{l}", "{f0}.{l}", "{f0}{l}", "{l}.{f}", "{l}{f}"]
+        if real_name and len(real_name.split()) >= 2:
+            f, l = _clean(real_name.split()[0]), _clean(real_name.split()[-1])
+            for i, pat in enumerate(order):
+                if b == pat.format(f=f, l=l, f0=f[:1]):
+                    return 80 - i
+        return 0
+
     bases = sorted(set(bases), key=score, reverse=True)[:max_per_provider]
 
     emails = []

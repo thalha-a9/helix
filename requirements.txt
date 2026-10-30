@@ -1,23 +1,29 @@
-# ── Required ──────────────────────────────────────────────────────────────────
+# Required
 aiohttp>=3.9.0,<4.0.0
 
-# ── Optional: WAF/Cloudflare bypass ──────────────────────────────────────────
+# Optional: SOCKS / Tor proxy support (--proxy socks5://..., --tor)
+# pip install aiohttp-socks
+# aiohttp-socks>=0.8.4,<1.0.0
+
+# Optional: WAF/Cloudflare bypass
 # pip install curl-cffi
 # curl-cffi>=0.6.2,<1.0.0
 
-# ── Optional: Avatar perceptual hash matching ─────────────────────────────────
+# Optional: Avatar perceptual hash matching
 # pip install imagehash Pillow
 # imagehash>=4.3.1,<5.0.0
-# Pillow>=10.0.0,<12.0.0
+# Pillow>=13.0.0   (Python 3.11+; earlier Pillows have image-decoder vulnerabilities,
+#                   and --phash decodes pictures from strangers' accounts)
 
-# ── Optional: Deep email scanning ────────────────────────────────────────────
-# pip install holehe
+# Optional: Deep email scanning
+# pip install holehe            (Kali/Debian build error -> pip install --use-pep517 holehe)
 # holehe>=1.4.4
+# pip install "httpx[socks]"    (holehe over --tor / SOCKS proxies)
 
-# ── Optional: PDF report generation ──────────────────────────────────────────
+# Optional: PDF report generation
 # pip install weasyprint
 # weasyprint>=60.0
 
-# ── Optional: AI verification ────────────────────────────────────────────────
-# pip install anthropic>=0.20.0    → set ANTHROPIC_API_KEY
-# pip install openai>=1.0.0        → set OPENROUTER_API_KEY or NVIDIA_API_KEY
+# Optional: AI verification
+# pip install anthropic>=0.25.0    -> set ANTHROPIC_API_KEY
+# pip install openai>=1.0.0        -> set OPENROUTER_API_KEY or NVIDIA_API_KEY

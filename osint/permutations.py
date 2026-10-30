@@ -1,5 +1,5 @@
 """
-OSINT Grapher v2.0 — Username Permutation Generator
+Helix: Username Permutation Generator
 Generates common variations a target might use across platforms.
 """
 
@@ -16,7 +16,7 @@ def generate_permutations(username: str) -> List[str]:
     u = username.lower()
 
     # Separator-based splits (for camelCase or compoundnames)
-    # e.g. JohnDoe → john_doe, john.doe, johndoe
+    # e.g. JohnDoe -> john_doe, john.doe, johndoe
     snake = re.sub(r'(?<=[a-z])(?=[A-Z])', '_', username).lower()
     dot   = re.sub(r'(?<=[a-z])(?=[A-Z])', '.', username).lower()
     if snake != u:

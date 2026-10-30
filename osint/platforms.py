@@ -1,5 +1,5 @@
 """
-Helix v2.0 — Platform Definitions
+Helix: Platform Definitions
 Detection methods: og_meta | text_not_present | text_present | status_code | api_json
 check_url: separate URL for HTTP probe (API endpoint) vs url (display link)
 """
@@ -8,7 +8,7 @@ _BIO_PATTERNS_DEVELOPER = {
     "twitter":   r"(?:twitter|x)\.com/([a-zA-Z0-9_]{1,50})",
     "linkedin":  r"linkedin\.com/in/([a-zA-Z0-9_\-]{1,100})",
     "instagram": r"instagram\.com/([a-zA-Z0-9_.]{1,50})",
-    "youtube":   r"youtube\.com/(?:@|c/|user/)?([a-zA-Z0-9_\-]{1,100})",
+    "youtube":   r"youtube\.com/(?:@|c/|user/)([a-zA-Z0-9_.\-]{1,100})",
     "medium":    r"medium\.com/@([a-zA-Z0-9_\-]{1,50})",
     "devto":     r"dev\.to/([a-zA-Z0-9_\-]{1,50})",
     "website":   r"(https?://(?!github\.com|linkedin\.com|twitter\.com|x\.com)[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}[^\s\"\'<>]*)",
@@ -17,30 +17,38 @@ _BIO_PATTERNS_DEVELOPER = {
 _BIO_PATTERNS_SOCIAL = {
     "github":   r"github\.com/([a-zA-Z0-9_\-]{1,100})",
     "linkedin": r"linkedin\.com/in/([a-zA-Z0-9_\-]{1,100})",
-    "youtube":  r"youtube\.com/(?:@|c/|user/)?([a-zA-Z0-9_\-]{1,100})",
+    "youtube":  r"youtube\.com/(?:@|c/|user/)([a-zA-Z0-9_.\-]{1,100})",
     "website":  r"(https?://(?!twitter\.com|x\.com|instagram\.com)[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}[^\s\"\'<>]*)",
 }
 
 PLATFORMS = {
 
-    # ── Social ─────────────────────────────────────────────────────────────────
+    # Social
     "Twitter/X": {
-        "url":             "https://twitter.com/{username}",
+        "url":             "https://x.com/{username}",
         "method":          "text_not_present",
-        "not_found_text":  "This account doesn\u2019t exist",
+        # X's server-rendered not-found page (checked 2026-10); the older
+        # "This account doesn't exist" text is drawn by JavaScript.
+        "not_found_text":  "User Profile Not Found",
         "tls_impersonate": True,
         "category": "social", "color": "#1DA1F2",
         "bio_patterns": _BIO_PATTERNS_SOCIAL, "bio_extract": True,
     },
     "Instagram": {
+        # Logged out, only a real account's page carries its og:title,
+        # "Name (@user) - Instagram photos and videos" (@ is HTML-escaped).
+        # Unknown names and login walls have none, the old "not found" text
+        # check passed on those.
         "url": "https://www.instagram.com/{username}/",
-        "method": "text_not_present", "not_found_text": "Page Not Found",
+        "method": "og_meta", "og_found": ["(&#064;{username})", "(@{username})"],
         "tls_impersonate": True, "requires_tls": True,
         "category": "social", "color": "#E1306C",
     },
     "TikTok": {
+        # A real account's page embeds its user record ("uniqueId"); an
+        # unknown name gets statusCode 10221 and no record.
         "url": "https://www.tiktok.com/@{username}",
-        "method": "text_not_present", "not_found_text": "Couldn\u2019t find this account",
+        "method": "text_present", "found_text": '"uniqueId":"{username}"',
         "tls_impersonate": True,
         "category": "social", "color": "#010101",
     },
@@ -78,33 +86,35 @@ PLATFORMS = {
         "category": "social", "color": "#6364FF",
     },
     "Bluesky": {
-        # SPA — static HTML never contains "Profile not found". Use AT Protocol API instead.
+        # SPA: static HTML never contains "Profile not found". Use AT Protocol API instead.
         "url":       "https://bsky.app/profile/{username}.bsky.social",
         "check_url": "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={username}.bsky.social",
         "method": "status_code", "found": [200],
         "category": "social", "color": "#0085FF",
     },
     "Threads": {
-        "url": "https://www.threads.net/@{username}",
+        "url": "https://www.threads.com/@{username}",
         "method": "text_not_present", "not_found_text": "isn\u2019t available",
         "tls_impersonate": True,
         "category": "social", "color": "#000000",
     },
     "VK": {
+        # VK answers 404 for an unregistered short name and 200 (often a bare
+        # login wall without the name in it) for a registered one.
         "url": "https://vk.com/{username}",
-        "method": "text_not_present", "not_found_text": "Page not found",
+        "method": "status_code", "found": [200], "name_in_page": False,
         "category": "social", "color": "#4C75A3",
     },
     "Telegram": {
         # Telegram og:title for existing = "Telegram: Contact @{username}"
-        # For non-existent = "Telegram: Contact @{username}" BUT page body says "If you have Telegram, you can contact" — unreliable
+        # For non-existent = "Telegram: Contact @{username}" BUT page body says "If you have Telegram, you can contact": unreliable
         # Better: check for specific text that only appears on valid profiles
         "url": "https://t.me/{username}",
         "method": "text_present", "found_text": "tgme_page_extra",
         "category": "social", "color": "#26A5E4",
     },
 
-    # ── Developer / Security ───────────────────────────────────────────────────
+    # Developer / Security
     "GitHub": {
         "url": "https://github.com/{username}",
         "method": "og_meta", "og_not_found": ["Page not found", "Not Found"],
@@ -112,10 +122,13 @@ PLATFORMS = {
         "bio_extract": True, "bio_patterns": _BIO_PATTERNS_DEVELOPER,
     },
     "GitLab": {
+        # Groups share the user URL space (gitlab.com/torvalds is a group), so
+        # the profile page cannot tell them apart. The users API only returns
+        # real user accounts: a group or a missing name returns [].
         "url": "https://gitlab.com/{username}",
-        "method": "og_meta", "og_not_found": ["404", "Not Found"],
+        "check_url": "https://gitlab.com/api/v4/users?username={username}",
+        "method": "text_present", "found_text": '"username":"{username}"',
         "category": "dev", "color": "#FC6D26",
-        "bio_extract": True, "bio_patterns": _BIO_PATTERNS_DEVELOPER,
     },
     "HackerNews": {
         "url": "https://news.ycombinator.com/user?id={username}",
@@ -133,12 +146,12 @@ PLATFORMS = {
         "category": "dev", "color": "#F26822",
     },
     "Replit": {
-        # Valid user og:title = "@username – Replit"
+        # Valid user og:title is "@username - Replit"
         # Invalid/homepage = "Replit" (caught by GENERIC_TITLES in verifier)
-        # og_found check is the primary signal — title MUST contain @username
+        # og_found check is the primary signal, title MUST contain @username
         "url": "https://replit.com/@{username}",
         "method": "og_meta",
-        "og_found": ["@{username}"],  # only og_found — no og_not_found clash
+        "og_found": ["@{username}"],  # only og_found: no og_not_found clash
         "category": "dev", "color": "#F26207",
     },
     "Codepen": {
@@ -153,7 +166,7 @@ PLATFORMS = {
         "bio_extract": True, "bio_patterns": _BIO_PATTERNS_DEVELOPER,
     },
     "StackOverflow": {
-        # SO user URLs use numeric IDs — username search is unreliable; skip or use search
+        # SO user URLs use numeric IDs, username search is unreliable; skip or use search
         # Use SO's search API as proxy: if username exists in top results, mark found
         "url": "https://stackoverflow.com/users/{username}",
         "method": "text_not_present", "not_found_text": "Page Not Found",
@@ -183,7 +196,7 @@ PLATFORMS = {
         "category": "dev", "color": "#FF6600",
     },
 
-    # ── Content / Creative ─────────────────────────────────────────────────────
+    # Content / Creative
     "YouTube": {
         "url": "https://www.youtube.com/@{username}",
         "method": "og_meta", "og_not_found": ["404", "This page isn"],
@@ -195,7 +208,7 @@ PLATFORMS = {
         "category": "content", "color": "#9146FF",
     },
     "Medium": {
-        # Non-existent redirects to homepage: og:title = "Medium – Where good ideas find you"
+        # Non-existent users redirect to the homepage, og:title "Medium - Where good ideas find you"
         # Also catches: "Out of nothing, something" (older Medium 404)
         "url": "https://medium.com/@{username}",
         "method": "og_meta",
@@ -212,7 +225,10 @@ PLATFORMS = {
     },
     "Patreon": {
         "url": "https://www.patreon.com/{username}",
-        "method": "og_meta", "og_not_found": ["Page not found"],
+        # A removed account still answers 200, titled "Removed | Patreon"
+        # (seen for patreon.com/jack, Oct 2026): it has no live profile.
+        "method": "og_meta",
+        "og_not_found": ["Page not found", "Not found | Patreon", "Removed | Patreon"],
         "tls_impersonate": True,
         "category": "content", "color": "#FF424D",
     },
@@ -259,14 +275,16 @@ PLATFORMS = {
         "category": "content", "color": "#FF5A00",
     },
 
-    # ── Gaming ─────────────────────────────────────────────────────────────────
+    # Gaming
     "Steam": {
+        # Positive evidence only: rate-limit and error pages lack the not-found
+        # text too, which made a missing marker read as "found".
         "url": "https://steamcommunity.com/id/{username}",
-        "method": "text_not_present", "not_found_text": "The specified profile could not be found",
+        "method": "text_present", "found_text": "g_rgProfileData",
         "category": "gaming", "color": "#1B2838",
     },
     "Chess.com": {
-        # Use Chess.com's public API — returns 404 for non-existent users. Zero false positives.
+        # Use Chess.com's public API: returns 404 for non-existent users. Zero false positives.
         "url":       "https://www.chess.com/member/{username}",
         "check_url": "https://api.chess.com/pub/player/{username}",
         "method": "status_code", "found": [200],
@@ -290,7 +308,7 @@ PLATFORMS = {
         "category": "gaming", "color": "#FA5C5C",
     },
 
-    # ── Forums / Community ─────────────────────────────────────────────────────
+    # Forums / Community
     "Reddit": {
         # JSON API: valid user returns {"kind":"t2","data":{"name":"...","is_employee":...}}
         # Invalid user returns HTTP 404. Text-present on "is_employee" is 100% reliable.
@@ -317,12 +335,23 @@ PLATFORMS = {
         "category": "forum", "color": "#AC130D",
     },
 
-    # ── Professional / Other ───────────────────────────────────────────────────
+    # Professional / Other
     "Keybase": {
         "url": "https://keybase.io/{username}",
-        "method": "og_meta", "og_not_found": ["Keybase - 404"],
+        # Profile pages no longer carry og:title, so use the public API. It
+        # answers {"them":[null]} for unknown names and includes the user's
+        # verified proofs (Twitter, GitHub, Reddit, domains).
+        "check_url": "https://keybase.io/_/api/1.0/user/lookup.json?usernames={username}&fields=basics,proofs_summary",
+        "method": "text_present", "found_text": '"username":"{username}"',
         "category": "other", "color": "#33A0FF",
-        "bio_extract": True, "bio_patterns": _BIO_PATTERNS_DEVELOPER,
+        "bio_extract": True, "bio_patterns": {
+            # Keybase proofs: accounts the user cryptographically proved they own
+            "twitter":    r'"proof_type":"twitter","nametag":"([A-Za-z0-9_]{1,50})"',
+            "github":     r'"proof_type":"github","nametag":"([A-Za-z0-9-]{1,39})"',
+            "reddit":     r'"proof_type":"reddit","nametag":"([A-Za-z0-9_-]{1,40})"',
+            "hackernews": r'"proof_type":"hackernews","nametag":"([A-Za-z0-9_-]{1,40})"',
+            "website":    r'"proof_type":"(?:dns|generic_web_site)","nametag":"([A-Za-z0-9.-]{3,100})"',
+        },
     },
     "About.me": {
         "url": "https://about.me/{username}",

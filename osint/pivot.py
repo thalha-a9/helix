@@ -1,7 +1,7 @@
 """
-Helix — Recursive Bio Pivot Engine  (concurrent BFS + verifier pass)
+Helix: Recursive Bio Pivot Engine  (concurrent BFS + verifier pass)
 Scans aliases found in bios up to MAX_DEPTH hops.
-Each depth level is scanned in full parallel — no sequential waiting.
+Each depth level is scanned in full parallel, no sequential waiting.
 """
 import asyncio, re
 from typing import Dict, List, Set
@@ -16,10 +16,13 @@ _ALIAS_PATTERNS = [
 
 
 def _extract_aliases(bio_links: dict) -> Set[str]:
+    """Handles only: a website URL ("https://t.co", "jack.blog") is not a username."""
     aliases = set()
-    for handle in bio_links.values():
+    for key, handle in bio_links.items():
+        if key == "website":
+            continue
         h = handle.strip().lstrip("@").lower()
-        if 3 <= len(h) <= 40:
+        if 3 <= len(h) <= 40 and re.fullmatch(r"[a-z0-9][a-z0-9_.\-]*", h) and "://" not in h:
             aliases.add(h)
     return aliases
 
@@ -30,6 +33,7 @@ async def pivot_scan(
     platforms:       dict,
     max_depth:       int = MAX_DEPTH,
     progress_cb             = None,
+    concurrency:     int = None,
 ) -> Dict[str, dict]:
     """
     Level-by-level BFS: all aliases at the same depth scan concurrently.
@@ -53,21 +57,20 @@ async def pivot_scan(
     if not level:
         return pivot_map
 
-    print(f"\n  [↻] Pivot: {len(level)} alias(es) queued")
+    print(f"\n  [>] Pivot: {len(level)} alias(es) queued")
 
-    # ── Level-by-level parallel scan ─────────────────────────────────────────
+    # Level-by-level parallel scan, at most 3 full scans at once (each is already async)
+    scan_sem = asyncio.Semaphore(3)
     while level:
         current_depth = level[0][1]
         current_level = [(u, d, v) for u, d, v in level if d == current_depth]
         level          = [(u, d, v) for u, d, v in level if d != current_depth]
 
-        # Semaphore: max 3 concurrent full scans at once (each scan is already async)
-        scan_sem = asyncio.Semaphore(3)
-
         async def scan_one(username, depth, via):
             async with scan_sem:
-                results = await check_username(username, platforms=platforms)
-                # ── Verifier pass on pivot results ────────────────────────────
+                results = await check_username(username, platforms=platforms,
+                                               concurrency=concurrency)
+                # Verifier pass on pivot results
                 results, purge_log = run_local_verifier(results, username)
                 found = [r for r in results if r.get("found")]
                 return username, depth, via, results, found, purge_log

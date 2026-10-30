@@ -1,1 +1,1 @@
-"""Helix intelligence modules — Wayback, GitHub, CRT, Paste"""
+"""Helix intelligence modules: Wayback, GitHub, CRT, Paste"""

@@ -1,5 +1,5 @@
 """
-Helix — Local Heuristic False Positive Engine  v3.2
+Helix: Local Heuristic False Positive Engine
 Hardened false-positive prevention with 7 detection layers:
   1. WAF / CAPTCHA page detection
   2. Registration / username-availability API trap detection
@@ -11,13 +11,13 @@ Hardened false-positive prevention with 7 detection layers:
 """
 import re
 from urllib.parse import urlparse
-from typing import Tuple, List, Optional
+from typing import Tuple, List
 
-# ── Score thresholds ──────────────────────────────────────────────────────────
+# Score thresholds
 _THRESHOLD_NORMAL = 60    # standard results
 _THRESHOLD_HIGH   = 85    # og_meta high-confidence results (stricter)
 
-# ── Score weights ─────────────────────────────────────────────────────────────
+# Score weights
 _SCORE_WAF              = 100   # instant purge: bot-challenge page
 _SCORE_REG_API          = 100   # instant purge: registration availability API
 _SCORE_SOFT_404         = 100   # instant purge: explicit not-found content
@@ -33,7 +33,10 @@ _SCORE_EXT_SOURCE       = 8
 _SCORE_NO_TITLE_WMN     = 50    # no og:title + WMN/Sherlock source = very suspicious
 _SCORE_API_URL_LOW      = 35    # API URL with confidence=low (body not validated)
 
-# ── Layer 1: WAF / CAPTCHA signatures ────────────────────────────────────────
+# Leads from external engines/databases get the same extra scrutiny.
+_EXTERNAL_SOURCES = ("sherlock", "wmn", "maigret_engine")
+
+# Layer 1: WAF / CAPTCHA signatures
 _WAF_SIGNATURES = [
     "just a moment...", "checking your browser",
     "enable javascript and cookies", "ddos protection by cloudflare",
@@ -43,9 +46,9 @@ _WAF_SIGNATURES = [
     "bot protection", "access denied by", "ray id",
 ]
 
-# ── Layer 2: Registration/availability API trap patterns ──────────────────────
+# Layer 2: Registration/availability API trap patterns
 # These URLs return 200 to mean "username is FREE to register",
-# NOT that a profile exists. Matching any of these → instant purge.
+# NOT that a profile exists. Matching any of these -> instant purge.
 _REGISTRATION_API_PATTERNS = [
     "checkusername",
     "check-username",
@@ -63,14 +66,14 @@ _REGISTRATION_API_PATTERNS = [
     "api/v1/accounts/lookup",    # Mastodon instances
     "wp-json/wporg/v1/username", # WordPress.org availability
     "GetCard/",                  # visnesscard
-    "tapitag/api/v1/",           # TAPiTAG — RF number, not user profile
+    "tapitag/api/v1/",           # TAPiTAG: RF number, not user profile
     "api/user/exist/",           # TryHackMe
     "/graphql",                  # GraphQL availability endpoints
-    "NickAvailability",          # Znanija — isAvailable:false ≠ profile exists
+    "NickAvailability",          # Znanija: isAvailable:false != profile exists
     "operationName=NickAvailability",
 ]
 
-# ── Layer 3: Soft-404 content strings ────────────────────────────────────────
+# Layer 3: Soft-404 content strings
 # Sites that serve "not found" pages with HTTP 200.
 _SOFT_404_MARKERS = [
     "not found", "page not found", "user not found", "profile not found",
@@ -84,7 +87,7 @@ _SOFT_404_MARKERS = [
     "couldn't find this account", "this page isn't available",
     "this page doesn't exist", "error 404", "http 404",
     "404 not found", '"users":[]', '"data":""', '"data":[]',
-    '"available":true',           # availability API → means NOT registered
+    '"available":true',           # availability API -> means NOT registered
     '"valid":false',              # X/Twitter format-rejection
     '"isValid":false',            # BGG
     '"msg":"invalid username"',   # Scratch
@@ -143,9 +146,9 @@ _SOFT_404_MARKERS = [
     "this user does not exist",
 ]
 
-# ── Layer 4: Bad redirect paths ───────────────────────────────────────────────
+# Layer 4: Bad redirect paths
 # If the final URL after redirects lands on one of these paths, the
-# original profile URL doesn't exist — the server bounced the request.
+# original profile URL doesn't exist: the server bounced the request.
 _BAD_REDIRECT_PATHS = [
     "/404", "/not-found", "/not_found", "/notfound",
     "/error", "/errors",
@@ -158,7 +161,7 @@ _BAD_REDIRECT_PATHS = [
     "/home", "/index", "/",
 ]
 
-# ── Layer 5: Dead / parked site markers ──────────────────────────────────────
+# Layer 5: Dead / parked site markers
 _DEAD_SITE_MARKERS = [
     "something new is coming", "site is shut down",
     "parked by godaddy", "this domain is for sale",
@@ -169,7 +172,7 @@ _DEAD_SITE_MARKERS = [
     "err_name_not_resolved", "err_cert_common_name_invalid",
 ]
 
-# ── Layer 5b: Hosts that are login-gated or CAPTCHA-blocked — always skip ────
+# Layer 5b: Hosts that are login-gated or CAPTCHA-blocked, always skip
 # These will NEVER produce a verifiable result without an authenticated session.
 _GATE_BLOCKED_HOSTS = {
     "bentbox.co",              # age-verify gate for all visitors
@@ -187,18 +190,18 @@ _GATE_BLOCKED_HOSTS = {
     "voices.com",              # redirects to talent search for missing profiles
     "3dnews.tech",             # CAPTCHA / login (alias)
     "igromania.ru",            # CAPTCHA / login (alias)
-    "slideshare.net",          # page no longer exists — all missing users 200
+    "slideshare.net",          # page no longer exists: all missing users 200
     "scribd.com",              # search results page, not a profile
     "ddosecrets.com",          # redirects to unrelated domain
     "hubski.com",              # login gate
     "ixbt.com",                # Russian forum login gate
     "kaggle.com",              # status_code only, soft-404s extensively
-    "op.gg",                   # OP.GG search pages — same result for any query
+    "op.gg",                   # OP.GG search pages: same result for any query
     "faceit.com",              # login gate
     "truelancer.com",          # false positive for all usernames
     "exploretalent.com",       # false positive
     "freelancebay.com",        # false positive
-    # Russian/obscure forums — status_code only, always 200 regardless of user
+    # Russian/obscure forums: status_code only, always 200 regardless of user
     "forum24.ru",              # alabay, kuban, jer, microcap, uaksu, volkodavcaoko
     "borda.ru",                # rodgersforum, starsonice, terminatorium
     "forum.rzn.info",          # Russian city forum
@@ -218,8 +221,8 @@ _GATE_BLOCKED_HOSTS = {
     "syberpussy.com",          # adult, login gate
     "mailpass.site",           # credential leak site, always 200
     "forum.rastrnet.ru",       # Russian ISP forum
-    "awd.ru",                  # search page — not a profile URL
-    "astro-talks.ru",          # search page — not a profile URL
+    "awd.ru",                  # search page: not a profile URL
+    "astro-talks.ru",          # search page: not a profile URL
     "forum-ukraina.net",       # Ukrainian forum, status_code FP
     "politforums.net",         # Russian politics, param-based not a profile
     "xss.is",                  # hacker forum, login required to view profiles
@@ -238,7 +241,7 @@ _GATE_BLOCKED_HOSTS = {
     "ulub.pl",                 # Polish video, status_code FP
     "nokia-love.ru",           # dead Russian Nokia forum
     "elektrik-avto.ru",        # Russian EV forum
-    "en.brickimedia.org",      # wiki — any username creates a page
+    "en.brickimedia.org",      # wiki: any username creates a page
     "milliarderr.com",         # Russian finance, status_code FP
     "ucozon.ru",               # Russian, status_code FP
     "vilinburg.net",           # Russian, status_code FP
@@ -280,11 +283,11 @@ _GATE_BLOCKED_HOSTS = {
     "guru.com",                # freelancer search, not profile
     "livetrack24.com",         # login gate
     "sports-tracker.com",      # login gate
-    "google.com",              # Google Maps contributor — not a real profile URL
-    "yelp.com",                # userid param — not a real profile
+    "google.com",              # Google Maps contributor: not a real profile URL
+    "yelp.com",                # userid param: not a real profile
     "touristlink.com",         # false positive
     "anime-planet.com",        # returns page for any username
-    "tvtropes.org",            # wiki — any username creates a page
+    "tvtropes.org",            # wiki: any username creates a page
     "carmasters.org",          # search page
     "nightbot.tv",             # no profile for non-existent users but 200
     "revolut.me",              # login/payment gate
@@ -298,7 +301,7 @@ _GATE_BLOCKED_HOSTS = {
     "airnfts.com",             # NFT platform false positive
     "freepo.st",               # old CGI false positive
     "bitpapa.com",             # crypto P2P false positive
-    # Sherlock false positives — status_code only, dot/underscore usernames not supported
+    # Sherlock false positives: status_code only, dot/underscore usernames not supported
     "pr0gramm.com",            # German site, rejects non-ASCII-compatible usernames
     "anilist.co",              # username validation rejects dots
     "discussions.apple.com",   # Apple requires AppleID format
@@ -323,6 +326,23 @@ _GATE_BLOCKED_HOSTS = {
     "gitlab.gnome.org",        # GNOME GitLab, soft-404 as 200 for missing users
     "gitlab.freedesktop.org",  # same pattern
     "patriots.win",            # "invalid user" served as 200 OK
+    # These answer unknown names inconsistently (sometimes 200, sometimes 404)
+    # or "find" every name, so a hit from them is never evidence.
+    "mb.srb2.org",             # random 200/404 for unknown names
+    "proshkolu.ru",            # intermittently omits its "user not found" text
+    "psychotype.info",         # 200 for unknown names under load
+    "reincarnationforum.com",  # 200 for unknown names under load
+    "codecademy.com",          # every name "found" (database text out of date)
+    "cydak.ru",                # every name "found" (database text out of date)
+    "explore.openaire.eu",     # a search page, not a profile
+    "cigarpass.com",           # forum homepage for any name
+    "breakers.tv",             # every name "found" (database text out of date)
+    "gefragt.net",             # 200 for unknown names under load
+    # Logged out, these serve the same login wall for every name, so no hit
+    # from them can be verified.
+    "facebook.com",
+    "threads.com",
+    "threads.net",
 }
 
 
@@ -333,7 +353,7 @@ def _is_gate_blocked_host(url: str) -> bool:
     except Exception:
         return False
 
-# ── Layer 6: Generic titles (existing verifier, keep) ────────────────────────
+# Layer 6: Generic titles (existing verifier, keep)
 _GENERIC_TITLES = {
     "instagram","facebook","tiktok","twitter","x","linkedin","pinterest",
     "snapchat","reddit","tumblr","medium","youtube","twitch","patreon",
@@ -383,7 +403,7 @@ _ERROR_KEYWORDS = [
     "error 404", "http 404", "page 404",
 ]
 
-# ── Layer 7: Per-platform username format rules ───────────────────────────────
+# Layer 7: Per-platform username format rules
 # If the username fails a platform's own format rule, ANY result is impossible.
 _PLATFORM_USERNAME_RULES: dict = {
     # pattern must FULLY match (re.fullmatch)
@@ -398,7 +418,7 @@ _PLATFORM_USERNAME_RULES: dict = {
 }
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# Helpers
 
 def _is_registration_api_url(url: str) -> bool:
     """Return True if this URL is a username-availability / registration check endpoint."""
@@ -428,19 +448,38 @@ def _is_dead_site(text: str) -> bool:
     return any(m in t for m in _DEAD_SITE_MARKERS)
 
 
-def _is_bad_redirect(original_url: str, final_url: str) -> bool:
+_MULTI_PART_SLD = {"co", "com", "org", "net", "ac", "gov", "edu"}
+
+
+def _site(netloc: str) -> str:
+    """Registrable domain, roughly: www.tumblr.com and x.tumblr.com -> tumblr.com."""
+    host = netloc.split("@")[-1].split(":")[0].lower().rstrip(".")
+    labels = host.split(".")
+    if len(labels) >= 3 and len(labels[-1]) == 2 and labels[-2] in _MULTI_PART_SLD:
+        return ".".join(labels[-3:])
+    return ".".join(labels[-2:])
+
+
+def _same_site_move(r, f, final_url: str, username: str) -> bool:
+    """A subdomain change within one site that still names the user (en.gravatar.com -> gravatar.com/jane)."""
+    return bool(username) and _site(r.netloc) == _site(f.netloc) \
+        and username.lower() in final_url.lower()
+
+
+def _is_bad_redirect(original_url: str, final_url: str, username: str = "") -> bool:
     """Return True if the final URL after redirect landed on a known bad path."""
     if not final_url or not original_url or final_url == original_url:
         return False
     try:
         r = urlparse(original_url)
         f = urlparse(final_url)
-        # Cross-domain redirect → always suspicious
+        # Cross-domain redirect -> always suspicious
         if r.netloc and f.netloc and r.netloc != f.netloc:
             # Exception: CDN redirects for confirmed profiles (e.g. Instagram CDN)
             if "cdninstagram" in f.netloc or "fbcdn" in f.netloc:
                 return False
-            return True
+            if not _same_site_move(r, f, final_url, username):
+                return True
         path = f.path.rstrip("/").lower() or "/"
         # Exact bad path match
         if path in _BAD_REDIRECT_PATHS:
@@ -464,15 +503,33 @@ def _username_valid_for_platform(username: str, platform_name: str) -> Tuple[boo
         return True, ""
     if rule.fullmatch(username):
         return True, ""
-    return False, f"username '{username}' violates {platform_name} format rules — result impossible"
+    return False, f"username '{username}' violates {platform_name} format rules: result impossible"
 
 
-def _is_homepage_redirect(req: str, final: str) -> bool:
+_HOMEPAGE_PATHS = {"", "/", "/home", "/index", "/index.html", "/index.php", "/en", "/en-us"}
+
+
+def _is_homepage_only(url: str, username: str) -> bool:
+    """A site root that never mentions the username cannot be anyone's profile."""
+    if not url or not username:
+        return False
+    try:
+        p = urlparse(url)
+    except Exception:
+        return False
+    if not p.netloc:
+        return False
+    if p.path.rstrip("/").lower() not in _HOMEPAGE_PATHS and p.path.lower() not in _HOMEPAGE_PATHS:
+        return False
+    return username.lower() not in url.lower()
+
+
+def _is_homepage_redirect(req: str, final: str, username: str = "") -> bool:
     if not final or not req or final == req:
         return False
     try:
         r = urlparse(req); f = urlparse(final)
-        if r.netloc != f.netloc:
+        if r.netloc != f.netloc and not _same_site_move(r, f, final, username):
             return True
         home = {"", "/", "/home", "/index", "/index.html",
                 "/login", "/signin", "/signup", "/register", "/join"}
@@ -481,57 +538,68 @@ def _is_homepage_redirect(req: str, final: str) -> bool:
         return False
 
 
-# ── Core scoring ──────────────────────────────────────────────────────────────
+# Core scoring
 
 def _compute_score(og_title: str, url: str, final_url: str,
                    confidence: str, source: str, username: str,
                    page_text: str = "",
-                   skip_missing_title: bool = False) -> Tuple[int, List[str]]:
+                   skip_missing_title: bool = False,
+                   probe_url: str = "") -> Tuple[int, List[str]]:
     """Pure scoring logic. Returns (score, reasons)."""
+    # Redirects are judged against the URL actually requested, for API-probed
+    # platforms that is the API host, not the profile page shown to the user.
+    origin = probe_url or url
     score   = 0
     reasons: List[str] = []
     t = og_title.lower().strip()
     u = username.lower()
 
-    # ── Layer 1: WAF / CAPTCHA ────────────────────────────────────────────────
+    # Layer 1: WAF / CAPTCHA
     if _has_waf_content(page_text) or (t and any(w in t for w in _WAF_SIGNATURES)):
         score += _SCORE_WAF
-        reasons.append("WAF/CAPTCHA page detected — bot-check served as 200 OK")
+        reasons.append("WAF/CAPTCHA page detected: bot-check served as 200 OK")
         return score, reasons   # no point scoring further
 
-    # ── Layer 2: Registration API trap ────────────────────────────────────────
+    # Layer 2: Registration API trap
     if _is_registration_api_url(url):
         score += _SCORE_REG_API
         reasons.append(
-            f"registration/availability API URL — HTTP 200 means username is FREE, "
+            f"registration/availability API URL: HTTP 200 means username is FREE, "
             f"not that a profile exists ({url[:80]})"
         )
         return score, reasons
 
-    # ── Layer 3: Soft-404 content ─────────────────────────────────────────────
+    # Layer 2b: Homepage-only "hit"
+    for candidate in (url, final_url):
+        if _is_homepage_only(candidate, username):
+            score += _SCORE_DEAD_SITE
+            reasons.append(f"homepage-only hit: no profile for this username ({candidate[:80]})")
+            return score, reasons
+
+    # Layer 3: Soft-404 content
     if page_text and _has_soft_404_content(page_text):
         score += _SCORE_SOFT_404
         reasons.append("page body contains explicit not-found / user-absent content")
         return score, reasons
 
-    # ── Layer 4: Bad redirect path ────────────────────────────────────────────
-    if _is_bad_redirect(url, final_url):
+    # Layer 4: Bad redirect path
+    if _is_bad_redirect(origin, final_url, username):
         score += _SCORE_BAD_REDIRECT
         reasons.append(f"redirected to bad path: {final_url[:80]}")
 
-    # ── Layer 5b: Login-gated / CAPTCHA-blocked host ──────────────────────────
+    # Layer 5b: Login-gated / CAPTCHA-blocked host
     if _is_gate_blocked_host(url):
         score += _SCORE_DEAD_SITE
-        reasons.append("login-gate or CAPTCHA-blocked host — result unverifiable")
+        reasons.append("login-gate or CAPTCHA-blocked host, so the result is unverifiable")
         return score, reasons
 
-    # ── Layer 5: Dead / parked site ───────────────────────────────────────────
+    # Layer 5: Dead / parked site
     if page_text and _is_dead_site(page_text):
         score += _SCORE_DEAD_SITE
         reasons.append("dead or parked domain")
         return score, reasons
 
-    # ── Layer 6: Generic title / login / error detection (original logic) ─────
+    # Layer 6: Generic title / login / error detection (original logic)
     if t and t in _GENERIC_TITLES:
         score += _SCORE_GENERIC
         reasons.append(f"platform-name title only: '{t}'")
@@ -561,14 +629,14 @@ def _compute_score(og_title: str, url: str, final_url: str,
     if not skip_missing_title and t and u not in t and confidence == "low":
         score += _SCORE_USER_ABSENT
 
-    if _is_homepage_redirect(url, final_url):
+    if _is_homepage_redirect(origin, final_url, username):
         score += _SCORE_ERROR
         reasons.append(f"redirected to homepage: {final_url[:60]}")
 
-    if source in ("sherlock", "wmn") and confidence == "low":
+    if source in _EXTERNAL_SOURCES and confidence == "low":
         score += _SCORE_EXT_SOURCE
 
-    if not og_title and source in ("sherlock", "wmn"):
+    if not og_title and source in _EXTERNAL_SOURCES:
         score += _SCORE_NO_TITLE_WMN
         if not skip_missing_title:
             reasons.append("no og:title on WMN/Sherlock result (likely API or dead page)")
@@ -594,8 +662,9 @@ def _score_result(result: dict, username: str) -> Tuple[bool, str, int]:
     source     = result.get("source",     "builtin")
     page_text  = result.get("_page_text", "")  # populated by checker when available
     platform   = result.get("platform",   "")
+    probe_url  = result.get("probe_url",  "") or ""
 
-    # ── Layer 7: username format pre-validation ───────────────────────────────
+    # Layer 7: username format pre-validation
     valid, fmt_reason = _username_valid_for_platform(username, platform)
     if not valid:
         return True, fmt_reason, 100
@@ -605,6 +674,7 @@ def _score_result(result: dict, username: str) -> Tuple[bool, str, int]:
             og_title, url, final_url, confidence, source, username,
             page_text=page_text,
             skip_missing_title=True,
+            probe_url=probe_url,
         )
         is_fp  = score >= _THRESHOLD_HIGH
         reason = "; ".join(reasons) if reasons else ""
@@ -613,6 +683,7 @@ def _score_result(result: dict, username: str) -> Tuple[bool, str, int]:
     score, reasons = _compute_score(
         og_title, url, final_url, confidence, source, username,
         page_text=page_text,
+        probe_url=probe_url,
     )
     is_fp  = score >= _THRESHOLD_NORMAL
     reason = "; ".join(reasons) if reasons else ""

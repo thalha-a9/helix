@@ -1,13 +1,14 @@
 """
-Helix — GitHub Deep Recon + Timezone Inference
+Helix: GitHub Deep Recon + Timezone Inference
 Uses GitHub REST API (free: 60 req/hr unauthenticated, 5000/hr with GITHUB_TOKEN).
-Extracts: real emails from commits, orgs, languages, timezone (≥15 commits),
+Extracts: real emails from commits, orgs, languages, timezone (>=15 commits),
 npm packages, top repos. Handles noreply addresses and rate limits gracefully.
 """
-import asyncio, aiohttp, os, re
+import asyncio, aiohttp, os
 from datetime import datetime, timezone
 from collections import Counter
 from typing import Dict, List, Optional, Set
+from osint import netconfig
 
 API = "https://api.github.com"
 
@@ -24,8 +25,7 @@ def _gh_headers() -> Dict:
 async def _get(session: aiohttp.ClientSession, url: str) -> Optional[any]:
     try:
         async with session.get(url, headers=_gh_headers(),
-                               timeout=aiohttp.ClientTimeout(total=12),
-                               ssl=False) as resp:
+                               timeout=aiohttp.ClientTimeout(total=12)) as resp:
             if resp.status == 200: return await resp.json()
             if resp.status == 403: return {"_rate_limited": True}
             return None
@@ -35,13 +35,13 @@ async def _get(session: aiohttp.ClientSession, url: str) -> Optional[any]:
 
 def _infer_timezone(timestamps: List[datetime]) -> Dict:
     """
-    Find the UTC offset that places the most commits in 07:00–23:00 local time.
-    Requires ≥15 commits for a reliable estimate.
+    Find the UTC offset that places the most commits in 07:00 to 23:00 local time.
+    Requires >=15 commits for a reliable estimate.
     """
     if len(timestamps) < 15:
         return {
             "timezone":    "insufficient data",
-            "note":        f"need ≥15 commits, have {len(timestamps)}",
+            "note":        f"need >=15 commits, have {len(timestamps)}",
             "active_hours": [],
         }
 
@@ -65,7 +65,7 @@ def _infer_timezone(timestamps: List[datetime]) -> Dict:
     return {
         "timezone":     tz_str,
         "confidence":   f"{conf}%",
-        "peak_hour":    f"{peak_hour:02d}:00–{(peak_hour+2)%24:02d}:00 local",
+        "peak_hour":    f"{peak_hour:02d}:00-{(peak_hour+2)%24:02d}:00 local",
         "active_hours": sorted(set(local_hours)),
         "sample_size":  len(timestamps),
     }
@@ -96,14 +96,14 @@ async def run(username: str) -> Dict:
     emails:     Set[str]      = set()
     timestamps: List[datetime] = []
 
-    connector = aiohttp.TCPConnector(limit=6, force_close=True)
-    async with aiohttp.ClientSession(connector=connector) as session:
+    connector = netconfig.build_connector(limit=6, force_close=True)
+    async with netconfig.new_session(connector=connector) as session:
 
-        # ── 1. Profile ────────────────────────────────────────────────────────
+        # 1. Profile
         profile = await _get(session, f"{API}/users/{username}")
         if not profile or (isinstance(profile, dict) and profile.get("_rate_limited")):
             result["rate_limited"] = True
-            result["error"] = "GitHub API rate limited — set GITHUB_TOKEN for 5000 req/hr"
+            result["error"] = "GitHub API rate limited: set GITHUB_TOKEN for 5000 req/hr"
             return result
         if isinstance(profile, dict) and profile.get("message") == "Not Found":
             result["error"] = "User not found on GitHub"
@@ -116,7 +116,7 @@ async def run(username: str) -> Dict:
         if profile.get("email") and _is_real_email(profile["email"]):
             emails.add(profile["email"])
 
-        # ── 2. Orgs ───────────────────────────────────────────────────────────
+        # 2. Orgs
         orgs = await _get(session, f"{API}/users/{username}/orgs")
         if orgs and isinstance(orgs, list):
             result["orgs"] = [
@@ -125,7 +125,7 @@ async def run(username: str) -> Dict:
                 for o in orgs[:10]
             ]
 
-        # ── 3. Repos + languages ──────────────────────────────────────────────
+        # 3. Repos + languages
         repos = await _get(session, f"{API}/users/{username}/repos?per_page=30&sort=pushed")
         lang_counter: Counter = Counter()
         if repos and isinstance(repos, list):
@@ -143,7 +143,7 @@ async def run(username: str) -> Dict:
         else:
             repos = []
 
-        # ── 4. Commit emails + timestamps (non-fork repos only) ───────────────
+        # 4. Commit emails + timestamps (non-fork repos only)
         checked = 0
         for repo in (repos or [])[:10]:
             if checked >= 6: break
@@ -172,11 +172,11 @@ async def run(username: str) -> Dict:
         result["commit_count"] = len(timestamps)
         result["emails"]       = sorted(emails)
 
-        # ── 5. Timezone inference ─────────────────────────────────────────────
+        # 5. Timezone inference
         if timestamps:
             result["timezone"] = _infer_timezone(timestamps)
 
-        # ── 6. npm cross-reference ────────────────────────────────────────────
+        # 6. npm cross-reference
         npm = await _get(session,
             f"https://registry.npmjs.org/-/v1/search?text=maintainer:{username}&size=5")
         if npm and isinstance(npm, dict) and "objects" in npm:

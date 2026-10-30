@@ -1,48 +1,77 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "helix-osint"
-version = "3.4.0"
-description = "Decode the digital DNA of any identity — OSINT Identity Mapper"
+dynamic = ["version"]
+description = "OSINT identity mapper: finds a username across 8,000+ sites, verifies every hit live, and graphs how the accounts connect"
 authors = [{name = "Thalha Ahmed", email = "sheikthalah035@gmail.com"}]
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.9"
-keywords = ["osint","reconnaissance","security","bug-bounty","username","identity"]
+keywords = ["osint", "reconnaissance", "security", "bug-bounty", "username", "identity",
+            "sherlock", "maigret", "whatsmyname", "investigation"]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Topic :: Security",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Security",
 ]
-dependencies = ["aiohttp>=3.9.0"]
+dependencies = ["aiohttp>=3.9.0,<4.0.0"]
 
 [project.optional-dependencies]
+socks = ["aiohttp-socks>=0.8.4"]
+dev   = ["pytest>=8", "pytest-asyncio>=0.23", "aiohttp-socks>=0.8.4"]
 tls   = ["curl-cffi>=0.6.2"]
-phash = ["imagehash>=4.3.1","Pillow>=10.0.0"]
-email = ["holehe>=1.4.4"]
-ai    = ["anthropic>=0.25.0","openai>=1.0.0"]
-full  = ["curl-cffi","imagehash","Pillow","holehe","anthropic","openai","weasyprint"]
+# --phash decodes pictures from strangers' accounts: Pillow 13 fixes 20 decoder
+# vulnerabilities but needs Python 3.11+, so older Pythons get the best they can.
+phash = ["imagehash>=4.3.1", "Pillow>=13.0.0; python_version >= '3.11'",
+         "Pillow>=11.3.0; python_version < '3.11'"]
+email = ["holehe>=1.4.4", "httpx[socks]"]
+ai    = ["anthropic>=0.25.0", "openai>=1.0.0"]
+pdf   = ["weasyprint>=60.0"]
+full  = ["curl-cffi>=0.6.2", "imagehash>=4.3.1", "Pillow>=13.0.0; python_version >= '3.11'",
+         "Pillow>=11.3.0; python_version < '3.11'", "holehe>=1.4.4",
+         "httpx[socks]", "anthropic>=0.25.0", "openai>=1.0.0", "weasyprint>=60.0",
+         "aiohttp-socks>=0.8.4"]
 
 [project.urls]
-Homepage   = "https://github.com/thalha-a9/helix"
-Repository = "https://github.com/thalha-a9/helix"
-Issues     = "https://github.com/thalha-a9/helix/issues"
+Homepage      = "https://github.com/thalha-a9/helix"
+Repository    = "https://github.com/thalha-a9/helix"
+Issues        = "https://github.com/thalha-a9/helix/issues"
+Changelog     = "https://github.com/thalha-a9/helix/blob/main/CHANGELOG.md"
+Benchmarks    = "https://github.com/thalha-a9/helix/blob/main/bench/README.md"
 
 [project.scripts]
-helix = "helix:main"
+# `helix-osint` is the name distribution packages ship: on Arch Linux (and so
+# BlackArch) `helix` is already the Helix text editor's binary.
+helix-osint = "helix:main"
+helix       = "helix:main"
 
 [tool.setuptools]
 py-modules = ["helix"]
+
+[tool.setuptools.dynamic]
+version = {attr = "osint.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["osint*"]
 
-[tool.setuptools.package-data]
-"*" = ["*.json"]
-
-[tool.setuptools.data-files]
-"." = ["helix.py"]
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]

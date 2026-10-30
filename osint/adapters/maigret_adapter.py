@@ -1,20 +1,38 @@
 """
-Helix — Maigret Adapter
+Helix: Maigret Adapter
 Fetches soxoj/maigret site database at runtime.
-Maigret has more sophisticated detection than Sherlock — uses presenceStrs,
+Maigret has more sophisticated detection than Sherlock, uses presenceStrs,
 absenceStrs, and more platform-specific logic. Cached 24h locally.
 github.com/soxoj/maigret
 """
-import aiohttp, json, time
+import aiohttp, json, re, time
 from pathlib import Path
 from typing import Dict, Optional
+from osint import netconfig
 
 MAIGRET_URL = (
     "https://raw.githubusercontent.com/soxoj/maigret/"
     "main/maigret/resources/data.json"
 )
 _CACHE_DIR  = Path.home() / ".cache" / "helix"
-_CACHE_FILE = _CACHE_DIR / "maigret_data.json"
+# v2: entries carry an "nsfw" flag. Version-1 caches lacked it, so --nsfw had
+# no effect on Maigret at all; a new file name makes them refetch.
+_CACHE_FILE = _CACHE_DIR / "maigret_data_v2.json"
+
+# Tags Maigret uses for adult sites. "dating" is its own category in both
+# Maigret and WhatsMyName and is kept.
+NSFW_TAGS = {"porn", "erotic", "webcam", "nsfw", "adult"}
+
+
+def is_nsfw(info: dict) -> bool:
+    tags = info.get("tags") or []
+    if isinstance(tags, str):
+        tags = [tags]
+    return bool(info.get("isNSFW")) or any(str(t).lower() in NSFW_TAGS for t in tags)
+
+
+def without_nsfw(platforms: Dict[str, dict], include_nsfw: bool) -> Dict[str, dict]:
+    return platforms if include_nsfw else {k: v for k, v in platforms.items() if not v.get("nsfw")}
 _CACHE_TTL  = 86_400   # 24 hours
 
 
@@ -47,10 +65,15 @@ def _translate(name: str, info: dict) -> Optional[dict]:
             return None
         url_tmpl = url_main.rstrip("/") + "/{username}"
 
+    url_tmpl = (url_tmpl.replace("{urlMain}", info.get("urlMain") or "{urlMain}")
+                        .replace("{urlSubpath}", info.get("urlSubpath") or ""))
+    # Anything still templated besides {username} cannot be requested.
+    if re.search(r"\{(?!username\})[^}]*\}", url_tmpl) or not url_tmpl.startswith("http"):
+        return None
+
     # Detection method
     presence  = info.get("presenceStrs",[])
     absence   = info.get("absenceStrs",[])
-    status_ok = info.get("isNSFW", False) is not None  # field presence check
 
     if absence and isinstance(absence, list) and absence[0]:
         pdef = {
@@ -106,7 +129,7 @@ async def fetch_maigret_platforms(timeout: int = 30) -> Dict[str, dict]:
     if cached:
         return cached
 
-    async with aiohttp.ClientSession() as session:
+    async with netconfig.new_session() as session:
         try:
             async with session.get(
                 MAIGRET_URL,
@@ -116,7 +139,7 @@ async def fetch_maigret_platforms(timeout: int = 30) -> Dict[str, dict]:
                     raise RuntimeError(f"HTTP {resp.status}")
                 raw = await resp.json(content_type=None)
         except Exception as e:
-            raise RuntimeError(f"Maigret fetch failed: {e}")
+            raise RuntimeError(f"Maigret fetch failed: {e}") from e
 
     platforms = {}
 
@@ -134,6 +157,8 @@ async def fetch_maigret_platforms(timeout: int = 30) -> Dict[str, dict]:
             continue
         pdef = _translate(name, info)
         if pdef:
+            if is_nsfw(info):
+                pdef["nsfw"] = True
             platforms[name] = pdef
 
     if platforms:
@@ -146,12 +171,12 @@ async def load_with_fallback(timeout: int = 30, include_nsfw: bool = False) -> D
     if cached:
         age = int(time.time() - _CACHE_FILE.stat().st_mtime)
         print(f"  [cache] Maigret data loaded ({age}s old, {len(cached)} platforms)")
-        return cached
+        return without_nsfw(cached, include_nsfw)
     try:
         p = await fetch_maigret_platforms(timeout=timeout)
         print(f"  [cache] Maigret data downloaded: {len(p)} platforms cached")
-        return p
+        return without_nsfw(p, include_nsfw)
     except Exception as e:
         print(f"\n  [!] Maigret adapter warning: {e}")
-        print(f"  [!] Try: --maigret-timeout 60\n")
+        print("  [!] Try: --maigret-timeout 60\n")
         return {}

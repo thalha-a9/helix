@@ -7,9 +7,10 @@ __pycache__/
 dist/
 build/
 .eggs/
+.pytest_cache/
 
 # Helix runtime
-results/
+/results/
 .cache/
 
 # Env & secrets
