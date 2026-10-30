@@ -1,0 +1,43 @@
+name: Site broken or missed
+description: A site no longer works, or Helix misses an account that really exists.
+title: "Site broken: <site>"
+labels: ["site broken"]
+body:
+  - type: input
+    id: site
+    attributes:
+      label: Site
+      placeholder: ExampleSite
+    validations:
+      required: true
+  - type: dropdown
+    id: problem
+    attributes:
+      label: What happens
+      options:
+        - Helix misses an account that exists
+        - The site is always reported as not checked
+        - The site errors on every scan
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: profile
+    attributes:
+      label: A public profile on that site
+      description: An account that exists, ideally a well known or brand account rather than a private person.
+      placeholder: https://example.com/u/somebrand
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: What Helix printed for that site
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Helix version
+      placeholder: Helix v3.6.0
+    validations:
+      required: true

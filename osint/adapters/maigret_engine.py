@@ -230,7 +230,8 @@ async def reprobe_leads(leads: List[dict], concurrency: int = 10,
         for lead in leads:
             lead.pop("_username", None)
         if control and username:
-            ctrls = (control_username(username), control_username(username))
+            ctrls = (control_username(username),
+                     control_username(username, keep_leading_digits=True))
             await asyncio.gather(*(
                 _control_check(session, lead, username, ctrls, semaphore)
                 for lead in leads if lead.get("found")

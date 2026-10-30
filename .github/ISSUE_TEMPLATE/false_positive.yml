@@ -1,0 +1,76 @@
+name: False positive
+description: Helix reported an account that does not exist, or a page that is not a profile.
+title: "False positive: <site> for <username>"
+labels: ["false positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. False positives are the bug I most want to fix.
+        Please don't include anything about a real person you are investigating; a made-up username that reproduces it is perfect.
+  - type: input
+    id: site
+    attributes:
+      label: Site
+      description: The site name as Helix printed it.
+      placeholder: ExampleSite
+    validations:
+      required: true
+  - type: input
+    id: username
+    attributes:
+      label: Username
+      description: A username that reproduces it. A made-up one is best.
+      placeholder: qzv8km2rtx4p
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: URL Helix reported
+      placeholder: https://example.com/u/qzv8km2rtx4p
+    validations:
+      required: true
+  - type: dropdown
+    id: page
+    attributes:
+      label: What the page actually shows
+      options:
+        - A "not found" or error page
+        - A login or sign-up wall
+        - The site's homepage or a search page
+        - Someone else's profile
+        - A bot check or captcha
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: helix-osint -u qzv8km2rtx4p --all
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Helix version
+      description: Output of `helix-osint --version`.
+      placeholder: Helix v3.6.0
+    validations:
+      required: true
+  - type: dropdown
+    id: network
+    attributes:
+      label: Network
+      options:
+        - Direct
+        - Tor (--tor)
+        - Proxy (--proxy)
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Did it happen every time? Did --no-control change anything?

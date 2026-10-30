@@ -1,0 +1,10 @@
+# Allow list: the image gets the package sources and nothing else.
+*
+!pyproject.toml
+!README.md
+!LICENSE
+!MANIFEST.in
+!helix.py
+!osint/
+**/__pycache__
+**/*.pyc

@@ -122,7 +122,7 @@ def _print_found(found, note=""):
         ph  = f" {M}~{RST}" if r.get("phash")              else ""
         src = {"sherlock":f" {DIM}[S]{RST}","wmn":f" {DIM}[W]{RST}",
                "maigret":f" {DIM}[M]{RST}","maigret_engine":f" {DIM}[M]{RST}",
-               "holehe":f" {M}[H]{RST}"}.get(r.get("source",""),"")
+               "fediverse":f" {DIM}[F]{RST}", "holehe":f" {M}[H]{RST}"}.get(r.get("source",""),"")
         lc  = f" {R}! location conflict{RST}" if r.get("location_conflict") else ""
         print(f"  {G}[+]{RST} {r['platform']:<24}{DIM}{r['url']}{RST}{cf}{xl}{ph}{src}{lc}")
 
@@ -266,6 +266,14 @@ async def run(args):
         from osint.adapters.maigret_adapter import load_with_fallback as mg_load
         mg   = await mg_load(timeout=args.maigret_timeout, include_nsfw=getattr(args,"nsfw",False))
         _merge_source(platform_map, "Maigret", mg)
+
+    # Fediverse servers (shipped list, no download)
+    if getattr(args, "fediverse", False):
+        from osint.adapters.fediverse_adapter import describe, host_of, load_platforms
+        print(f"  {C}[*]{RST} Loading fediverse servers ({describe()})...")
+        known = {host_of(d.get(k, "")) for d in platform_map.values() for k in ("url", "check_url")}
+        fv = load_platforms(include_nsfw=getattr(args, "nsfw", False), skip_hosts=known)
+        _merge_source(platform_map, "Fediverse", fv)
 
     # Strip leading dots/underscores so output dir isn't hidden on Linux
     # e.g. .rxzikhx. -> rxzikhx_
@@ -491,7 +499,7 @@ async def run(args):
             print(f"  {Y}[!]{RST} {DIM}{skipped} WAF platforms skipped: pip install curl-cffi{RST}")
         print(f"  {B}{'-'*54}{RST}")
         _print_found(found_u)
-        print(f"\n  {G}*{RST}=OG-verified  {C}<->{RST}=bio  {DIM}[S]{RST}=Sherlock  {DIM}[W]{RST}=WMN  {DIM}[M]{RST}=Maigret  {M}~{RST}=avatar\n")
+        print(f"\n  {G}*{RST}=OG-verified  {C}<->{RST}=bio  {DIM}[S]{RST}=Sherlock  {DIM}[W]{RST}=WMN  {DIM}[M]{RST}=Maigret  {DIM}[F]{RST}=Fediverse  {M}~{RST}=avatar\n")
 
         # Email permutation
         if args.email_permute and found_u:
@@ -878,7 +886,7 @@ Operational security:
 
     g = p.add_argument_group("platform sources")
     g.add_argument("--all",             action="store_true",  dest="all_sources",
-        help="Full coverage: builtin + WhatsMyName + Sherlock + Maigret databases (8,000+ sites; a few minutes on a fast link, 7 to 9 on a slow one)")
+        help="Full coverage: builtin + WhatsMyName + Sherlock + Maigret databases + fediverse servers (about 12,000 sites; a few minutes on a fast link, about 10 on a slow one)")
     g.add_argument("--no-control",      action="store_true",  dest="no_control",
         help="Skip the control probe that discards platforms which also 'find' a random "
              "nonexistent username (faster, but lets catch-all pages through)")
@@ -891,6 +899,8 @@ Operational security:
     g.add_argument("--sherlock",        action="store_true")
     g.add_argument("--sherlock-timeout",type=int,default=30,  dest="sherlock_timeout")
     g.add_argument("--maigret",         action="store_true",  help="Load Maigret database (github.com/soxoj/maigret)")
+    g.add_argument("--fediverse",       action="store_true",
+        help="Check about 3,900 Mastodon, Misskey, Lemmy and PeerTube servers, each its own site (live-tested list)")
     g.add_argument("--maigret-timeout", type=int,default=30,  dest="maigret_timeout")
     g.add_argument("--maigret-engine",  action="store_true",  dest="maigret_engine",
         help="Run the installed Maigret engine as a lead source, every hit is "
@@ -964,7 +974,7 @@ Operational security:
         sys.exit(1 if problems else 0)
     args.pivot_depth = min(max(getattr(args,"pivot_depth",3),1),4)
     if args.all_sources:
-        args.wmn = args.sherlock = args.maigret = True
+        args.wmn = args.sherlock = args.maigret = args.fediverse = True
 
     if args.tor and args.proxy:
         print(f"{R}[!] Use either --tor or --proxy, not both{RST}\n"); sys.exit(1)

@@ -1,5 +1,19 @@
 # Helix Changelog
 
+## v3.6.0 (2026-10-30)
+
+### Added
+- `--fediverse`: 3,925 Mastodon, Misskey, Lemmy and PeerTube servers, each its own website with its own users, checked through each server's standard user lookup. Every server passed a live test (an existing account found, two made-up names not) and had at least one active user a month. Included in `--all`, which now checks 11,988 sites; servers another database lists are skipped; 14 adult servers only with `--nsfw`. `tools/update_fediverse.py` rebuilds the list.
+- Docker image, `ghcr.io/thalha-a9/helix`, for linux/amd64 and linux/arm64 with every module included: `docker run --rm -v "$PWD:/data" ghcr.io/thalha-a9/helix -u USERNAME`. Published on each release tag, or by hand from the Actions tab.
+- Issue forms for false positives, broken sites, bugs, new sites and feature ideas, plus `CONTRIBUTING.md` and `SECURITY.md` (private vulnerability reports).
+
+### Changed
+- README: leads with verified username checking across 8,305 sites, shows the laptop timings next to the fast-link run, and recommends `--concurrency 150` to start.
+- Release workflow: artifact actions moved to their Node 24 versions.
+
+### Fixed
+- False positive on sites that read only the leading number of a username as a member id: forum.quik.ru showed member #4's profile for the made-up name "4tj4jneu4byr", and the control names, starting with other digits, got a clean 404. The second control name now keeps the leading digits, so such a site "finds" it too and is dropped. Real usernames that start with digits are still found on ordinary sites.
+
 ## v3.5.0 (2026-10-29)
 
 ### Added

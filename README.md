@@ -12,14 +12,14 @@
 ### Decode the digital DNA of any identity
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-3.5.0-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
+[![Version](https://img.shields.io/badge/Version-3.6.0-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
 [![License](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)](LICENSE)
 [![Platforms](https://img.shields.io/badge/Platforms-56%20builtin%20%7C%208%2C305%20with%20--all-a78bfa?style=flat-square)](https://github.com/thalha-a9/helix)
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-reproducible%20%7C%200%20false%20positives-00ff88?style=flat-square)](bench/README.md)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](https://github.com/thalha-a9/helix/pulls)
 
 **Helix** is an open-source username checker for OSINT. It checks a username<br>
-across **8,305 sites** (the Sherlock, WhatsMyName and Maigret databases combined)<br>
+across **11,988 sites** (the Sherlock, WhatsMyName and Maigret databases plus 3,683 fediverse servers)<br>
 and re-checks every hit live before reporting it: a made-up username comes back with **0 accounts**.<br>
 Then it shows which accounts belong to the same person, in an interactive graph you can explore and export.
 
@@ -27,6 +27,8 @@ Then it shows which accounts belong to the same person, in an interactive graph 
 **Thalha Ahmed**, creator of Helix | [@thalha-a9](https://github.com/thalha-a9)
 
 [**Quick Start**](#quick-start) | [**Features**](#what-makes-helix-different) | [**Modules**](#intelligence-modules) | [**Graph**](#the-graph) | [**Install**](#installation)
+
+<img src="docs/images/graph.png" width="900" alt="Helix graph of a real scan: the username in the middle, the accounts found around it, grouped by category">
 
 </div>
 
@@ -36,13 +38,13 @@ Then it shows which accounts belong to the same person, in an interactive graph 
 
 Most username checkers answer one question, *"Does this username exist on Platform X?"*, and leave you to sort the real hits from the false ones.
 
-Helix answers it across 8,305 sites with every hit verified, then answers the harder one: **"Which of these accounts belong to the same person?"**
+Helix answers it across nearly 12,000 sites with every hit verified, then answers the harder one: **"Which of these accounts belong to the same person?"**
 
 It extracts cross-platform links the account holders declare, matches identical profile pictures by perceptual hash, infers timezone from commit patterns, discovers domains via certificate transparency, and plots every relationship as a glowing edge in a browser-based network graph, all in a single command.
 
 ```bash
 pipx install helix-osint
-helix-osint -u johndoe --all                    # 8,305 sites, every hit verified
+helix-osint -u johndoe --all                    # 11,988 sites, every hit verified
 helix-osint -u johndoe --phash --pivot --crt    # plus avatar matching, pivoting and domains
 ```
 
@@ -51,14 +53,15 @@ helix-osint -u johndoe --phash --pivot --crt    # plus avatar matching, pivoting
 ## What Makes Helix Different
 
 Helix builds on Sherlock, WhatsMyName and Maigret. With `--all` it scans
-their site databases together (8,305 sites on 29 Oct 2026, with adult sites
-and search pages left out; `--nsfw` adds adult sites back). What it adds is
-what happens after a site says "found":
+their site databases together with 3,683 Mastodon, Misskey, Lemmy and PeerTube
+servers: 11,988 sites on 30 Oct 2026, with adult sites and search pages left
+out (`--nsfw` adds adult sites back). What it adds is what happens after a
+site says "found":
 
 | | What Helix does | Why it matters |
 |---|---|---|
 | **Live verification of every hit** | Each hit is re-fetched, and two usernames that cannot exist are requested from the same site at the same moment. The hit is kept only if it reproduces and both impossible names get the same clear "no such user" | Login walls, catch-all pages and changed markup are caught automatically, on every site, with no per-site tuning |
-| **A measured, reproducible false-positive rate** | 0 false positives on made-up names across the whole database, in a sealed rehearsal anyone can verify (8,305 sites) and in every earlier full run, with the harness and run records in [`bench/`](bench/README.md) | A number anyone can re-run, not a promise |
+| **A measured, reproducible false-positive rate** | 0 false positives on made-up names across the whole database, in sealed rehearsals anyone can verify (8,305 sites before the fediverse servers, 11,988 after) and in every earlier full run, with the harness and run records in [`bench/`](bench/README.md) | A number anyone can re-run, not a promise |
 | **Identity confidence per finding** | HIGH / MEDIUM / LOW from independent evidence: avatar match, declared cross-link, email, real name, location. A username match alone is never above LOW | "The account exists" and "the account is your subject" are reported separately |
 | **Perceptual avatar matching** | The identical picture on two accounts links them (`--phash`); platform defaults and site-wide images are ignored | Corroboration that does not depend on the username |
 | **Declared-only relationships** | Employers, organisations and family taken only from what the subject's corroborated accounts state, each with its source and quote | Nothing inferred from shared surnames or followers |
@@ -84,7 +87,8 @@ the report is the expensive mistake.
 |---|---|
 | `--wmn` | Loads WhatsMyName database at runtime: **~590 platforms** after unsafe entries are filtered out |
 | `--maigret` | Loads **Maigret** database at runtime: sophisticated detection with `presenceStrs`/`absenceStrs`, 24h cached |
-| `--all` | Full coverage in one flag: builtin + WhatsMyName + Sherlock + Maigret databases (8,305 sites on 29 Oct 2026, adult sites and search pages excluded; the upstream databases grow), every hit checked by the control probe |
+| `--fediverse` | **3,925 Mastodon, Misskey, Lemmy and PeerTube servers**, each its own website with its own users. Every server on the list passed a live test (an account that exists there was found, two made-up names were not) and had at least one active user a month. Checked through each server's standard user lookup; servers another database already lists are skipped, and 14 adult servers are only checked with `--nsfw` (reviewed by name, so report any we missed). `tools/update_fediverse.py` rebuilds the list |
+| `--all` | Full coverage in one flag: builtin + WhatsMyName + Sherlock + Maigret databases + fediverse servers (11,988 sites on 30 Oct 2026, adult sites and search pages excluded; the databases grow), every hit checked by the control probe |
 | `--concurrency N` | Probes in flight at once (default 20 to 60, scaled to the scan size; max 1,000). Raise it only on a fast, direct link: live, 250 in flight made 1,302 healthy sites time out on an ordinary connection. Sites that time out get one calm retry either way, and the end of every scan says how many sites answered |
 | `--save-pages` | Keeps the exact page received for every reported account: the raw bytes, response headers, the URL it ended on and the UTC time, each hashed with SHA-256, in `<name>_pages/` with a browsable `index.html`. Proof of what a profile showed at that moment, even if it is deleted later. Pages are saved as text so they cannot run scripts. For sites checked through an official API, the saved page is the API's answer. `--verify-pages DIR` re-checks every file |
 | `--record-attempt` | Writes sealed evidence of the scan, for a witnessed test, an audit or a published result: UTC start and finish, the exact site database and its SHA-256, the outcome for every site, and a fingerprint of the whole file, printed at the end so a screen recording can show it. `--verify-evidence FILE [SITES]` checks it |
@@ -173,6 +177,14 @@ pip install openai            # OpenRouter / NVIDIA AI verification (--ai openro
 pip install "helix-osint[full]"
 ```
 
+**Or run it with Docker** (every module included, nothing to install; Linux, macOS and Windows, Intel and ARM)
+```bash
+docker run --rm -v "$PWD:/data" ghcr.io/thalha-a9/helix -u johndoe
+```
+Reports land in `./results`. Add `--user "$(id -u):$(id -g)"` if the files should belong to your
+user. Tor running on your machine: on Linux add `--network host` and use `--tor`; on macOS and
+Windows use `--proxy socks5h://host.docker.internal:9050`.
+
 **Set GITHUB_TOKEN for 5000 req/hr on GitHub API** (optional, default is 60/hr):
 ```bash
 export GITHUB_TOKEN=ghp_yourtoken
@@ -208,7 +220,7 @@ python helix.py -u johndoe --pivot --pivot-depth 4
 # Permutations: scan johndoe1, john.doe, realjohndoe, etc.
 python helix.py -u johndoe --permutations
 
-# Full database (8,000+ sites), with sealed evidence of the run
+# Full database (about 12,000 sites), with sealed evidence of the run
 python helix.py -u johndoe --all --record-attempt --no-browser
 python helix.py --verify-evidence results/johndoe/johndoe_evidence.json results/johndoe/johndoe_sites.json
 
@@ -375,6 +387,8 @@ Helix uses the right detection method per platform instead of naive HTTP 200 che
 Measured live on 29 Oct 2026, the full database at the time (8,381 sites), a username
 nobody has: **72 accounts "found" with the control probe off, 0 with it on.**
 
+<img src="docs/images/scan.svg" width="820" alt="Helix scanning a made-up username across all 11,988 sites: 111 catch-all sites dropped by the control probe, 0 accounts reported, sealed with a fingerprint">
+
 Big username databases are full of sites that answer "found" for **any** name:
 login walls (Facebook and Instagram when logged out), catch-all pages, sites
 whose markup changed since the database entry was written. A single site like
@@ -484,12 +498,11 @@ Metric definitions, the record files and the live method are in [`bench/README.m
 
 ## Contributing
 
-Pull requests are welcome. For major changes open an issue first.
-
-When adding a platform to `platforms.py`:
-- Prefer `og_meta` or API endpoints over `text_not_present`
-- Always test against a non-existent username first: if it returns `found=True`, your detection is wrong
-- Add `bio_extract: True` + `bio_patterns` if the platform renders bio text server-side
+Pull requests and issues are welcome, and Helix is actively maintained.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, how to add or fix a site, and
+what a pull request needs. Found an account Helix reported that doesn't exist?
+Use the **False positive** issue form: it's the most useful report you can send.
+Security problems go through [SECURITY.md](SECURITY.md), privately.
 
 ---
 

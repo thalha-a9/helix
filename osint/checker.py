@@ -415,7 +415,7 @@ def definitive_negative(control: dict, platform: dict) -> bool:
 CONTROL_MIN_RANDOM = 12
 
 
-def control_username(shape: str = "") -> str:
+def control_username(shape: str = "", keep_leading_digits: bool = False) -> str:
     """
     A username nobody has, in the same shape as `shape`: the same punctuation
     in the same places (a leading dot, an underscore, a hyphen), every run of
@@ -425,7 +425,16 @@ def control_username(shape: str = "") -> str:
     The shape matters: sites treat some names specially. dev.to answered a
     leading-dot path like a profile while plain random names got a clean 404,
     so ".name" passed a control that never had a dot in it.
+
+    With keep_leading_digits, a username that starts with digits keeps them.
+    Some sites read only the leading number as a member id: forum.quik.ru
+    served member #4's profile for "4tj4jneu4byr", while controls starting
+    with other digits got a clean 404, so the made-up name passed as found.
     """
+    if keep_leading_digits:
+        m = re.match(r"\d+", shape or "")
+        if m:
+            return m.group(0) + control_username(shape[m.end():])
     rng = random.SystemRandom()
     letters, alnum = "abcdefghijklmnopqrstuvwxyz", "abcdefghijklmnopqrstuvwxyz0123456789"
     parts = re.findall(r"[A-Za-z0-9]+|[^A-Za-z0-9]+", shape or "")
@@ -461,9 +470,11 @@ async def _control_probe(session, results: list, plat_map: dict,
     while ctrl.lower() == username.lower():
         ctrl = control_username(username)
 
-    ctrl2 = control_username(username)
+    # The second control keeps any leading digits, so a site that only reads
+    # the leading number (a member id) "finds" it too and is caught.
+    ctrl2 = control_username(username, keep_leading_digits=True)
     while ctrl2.lower() in (username.lower(), ctrl.lower()):
-        ctrl2 = control_username(username)
+        ctrl2 = control_username(username, keep_leading_digits=True)
 
     async def settled(pdef, name, platform):
         """One check, retried once if the answer was transient (429, timeout...)."""

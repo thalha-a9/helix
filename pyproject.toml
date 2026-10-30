@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "helix-osint"
 dynamic = ["version"]
-description = "OSINT identity mapper: finds a username across 8,000+ sites, verifies every hit live, and graphs how the accounts connect"
+description = "OSINT identity mapper: finds a username across nearly 12,000 sites, verifies every hit live, and graphs how the accounts connect"
 authors = [{name = "Thalha Ahmed", email = "sheikthalah035@gmail.com"}]
 license = "MIT"
 license-files = ["LICENSE"]

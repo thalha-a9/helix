@@ -1,0 +1,30 @@
+name: New site
+description: Suggest a site Helix should check.
+title: "New site: <site>"
+labels: ["new site"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Helix already checks nearly 12,000 sites: the Sherlock, WhatsMyName and Maigret databases plus about 3,900 fediverse servers. If a site is missing, adding it to one of those projects helps every tool. For a site that only makes sense in Helix, fill this in.
+  - type: input
+    id: site
+    attributes:
+      label: Site and profile URL pattern
+      placeholder: https://example.com/u/{username}
+    validations:
+      required: true
+  - type: input
+    id: exists
+    attributes:
+      label: A profile that exists
+      placeholder: https://example.com/u/somebrand
+    validations:
+      required: true
+  - type: textarea
+    id: missing
+    attributes:
+      label: What the site shows for a username that doesn't exist
+      description: Status code, page title or text. This is what Helix uses to tell the two apart.
+    validations:
+      required: true

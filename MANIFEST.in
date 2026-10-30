@@ -2,6 +2,7 @@ include LICENSE README.md CHANGELOG.md requirements.txt install.sh
 graft tests
 graft bench
 graft docs
+graft tools
 global-exclude __pycache__ *.py[cod]
 prune private
 exclude tests/test_privacy.py

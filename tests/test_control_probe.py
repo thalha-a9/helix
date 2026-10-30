@@ -7,6 +7,7 @@ A platform that also finds the control name proves nothing and is discarded.
 """
 
 import http.server
+import re as _re
 import socket
 import threading
 
@@ -72,6 +73,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
             name = path.rsplit("/", 1)[-1].encode()
             status, body = 200, b"<html><head><title>Profile of " + name + \
                 b"</title></head><body>Welcome to the profile of " + name + b"</body></html>"
+        elif path.startswith("/memberid/"):
+            # Like forum.quik.ru: only the leading number is read, as a member
+            # id. "4tj4jneu4byr" shows member #4; names with no number 404.
+            name = path.rsplit("/", 1)[-1]
+            m = _re.match(r"\d+", name)
+            if m and int(m.group(0)) in (4, 62, 1337):
+                status, body = 200, (f'<html><head><title>Member {m.group(0)}</title>'
+                                     f'<link rel="canonical" href="/memberid/{name}"></head>'
+                                     f'<body>Posts by member {m.group(0)}</body></html>').encode()
+            else:
+                status, body = 404, b"<html><body>Page Not Found</body></html>"
+        elif path.startswith("/digits/"):
+            # An ordinary site where a real username starts with digits.
+            if path.endswith("/1337hax"):
+                status, body = 200, b"<html><title>1337hax</title>1337hax - 9 posts</html>"
+            else:
+                status, body = 404, b"<html><body>Page Not Found</body></html>"
         elif path == "/real/janeroe":
             status, body = 200, (b'<html><head><meta property="og:title" content="Jane Roe (@janeroe)">'
                                  b'</head><body>Jane Roe - 42 posts, joined 2019</body></html>')
@@ -293,7 +311,6 @@ async def test_one_off_error_for_the_random_name_is_not_proof(base, monkeypatch)
 
 # control names mirror the tested username's shape
 
-import re as _re
 
 
 @pytest.mark.parametrize("username", [".janeroe", "jane.roe", "jane_roe-99", "_x_", "max", "A1", "a-b"])
@@ -341,3 +358,35 @@ def test_a_site_that_finds_any_dotted_name_is_caught():
         httpd.shutdown(); httpd.server_close()
     assert dotted[0]["found"] is False and dotted[0].get("control_failed")
     assert real[0]["found"] is True
+
+
+# Sites that read only the leading number of a username (forum.quik.ru,
+# found by a live made-up-name scan on 30 Oct 2026).
+
+@pytest.mark.parametrize("username,prefix", [("4tj4jneu4byr", "4"), ("1337", "1337"),
+                                             ("62_x", "62"), ("1337hax", "1337")])
+def test_control_can_keep_the_leading_digits(username, prefix):
+    for _ in range(20):
+        c = control_username(username, keep_leading_digits=True)
+        assert c.startswith(prefix) and not c[len(prefix)].isdigit()
+        assert len(_re.sub(r"[^A-Za-z0-9]", "", c[len(prefix):])) >= 12
+        assert validate_username(c)[0]
+
+
+def test_keeping_leading_digits_changes_nothing_without_them():
+    for _ in range(20):
+        assert control_username("janeroe", keep_leading_digits=True)[0].isalpha()
+
+
+@pytest.mark.asyncio
+async def test_member_id_site_is_caught_for_a_made_up_name(base):
+    platforms = {"MemberId": plat(base, "memberid")}
+    results = await check_username("4tj4jneu4byr", platforms=platforms)
+    assert [r["platform"] for r in results if r["found"]] == []
+
+
+@pytest.mark.asyncio
+async def test_real_username_starting_with_digits_is_still_found(base):
+    platforms = {"Digits": plat(base, "digits")}
+    r = by_name(await check_username("1337hax", platforms=platforms))
+    assert r["Digits"]["found"] is True
