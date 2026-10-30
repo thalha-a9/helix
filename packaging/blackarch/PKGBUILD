@@ -2,43 +2,33 @@
 # See COPYING for license details.
 
 pkgname=helix-osint
-_pypi_name=helix-osint
-_pypi_archive=helix_osint
+_pkgname=helix_osint
 pkgver=3.5.0
 pkgrel=1
-pkgdesc='OSINT identity mapper: finds a username across 8,000+ sites, verifies every hit live and graphs how the accounts connect.'
+pkgdesc='OSINT username checker that verifies every hit live and maps how the accounts connect.'
 groups=('blackarch' 'blackarch-social' 'blackarch-recon')
 arch=('any')
 url='https://github.com/thalha-a9/helix'
 license=('MIT')
 depends=('python' 'python-aiohttp')
 optdepends=('python-aiohttp-socks: --tor and socks5:// proxies'
-            'python-curl-cffi: TLS impersonation for X, Instagram, TikTok'
-            'python-imagehash: perceptual avatar matching (--phash)'
-            'python-pillow: perceptual avatar matching (--phash)'
-            'holehe: deep email scan (--holehe)'
+            'python-curl_cffi: TLS impersonation for X, Instagram and TikTok'
+            'python-imagehash: avatar matching (--phash)'
+            'python-pillow: avatar matching (--phash)'
+            'holehe: email account check (--holehe)'
             'python-weasyprint: PDF reports (--report)')
 makedepends=('python-build' 'python-pip' 'python-setuptools')
-checkdepends=('python-pytest' 'python-pytest-asyncio' 'python-aiohttp-socks')
-source=("https://files.pythonhosted.org/packages/source/${_pypi_name::1}/$_pypi_name/$_pypi_archive-$pkgver.tar.gz")
-# Filled in by `updpkgsums` once v3.5.0 is on PyPI (see docs/RELEASING.md).
-sha512sums=('SKIP')
+source=("https://files.pythonhosted.org/packages/source/${pkgname::1}/$pkgname/$_pkgname-$pkgver.tar.gz")
+sha512sums=('c05fc8d1cfa8a7d228b2b59687e09e7b6aa7b1cd846a0aa9c323ba919903429fdaa98b046f099b99e7853aa4d4446f80704e9888cf47f42be6baea46ade87b16')
 
 build() {
-  cd "$_pypi_archive-$pkgver"
+  cd "$_pkgname-$pkgver"
 
   python -m build --wheel --no-isolation --outdir="$srcdir/dist"
 }
 
-check() {
-  cd "$_pypi_archive-$pkgver"
-
-  # Offline: the suite never touches the network.
-  python -m pytest -q -p no:cacheprovider
-}
-
 package() {
-  cd "$_pypi_archive-$pkgver"
+  cd "$_pkgname-$pkgver"
 
   pip install \
     --verbose \
@@ -51,11 +41,11 @@ package() {
     --prefix=/usr \
     --no-index \
     --find-links="file://$srcdir/dist" \
-    $_pypi_name
-
-  # /usr/bin/helix belongs to the Helix text editor (extra/helix).
-  rm -f "$pkgdir/usr/bin/helix"
+    $pkgname
 
   install -Dm 644 -t "$pkgdir/usr/share/doc/$pkgname/" README.md CHANGELOG.md
   install -Dm 644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+
+  # /usr/bin/helix belongs to the Helix text editor (extra/helix).
+  rm -f "$pkgdir/usr/bin/helix"
 }

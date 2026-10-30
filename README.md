@@ -18,9 +18,10 @@
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-reproducible%20%7C%200%20false%20positives-00ff88?style=flat-square)](bench/README.md)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](https://github.com/thalha-a9/helix/pulls)
 
-**Helix** is an open-source OSINT tool that does more than check usernames.<br>
-It maps how a target's online accounts actually connect, and draws them as an<br>
-interactive D3.js graph you can explore, filter and export.
+**Helix** is an open-source username checker for OSINT. It checks a username<br>
+across **8,305 sites** (the Sherlock, WhatsMyName and Maigret databases combined)<br>
+and re-checks every hit live before reporting it: a made-up username comes back with **0 accounts**.<br>
+Then it shows which accounts belong to the same person, in an interactive graph you can explore and export.
 
 *"Finding accounts is easy. Proving them is the job."*<br>
 **Thalha Ahmed**, creator of Helix | [@thalha-a9](https://github.com/thalha-a9)
@@ -33,14 +34,16 @@ interactive D3.js graph you can explore, filter and export.
 
 ## Why Helix?
 
-Most OSINT tools answer one question: *"Does this username exist on Platform X?"*
+Most username checkers answer one question, *"Does this username exist on Platform X?"*, and leave you to sort the real hits from the false ones.
 
-Helix answers a harder one: **"How do all these accounts connect to the same person?"**
+Helix answers it across 8,305 sites with every hit verified, then answers the harder one: **"Which of these accounts belong to the same person?"**
 
 It extracts cross-platform links the account holders declare, matches identical profile pictures by perceptual hash, infers timezone from commit patterns, discovers domains via certificate transparency, and plots every relationship as a glowing edge in a browser-based network graph, all in a single command.
 
 ```bash
-python helix.py -u johndoe --wayback --crt --paste --pivot --phash
+pipx install helix-osint
+helix-osint -u johndoe --all                    # 8,305 sites, every hit verified
+helix-osint -u johndoe --phash --pivot --crt    # plus avatar matching, pivoting and domains
 ```
 
 ---
@@ -109,15 +112,15 @@ the report is the expensive mistake.
 The HTML output is a standalone zero-dependency interactive network, no server needed, just open in a browser.
 
 ```
-White pulsing node     ->  Username root
-Amber pulsing node     ->  Email root
-Amber/orange nodes     ->  Pivot-discovered aliases
-Green solid edges      ->  Cross-links the account holder declared (Keybase proofs, profile links)
-Pink dashed edges      ->  The same picture on both accounts (perceptual hash)
-Red / violet nodes     ->  Breach exposure / dark-web leads (leads, not proof)
-Amber dashed edges     ->  Email-matched platforms
-Green ring on node     ->  High confidence (OG meta validated)
-Blue ring on node      ->  Medium confidence
+White pulsing node        Username root
+Amber pulsing node        Email root
+Amber/orange nodes        Pivot-discovered aliases
+Green solid edges         Cross-links the account holder declared (Keybase proofs, profile links)
+Pink dashed edges         The same picture on both accounts (perceptual hash)
+Red / violet nodes        Breach exposure / dark-web leads (leads, not proof)
+Amber dashed edges        Email-matched platforms
+Green ring on node        High confidence (OG meta validated)
+Blue ring on node         Medium confidence
 ```
 
 **Controls:** drag nodes | scroll to zoom | click node to open profile | hover for tooltip (confidence, og:title, cross-link partners, bio-extracted alias details) | search | not-found overlay | labels | SVG export | filter by confidence
@@ -283,8 +286,8 @@ Sends uncertain results to an LLM with a strict system prompt. Three providers:
 | Provider | Flag | Cost | Setup |
 |---|---|---|---|
 | Claude Sonnet 5.5 | `--ai claude` | Paid | `export ANTHROPIC_API_KEY=...` |
-| Nemotron 3.5 Super on OpenRouter | `--ai openrouter` | **Free tier** | `export OPENROUTER_API_KEY=...` -> [openrouter.ai](https://openrouter.ai) |
-| Nemotron 3.5 Super on NVIDIA NIM | `--ai nvidia` | **Free tier** | `export NVIDIA_API_KEY=...` -> [build.nvidia.com](https://build.nvidia.com) |
+| Nemotron 3.5 Super on OpenRouter | `--ai openrouter` | **Free tier** | `export OPENROUTER_API_KEY=...`, key from [openrouter.ai](https://openrouter.ai) |
+| Nemotron 3.5 Super on NVIDIA NIM | `--ai nvidia` | **Free tier** | `export NVIDIA_API_KEY=...`, key from [build.nvidia.com](https://build.nvidia.com) |
 
 Every result the AI sees has already passed the control probe, so it may only
 remove pages whose title is a login wall, an error or a bot check; it never
@@ -338,7 +341,7 @@ helix/
 
 **Every hit must survive a live cross-check before it is reported.** At the moment of checking, Helix re-requests the profile and two usernames that cannot exist. A hit is kept only if the profile is found again (twice) and both made-up names get the same clear "no such user" answer. A site that "finds" a made-up name is a catch-all, and is dropped. A made-up name that only gets a rate limit, challenge or gateway error proves nothing, so that hit is dropped as unverifiable. Pages judged by status code or by the absence of a not-found message must also name the exact user, so a rate-limit page, a sign-in redirect or a search result listing `jackie` cannot pass for `jack`.
 
-Measured live (Oct 2026), full `--all` database of 6,158 sites, default settings:
+Measured live (Oct 2026) on the `--all` database as it was then (6,158 sites; 8,305 in 3.5.0, see the rehearsals under Benchmarks), default settings:
 
 - **0 false positives** in each of 12 scans of fresh made-up usernames since these checks were added (the last 5 on the current code; 8 per scan before them).
 - **Precision on real names:** every sampled hit was a real account when checked against the live page (40 of 40, `--all`, username `jack`; every built-in hit for `jack`, `torvalds`, `max`, `Gargron`).
@@ -353,7 +356,7 @@ Helix uses the right detection method per platform instead of naive HTTP 200 che
 
 | Platform | Method | Why |
 |---|---|---|
-| Reddit | `reddit.com/user/{u}/about.json` -> `"is_employee"` field | JSON API; field only exists for valid users |
+| Reddit | `reddit.com/user/{u}/about.json`, the `"is_employee"` field | JSON API; field only exists for valid users |
 | Bluesky | AT Protocol API | SPA: static HTML is useless |
 | Chess.com | `api.chess.com/pub/player/{u}` | Official public API |
 | Lichess | `lichess.org/api/user/{u}` | Official public API |
@@ -369,7 +372,7 @@ Helix uses the right detection method per platform instead of naive HTTP 200 che
 
 ## Control Probe
 
-Measured live on 29 Oct 2026, the full database (8,381 sites), a username
+Measured live on 29 Oct 2026, the full database at the time (8,381 sites), a username
 nobody has: **72 accounts "found" with the control probe off, 0 with it on.**
 
 Big username databases are full of sites that answer "found" for **any** name:
@@ -382,7 +385,7 @@ that cannot exist. The hit survives only if it is found again (twice) and both
 random names get the same clear "no such user" answer. A site that "finds" a
 random name is a catch-all; a random name that only gets a rate limit,
 challenge or gateway error proves nothing, so that hit is dropped as
-unverifiable. No per-site tuning: it holds across all 6,158 sites. Sites seen
+unverifiable. No per-site tuning: it holds across the whole database. Sites seen
 answering unknown names at random are blocked outright.
 
 Leads from the Maigret engine get the same treatment by URL: the page must name
@@ -443,7 +446,7 @@ python -m bench.benchmark --sites 6000 --concurrency 300 --repeat 3 --json bench
 
 The harness serves 6,000 fake platforms from a separate process, 2 % of them
 catch-alls that answer "found" for any name, and scores the full pipeline
-(scan -> control probe -> verifier) against exact ground truth.
+(scan, control probe, then verifier) against exact ground truth.
 
 | 29 Oct 2026, 6,000 sites, control probe on | sites/s | precision | recall | false positives |
 |---|---|---|---|---|
@@ -459,6 +462,21 @@ catch-alls that answer "found" for any name, and scores the full pipeline
 
 The made-up-name evidence is published in `bench/results/` and verifies with
 `helix-osint --verify-evidence`.
+
+That run was on a fast data-centre link. The same check on a laptop over a
+mobile hotspot (30 Oct 2026, Kali, 4 threads), 8,305 sites each time:
+
+| `--concurrency` | clear answers | accounts reported (made-up name) | wall |
+|---|---|---|---|
+| 100 | 6,971 | **0** | 516.7 s |
+| **150** | **7,032** | **0** | **419.6 s** |
+| 250 | 7,022 | **0** | 445.8 s |
+
+So expect a few minutes for `--all` on a fast connection and 7 to 9 minutes on
+a slow one. The best `--concurrency` depends on the link: 250 was fastest on
+the data-centre link, but on the hotspot it overloaded the connection (about
+2,350 probes timed out on the first pass, against 580 at 150) and the re-check
+pass made it slower. Start at 150 and compare the clear-answer count.
 
 Metric definitions, the record files and the live method are in [`bench/README.md`](bench/README.md).
 

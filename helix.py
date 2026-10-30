@@ -878,7 +878,7 @@ Operational security:
 
     g = p.add_argument_group("platform sources")
     g.add_argument("--all",             action="store_true",  dest="all_sources",
-        help="Full coverage: builtin + WhatsMyName + Sherlock + Maigret databases (8,000+ sites; about 7 to 9 minutes)")
+        help="Full coverage: builtin + WhatsMyName + Sherlock + Maigret databases (8,000+ sites; a few minutes on a fast link, 7 to 9 on a slow one)")
     g.add_argument("--no-control",      action="store_true",  dest="no_control",
         help="Skip the control probe that discards platforms which also 'find' a random "
              "nonexistent username (faster, but lets catch-all pages through)")
