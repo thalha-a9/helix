@@ -1,12 +1,15 @@
 name: Release
 
-# Push a tag like v3.5.0 and this builds, tests, publishes to PyPI and makes a
-# GitHub release. PyPI uses Trusted Publishing: no API token is stored here.
-# One-time setup is in docs/RELEASING.md.
+# Push a tag like v3.6.0, or press "Run workflow" on main in the Actions tab
+# (works from a phone): this builds, tests, publishes to PyPI and makes the
+# GitHub release. Started by hand, it creates the tag from osint.__version__
+# and then starts the Docker workflow for it. PyPI uses Trusted Publishing:
+# no API token is stored here. One-time setup is in docs/RELEASING.md.
 
 on:
   push:
     tags: ["v*.*.*"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,6 +17,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v5
 
@@ -21,13 +26,27 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Tag must match osint.__version__
+      - name: Work out the tag from osint.__version__
+        id: version
         run: |
           version=$(python -c "import re;print(re.search(r'__version__ = \"(.+?)\"', open('osint/__init__.py').read()).group(1))")
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match osint.__version__ ($version)"
-            exit 1
+          tag="v$version"
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            if [ "$tag" != "$GITHUB_REF_NAME" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match osint.__version__ ($version)"
+              exit 1
+            fi
+          else
+            if [ "$GITHUB_REF_NAME" != "main" ]; then
+              echo "::error::start a release from main, not $GITHUB_REF_NAME"
+              exit 1
+            fi
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+              echo "::error::$tag already exists: bump osint.__version__ first"
+              exit 1
+            fi
           fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: |
@@ -65,10 +84,11 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
 
   github-release:
-    needs: pypi
+    needs: [build, pypi]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write           # to start the Docker workflow
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v8
@@ -78,7 +98,18 @@ jobs:
       - name: Create the GitHub release with the changelog section as notes
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${TAG#v}"
           awk -v v="## v$version" 'index($0, v)==1 {on=1; next} /^## v/ && on {exit} on' CHANGELOG.md > notes.md
-          gh release create "$GITHUB_REF_NAME" dist/* --title "Helix $GITHUB_REF_NAME" --notes-file notes.md
+          # --target creates the tag on this commit when the release was started by hand.
+          gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Helix $TAG" --notes-file notes.md
+
+      # A tag made with the workflow token starts no workflows, so start the
+      # Docker publish for it here (manual starts are allowed).
+      - name: Publish the Docker image for this tag
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: gh workflow run docker.yml --ref "$TAG"

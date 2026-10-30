@@ -23,17 +23,23 @@ changelog section as notes.
 1. Set the version in `osint/__init__.py` and add a `## vX.Y.Z (date)`
    section at the top of `CHANGELOG.md` (a test fails if it is missing).
 2. Merge to `main` with CI green.
-3. Tag and push:
+3. Start the release, either way:
+   - **From the browser (works on a phone):** Actions, **Release**, **Run
+     workflow**, branch `main`. It reads the version, refuses if that tag
+     already exists, creates the tag with the release, and starts the
+     **Docker** workflow for it.
+   - **From a terminal:**
 
-   ```bash
-   git checkout main && git pull
-   git tag -a v3.5.0 -m "Helix v3.5.0"
-   git push origin v3.5.0
-   ```
+     ```bash
+     git checkout main && git pull
+     git tag -a v3.6.0 -m "Helix 3.6.0"
+     git push origin v3.6.0
+     ```
 
-4. Watch the **Release** workflow. When it is green:
+4. Watch the **Release** and **Docker** workflows. When they are green:
    - <https://pypi.org/project/helix-osint/> shows the new version,
-   - the GitHub release has the wheel, the sdist and the notes.
+   - the GitHub release has the wheel, the sdist and the notes,
+   - `ghcr.io/thalha-a9/helix` has the new version.
 
 ## After the release
 

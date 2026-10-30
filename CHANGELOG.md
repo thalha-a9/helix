@@ -9,7 +9,7 @@
 
 ### Changed
 - README: leads with verified username checking across 8,305 sites, shows the laptop timings next to the fast-link run, and recommends `--concurrency 150` to start.
-- Release workflow: artifact actions moved to their Node 24 versions.
+- Release workflow: artifact actions moved to their Node 24 versions, and a release can be started from the Actions tab (Run workflow), which creates the tag and starts the Docker publish.
 
 ### Fixed
 - False positive on sites that read only the leading number of a username as a member id: forum.quik.ru showed member #4's profile for the made-up name "4tj4jneu4byr", and the control names, starting with other digits, got a clean 404. The second control name now keeps the leading digits, so such a site "finds" it too and is dropped. Real usernames that start with digits are still found on ordinary sites.
