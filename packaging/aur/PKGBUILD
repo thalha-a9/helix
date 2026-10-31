@@ -1,0 +1,35 @@
+# Maintainer: Thalha Ahmed <sheikthalah035 at gmail dot com>
+
+pkgname=helix-osint
+_pkgname=helix_osint
+pkgver=3.6.1
+pkgrel=1
+pkgdesc='OSINT username checker that verifies every hit live and maps how the accounts connect'
+arch=('any')
+url='https://github.com/thalha-a9/helix'
+license=('MIT')
+depends=('python' 'python-aiohttp')
+makedepends=('python-build' 'python-installer' 'python-setuptools' 'python-wheel')
+optdepends=('python-aiohttp-socks: --tor and socks5:// proxies'
+            'python-curl_cffi: TLS impersonation for X, Instagram and TikTok'
+            'python-imagehash: avatar matching (--phash)'
+            'python-pillow: avatar matching (--phash)'
+            'holehe: email account check (--holehe)'
+            'python-weasyprint: PDF reports (--report)')
+source=("https://files.pythonhosted.org/packages/source/${pkgname::1}/$pkgname/$_pkgname-$pkgver.tar.gz")
+sha256sums=('0831072b447993046693e365c22d0a416e259a2b353922a09b8a3687b121fd0d')
+
+build() {
+  cd "$_pkgname-$pkgver"
+  python -m build --wheel --no-isolation
+}
+
+package() {
+  cd "$_pkgname-$pkgver"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 -t "$pkgdir/usr/share/doc/$pkgname/" README.md CHANGELOG.md
+
+  # /usr/bin/helix belongs to the Helix text editor (extra/helix).
+  rm "$pkgdir/usr/bin/helix"
+}
