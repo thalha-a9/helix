@@ -133,4 +133,4 @@ def test_maigret_fetch_flags_and_load_filters(monkeypatch, tmp_path):
 
 def test_cache_files_were_renamed_so_flagless_caches_are_not_reused():
     assert sherlock_adapter._CACHE_FILE.name == "sherlock_data_v2.json"
-    assert maigret_adapter._CACHE_FILE.name == "maigret_data_v2.json"
+    assert maigret_adapter._CACHE_FILE.name == "maigret_data_v3.json"  # v3: all absence strings

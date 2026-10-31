@@ -17,7 +17,8 @@ MAIGRET_URL = (
 _CACHE_DIR  = Path.home() / ".cache" / "helix"
 # v2: entries carry an "nsfw" flag. Version-1 caches lacked it, so --nsfw had
 # no effect on Maigret at all; a new file name makes them refetch.
-_CACHE_FILE = _CACHE_DIR / "maigret_data_v2.json"
+# v3: entries carry every absence string, not just the first.
+_CACHE_FILE = _CACHE_DIR / "maigret_data_v3.json"
 
 # Tags Maigret uses for adult sites. "dating" is its own category in both
 # Maigret and WhatsMyName and is kept.
@@ -57,6 +58,9 @@ def _save_cache(data: dict):
 
 def _translate(name: str, info: dict) -> Optional[dict]:
     """Translate a Maigret site entry to Helix platform schema."""
+    # Some entries take an account id (vk_id, steam_id...), not a username.
+    if info.get("type", "username") != "username":
+        return None
     url_tmpl = info.get("url","")
     if not url_tmpl or "{username}" not in url_tmpl:
         # Try to construct from urlMain + username
@@ -71,18 +75,28 @@ def _translate(name: str, info: dict) -> Optional[dict]:
     if re.search(r"\{(?!username\})[^}]*\}", url_tmpl) or not url_tmpl.startswith("http"):
         return None
 
-    # Detection method
-    presence  = info.get("presenceStrs",[])
-    absence   = info.get("absenceStrs",[])
+    # Detection method. A page showing any of the absence strings is not a
+    # profile. Olx.pl lists two; reading only the first let its generic page
+    # (which has the second) through as an account.
+    #
+    # Maigret's presence strings ("presenseStrs") are not used: many are
+    # written for the reply of its urlProbe API address, which Helix does not
+    # request, so on the profile page they miss real accounts (Twitter,
+    # Roblox, Chess.com, Gravatar).
+    absence = info.get("absenceStrs") or []
+    absence = [x for x in ([absence] if isinstance(absence, str) else absence)
+               if isinstance(x, str) and x]
+    presence = info.get("presenceStrs", [])
 
-    if absence and isinstance(absence, list) and absence[0]:
+    if absence:
         pdef = {
-            "url":            url_tmpl,
-            "method":         "text_not_present",
-            "not_found_text": absence[0],
-            "category":       _categorize(info),
-            "color":          "#38bdf8",
-            "source":         "maigret",
+            "url":             url_tmpl,
+            "method":          "text_not_present",
+            "not_found_text":  absence[0],
+            "not_found_texts": absence,
+            "category":        _categorize(info),
+            "color":           "#38bdf8",
+            "source":          "maigret",
         }
     elif presence and isinstance(presence, list) and presence[0]:
         pdef = {

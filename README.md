@@ -12,7 +12,7 @@
 ### Decode the digital DNA of any identity
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-3.6.0-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
+[![Version](https://img.shields.io/badge/Version-3.6.1-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
 [![License](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)](LICENSE)
 [![Platforms](https://img.shields.io/badge/Platforms-56%20builtin%20%7C%208%2C305%20with%20--all-a78bfa?style=flat-square)](https://github.com/thalha-a9/helix)
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-reproducible%20%7C%200%20false%20positives-00ff88?style=flat-square)](bench/README.md)
@@ -61,7 +61,7 @@ site says "found":
 | | What Helix does | Why it matters |
 |---|---|---|
 | **Live verification of every hit** | Each hit is re-fetched, and two usernames that cannot exist are requested from the same site at the same moment. The hit is kept only if it reproduces and both impossible names get the same clear "no such user" | Login walls, catch-all pages and changed markup are caught automatically, on every site, with no per-site tuning |
-| **A measured, reproducible false-positive rate** | 0 false positives on made-up names across the whole database, in sealed rehearsals anyone can verify (8,305 sites before the fediverse servers, 11,988 after) and in every earlier full run, with the harness and run records in [`bench/`](bench/README.md) | A number anyone can re-run, not a promise |
+| **A measured, reproducible false-positive rate** | 0 false positives on made-up names across the whole database, in sealed rehearsals anyone can verify (8,305 sites before the fediverse servers, 11,988 after) and in every earlier full run, with the harness and run records in [`bench/`](bench/README.md). One reader's run found 1 (Olx.pl, a page that matched any id-shaped name); fixed in 3.6.1 | A number anyone can re-run, not a promise |
 | **Identity confidence per finding** | HIGH / MEDIUM / LOW from independent evidence: avatar match, declared cross-link, email, real name, location. A username match alone is never above LOW | "The account exists" and "the account is your subject" are reported separately |
 | **Perceptual avatar matching** | The identical picture on two accounts links them (`--phash`); platform defaults and site-wide images are ignored | Corroboration that does not depend on the username |
 | **Declared-only relationships** | Employers, organisations and family taken only from what the subject's corroborated accounts state, each with its source and quote | Nothing inferred from shared surnames or followers |

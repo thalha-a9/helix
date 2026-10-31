@@ -324,11 +324,12 @@ async def _apply(result: dict, platform: dict, username: str,
                 result["error"] = "soft404_body: page body indicates user not found"
 
     elif method == "text_not_present":
-        nf = platform.get("not_found_text", "")
+        nfs = [t for t in (platform.get("not_found_texts")
+                           or [platform.get("not_found_text", "")]) if t]
         # Absence of the not-found text alone is weak: a rate-limit page, an
         # error page or changed wording lacks it too. A real profile page
         # names its user, so require that as well.
-        result["found"] = ((status == 200) and (nf not in text)
+        result["found"] = ((status == 200) and not any(t in text for t in nfs)
                            and names_user(text, username))
         if result["found"]: result["confidence"] = "medium"
 

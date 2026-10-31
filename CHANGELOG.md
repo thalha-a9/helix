@@ -1,5 +1,11 @@
 # Helix Changelog
 
+## v3.6.1 (2026-10-31)
+
+### Fixed
+- False positive on Olx.pl, found by a reader: a made-up username was reported as an account. Maigret lists two "not found" texts for Olx.pl and Helix read only the first, so a generic page carrying the second passed. Every "not found" text of a Maigret entry now counts (65 entries list more than one). Olx.pl user pages are keyed by seller ids, so a username match there was never evidence anyway. Checked against 635 real hits for `jack` and `torvalds`: none lost.
+- Maigret entries that take an account id rather than a username (VK, Steam, Yandex ids and similar) are skipped instead of being requested with a username. That is 25 entries, so `--all` now checks 11,963 sites. Three full scans of new made-up names with this release: 0 accounts each.
+
 ## v3.6.0 (2026-10-30)
 
 ### Added
