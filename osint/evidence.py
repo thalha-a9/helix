@@ -54,6 +54,7 @@ _REASONS = (
     ("unverifiable: platform also reports", "control probe: site finds impossible usernames"),
     ("unverifiable: no clear", "control probe: impossible username got no clear answer"),
     ("unverifiable: hit did not reproduce", "control probe: hit did not reproduce"),
+    ("unconfirmed: a made-up name the same length", "unconfirmed: a same-length made-up name was also found"),
     ("heuristic_purge", "verifier: false-positive pattern"),
     ("soft404_body", "verifier: not-found page"),
     ("Server disconnected", "connection error"),
@@ -142,8 +143,12 @@ def summarise(results: List[dict]) -> Dict:
 
 def build(*, username: str, results: List[dict], platform_map: Dict[str, dict],
           started: str, finished: str, wall_seconds: float, argv: List[str],
-          concurrency: int, control: bool, sites_file: str, pages: Optional[Dict] = None) -> Dict:
-    """The evidence record, with `fingerprint` = SHA-256 of everything else."""
+          concurrency: int, control: bool, sites_file: str, pages: Optional[Dict] = None,
+          target_type: str = "username") -> Dict:
+    """The evidence record, with `fingerprint` = SHA-256 of everything else.
+
+    For an email scan `username` holds the address and target_type is "email";
+    username records leave the key out, so their bytes stay as they were."""
     sites_hash = sha256(canonical(platform_map))
     per_site = sorted(
         ({"platform": r.get("platform"), "source": r.get("source"), "url": r.get("url"),
@@ -164,6 +169,7 @@ def build(*, username: str, results: List[dict], platform_map: Dict[str, dict],
             "command": " ".join(_redact_argv(argv)),
             "concurrency": concurrency,
             "control_probe": control,
+            **({"target_type": target_type} if target_type != "username" else {}),
         },
         "environment": {
             "python": _platform.python_version(),

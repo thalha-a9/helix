@@ -8,6 +8,11 @@ engine being measured. Every site is one of:
             404 for everyone else (the common well-behaved platform)
   catchall  answers 200 naming *any* user (login walls, search pages: the
             false-positive trap the control probe exists to catch)
+  short400  a catch-all for names up to SHORT_LIMIT characters that rejects
+            longer ones with 400 "invalid username"
+  short404  the same, but longer names get a plain 404 (a route that only
+            matches short names). Made-up names longer than the subject
+            cannot catch these two: they never see the catch-all.
   dead      never answers (a host that is down; the engine's timeout tax)
 
 Which sites have which kind, and which have the subject, is decided by a
@@ -29,19 +34,24 @@ from typing import Dict
 
 SUBJECT = "janeroe"          # the one user the benchmark scans for
 SUBJECT_EVERY = 10           # normal site i has the subject when i % 10 == 0
+SHORT_LIMIT = 11             # longest name the short* catch-alls accept
+CATCHALL_KINDS = ("catchall", "short400", "short404")
 
 _NOT_FOUND = b"<html><head><title>Page not found</title></head><body>user not found</body></html>"
 
 
-def build_manifest(sites: int, seed: int, catchall_frac: float, dead_frac: float) -> Dict[str, dict]:
+def build_manifest(sites: int, seed: int, catchall_frac: float, dead_frac: float,
+                   short_catchall_frac: float = 0.0) -> Dict[str, dict]:
     rng = random.Random(seed)
     manifest = {}
     for i in range(sites):
-        roll = rng.random()
+        roll = rng.random()       # one draw per site, so other kinds stay where they were
         if roll < dead_frac:
             kind = "dead"
         elif roll < dead_frac + catchall_frac:
             kind = "catchall"
+        elif roll < dead_frac + catchall_frac + short_catchall_frac:
+            kind = "short400" if i % 2 else "short404"
         else:
             kind = "normal"
         manifest[f"s{i}"] = {"kind": kind, "has_subject": kind == "normal" and i % SUBJECT_EVERY == 0}
@@ -72,8 +82,12 @@ def make_handler(manifest: Dict[str, dict], latency_s: float, dead_s: float):
                 return self._send(504, b"gateway timeout")
             if latency_s:
                 time.sleep(latency_s)
-            if kind == "catchall" or (kind == "normal" and manifest[site]["has_subject"]
-                                      and user == SUBJECT):
+            if kind in ("short400", "short404") and len(user) > SHORT_LIMIT:
+                if kind == "short400":
+                    return self._send(400, b"<html><body>invalid username</body></html>")
+                return self._send(404, _NOT_FOUND)
+            if kind in CATCHALL_KINDS or (kind == "normal" and manifest[site]["has_subject"]
+                                          and user == SUBJECT):
                 return self._send(200, _profile_page(user))
             return self._send(404, _NOT_FOUND)
 
@@ -103,8 +117,9 @@ def free_port() -> int:
 
 
 def serve(port: int, sites: int, seed: int, catchall_frac: float, dead_frac: float,
-          latency_ms: float, dead_seconds: float, block: bool = True):
-    manifest = build_manifest(sites, seed, catchall_frac, dead_frac)
+          latency_ms: float, dead_seconds: float, block: bool = True,
+          short_catchall_frac: float = 0.0):
+    manifest = build_manifest(sites, seed, catchall_frac, dead_frac, short_catchall_frac)
     httpd = http.server.ThreadingHTTPServer(
         ("127.0.0.1", port), make_handler(manifest, latency_ms / 1000.0, dead_seconds))
     httpd.daemon_threads = True
@@ -121,10 +136,12 @@ def main():
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--catchall-frac", type=float, default=0.02)
     p.add_argument("--dead-frac", type=float, default=0.0)
+    p.add_argument("--short-catchall-frac", type=float, default=0.0)
     p.add_argument("--latency-ms", type=float, default=50.0)
     p.add_argument("--dead-seconds", type=float, default=30.0)
     a = p.parse_args()
-    serve(a.port, a.sites, a.seed, a.catchall_frac, a.dead_frac, a.latency_ms, a.dead_seconds)
+    serve(a.port, a.sites, a.seed, a.catchall_frac, a.dead_frac, a.latency_ms, a.dead_seconds,
+          short_catchall_frac=a.short_catchall_frac)
 
 
 if __name__ == "__main__":

@@ -18,9 +18,10 @@ import tempfile
 from typing import Dict, List, Optional
 
 from osint import netconfig
-from osint.checker import (CONTROL_ERROR, CONTROL_INCONCLUSIVE, _extract_og_tag, _headers,
-                           _is_waf_page, _MAX_BODY_BYTES, _TRANSIENT_STATUSES,
-                           control_username, names_user)
+from osint.checker import (CONTROL_ERROR, CONTROL_INCONCLUSIVE, CONTROL_UNCONFIRMED,
+                           _extract_og_tag, _headers, _is_waf_page, _MAX_BODY_BYTES,
+                           _TRANSIENT_STATUSES, control_username, names_user,
+                           same_length_control)
 
 import aiohttp
 
@@ -198,7 +199,10 @@ async def _control_check(session, lead: dict, username: str, ctrls: tuple,
     def discard(reason):
         lead["found"] = False
         lead["error"] = reason
-        lead["control_failed"] = True
+        if reason == CONTROL_UNCONFIRMED:
+            lead["unconfirmed"] = True
+        else:
+            lead["control_failed"] = True
 
     if username.lower() not in lead["url"].lower():
         return discard(CONTROL_INCONCLUSIVE)
@@ -210,7 +214,9 @@ async def _control_check(session, lead: dict, username: str, ctrls: tuple,
             return discard(CONTROL_INCONCLUSIVE)
         if status == 200 and (names_user(text, ctrl)
                               or looks_same(lead.get("_page_text", ""), text[:6000], username, ctrl)):
-            return discard(CONTROL_ERROR)             # the made-up name "exists" too
+            # the made-up name "exists" too; one of the name's own length may be taken
+            return discard(CONTROL_UNCONFIRMED if len(ctrl) == len(username) != len(ctrls[0])
+                           else CONTROL_ERROR)
         answers.append(status)
     if len(set(answers)) != 1:
         discard(CONTROL_INCONCLUSIVE)
@@ -232,6 +238,8 @@ async def reprobe_leads(leads: List[dict], concurrency: int = 10,
         if control and username:
             ctrls = (control_username(username),
                      control_username(username, keep_leading_digits=True))
+            if len(ctrls[0]) != len(username):   # a short name: see same_length_control
+                ctrls += (same_length_control(username),)
             await asyncio.gather(*(
                 _control_check(session, lead, username, ctrls, semaphore)
                 for lead in leads if lead.get("found")

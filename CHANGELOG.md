@@ -1,5 +1,14 @@
 # Helix Changelog
 
+## v3.6.2 (2026-11-02)
+
+### Fixed
+- False positives for short usernames on sites that accept any short name and refuse longer ones, found by a reviewer. The made-up names behind every hit were padded to 12 random characters so they could not collide with a real account, so a site that "finds" every name up to 11 characters and answers longer ones with 400 "invalid" (or a 404 from a route that only matches short names) gave them a clean "not found", and any short name was reported as an account. A short name now also gets a made-up name of exactly its length. When a site "finds" that one too, the hit is reported as **unconfirmed** with the reason (any short name works there, or that name is taken), not as an account and not silently dropped. The benchmark now includes both kinds of site: on 1,000 mock sites the old code reported 42 false positives, the new code 0, with every real account still found. Measured live on all 11,963 sites: for `jack` (4 letters), 40 of the 960 sites that reported it, all large ones such as Chess.com, Docker Hub, Minecraft and Roblox, are now unconfirmed, because random 4-letter names are taken there; for `torvalds` (8 letters), none. The JSON report lists unconfirmed sites with their own count.
+
+### Added
+- `--controls N`: how many made-up names every hit is checked against (default 3, at least 3). More catch sites that answer only some names; use it when a result must be defended.
+- `--record-attempt` seals an email scan (`-e`) too. It writes its own evidence and sites files (`<label>_email_*` when a username is scanned in the same run), so the username record stays exactly as before, and `--verify-evidence` checks it. The end-of-run block shows the address and says how many sites have an account for it; it does not claim the fake-username control probe, which email checks do not run. Before, an email scan with `--record-attempt` wrote no record.
+
 ## v3.6.1 (2026-10-31)
 
 ### Fixed

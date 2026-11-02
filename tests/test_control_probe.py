@@ -294,7 +294,8 @@ async def test_rate_limited_control_is_retried_once(base, monkeypatch):
     monkeypatch.setattr(ck, "CONTROL_RETRY_DELAY", 0)
     RETRY["n"] = 0
     r = by_name(await check_username("janeroe", platforms={"Retry": plat(base, "retry")}))
-    assert r["Retry"]["found"] is True and RETRY["n"] == 3   # 429, retry 404, 2nd name 404
+    # 429, retry 404, 2nd name 404, same-length name 404
+    assert r["Retry"]["found"] is True and RETRY["n"] == 4
 
 
 @pytest.mark.asyncio

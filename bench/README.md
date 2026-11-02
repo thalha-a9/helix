@@ -24,7 +24,10 @@ Two benchmarks, same metrics:
 server's CPU never counts against the engine. A seeded RNG makes each site
 *normal* (a profile only for the users it has), a *catch-all* (200 for any
 name: login walls and search pages, the classic false-positive trap) or
-*dead* (never answers). The manifest says exactly which sites have the
+*dead* (never answers). A *short* catch-all accepts any name up to 11
+characters and refuses longer ones with 400 or 404 (`--short-catchall-frac`,
+2 % by default); it is there because made-up names longer than the subject
+cannot catch it. The manifest says exactly which sites have the
 subject, so precision and recall are exact, not sampled.
 
 ```bash

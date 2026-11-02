@@ -390,6 +390,8 @@ async def _apply(result: dict, platform: dict, username: str,
 CONTROL_ERROR = "unverifiable: platform also reports a random nonexistent username as found"
 CONTROL_INCONCLUSIVE = "unverifiable: no clear 'not found' for a random username (blocked, rate-limited or erroring)"
 RECHECK_ERROR = "unverifiable: hit did not reproduce on re-check"
+CONTROL_UNCONFIRMED = ("unconfirmed: a made-up name the same length as this one was also found "
+                       "(the site may accept any short name, or that name is taken)")
 CONTROL_RETRY_DELAY = 3.0
 
 # For the random username, these answers say nothing about whether the site
@@ -414,6 +416,12 @@ def definitive_negative(control: dict, platform: dict) -> bool:
 
 
 CONTROL_MIN_RANDOM = 12
+
+# Made-up names checked against every hit: two shaped like the name (at least
+# CONTROL_MIN_RANDOM random characters), then the rest, which for a name
+# shorter than those two are of exactly its length. --controls raises it for
+# strict use.
+DEFAULT_CONTROLS = 3
 
 
 def control_username(shape: str = "", keep_leading_digits: bool = False) -> str:
@@ -456,8 +464,53 @@ def control_username(shape: str = "", keep_leading_digits: bool = False) -> str:
     return "".join(out)
 
 
+def same_length_control(shape: str) -> str:
+    """
+    A made-up name exactly as long as `shape`, same punctuation in the same
+    places, each run of letters and digits replaced by random ones.
+
+    The usual controls are padded to CONTROL_MIN_RANDOM characters so they
+    cannot collide with a real account, but that lets a site that accepts any
+    short name and refuses longer ones (400 "invalid", or a 404 from a route
+    that only matches short names) answer every control with a clean "not
+    found" while "finding" the short name searched for. A control of the same
+    length is answered by the same rule. For a short name it can be a real
+    account, so a hit it contradicts is reported as unconfirmed, not dropped.
+    """
+    rng = random.SystemRandom()
+    letters, alnum = "abcdefghijklmnopqrstuvwxyz", "abcdefghijklmnopqrstuvwxyz0123456789"
+    out = []
+    for p in re.findall(r"[A-Za-z0-9]+|[^A-Za-z0-9]+", shape or "x"):
+        if not p[0].isalnum():
+            out.append(p)
+            continue
+        first = rng.choice(letters if p[0].isalpha() else "0123456789")
+        out.append(first + "".join(rng.choice(alnum) for _ in range(len(p) - 1)))
+    return "".join(out)
+
+
+def _extra_controls(username: str, first: str, controls: int) -> tuple:
+    """(names, same_length): the controls beyond the first two."""
+    same_length = len(first) != len(username)
+    n = max(controls - 2, 1 if same_length else 0)
+    make = same_length_control if same_length else control_username
+    names, taken = [], {username.lower(), first.lower()}
+    for _ in range(n):
+        c = make(username)
+        for _retry in range(20):
+            if c.lower() not in taken:
+                break
+            c = make(username)
+        else:
+            continue            # a one- or two-character name has few others
+        taken.add(c.lower())
+        names.append(c)
+    return names, same_length
+
+
 async def _control_probe(session, results: list, plat_map: dict,
-                         semaphore: asyncio.Semaphore, username: str) -> list:
+                         semaphore: asyncio.Semaphore, username: str,
+                         controls: int = DEFAULT_CONTROLS) -> list:
     """
     Re-check every hit with a username that cannot exist. A platform that
     "finds" it too returns the same answer for any name (login walls, catch-all
@@ -476,6 +529,7 @@ async def _control_probe(session, results: list, plat_map: dict,
     ctrl2 = control_username(username, keep_leading_digits=True)
     while ctrl2.lower() in (username.lower(), ctrl.lower()):
         ctrl2 = control_username(username, keep_leading_digits=True)
+    extras, same_length = _extra_controls(username, ctrl, controls)
 
     async def settled(pdef, name, platform):
         """One check, retried once if the answer was transient (429, timeout...)."""
@@ -506,6 +560,12 @@ async def _control_probe(session, results: list, plat_map: dict,
         if (not definitive_negative(control2, pdef)
                 or control2.get("status_code") != control.get("status_code")):
             return CONTROL_INCONCLUSIVE
+        for extra in extras:
+            r = await settled(pdef, extra, name)
+            if r.get("found"):
+                return CONTROL_UNCONFIRMED if same_length else CONTROL_ERROR
+            if not definitive_negative(r, pdef):
+                return CONTROL_INCONCLUSIVE
         # And the hit must hold a third time. A site that answers unknown names
         # at random now has to land "found" three times and "not found" twice
         # in a row to slip through.
@@ -516,7 +576,11 @@ async def _control_probe(session, results: list, plat_map: dict,
     reasons = await asyncio.gather(*(verify(h) for h in hits))
     discarded = []
     for hit, reason in zip(hits, reasons):
-        if reason:
+        if reason == CONTROL_UNCONFIRMED:
+            hit["found"] = False
+            hit["error"] = reason
+            hit["unconfirmed"] = True
+        elif reason:
             hit["found"] = False
             hit["error"] = reason
             hit["control_failed"] = True
@@ -569,7 +633,7 @@ async def _retry_timeouts(session, results: list, plat_map: dict, username: str,
 async def check_username(username: str, platforms: dict = None, progress_cb=None,
                          control: bool = True, concurrency: Optional[int] = None,
                          retry_cb=None, retry_timeouts: Optional[bool] = None,
-                         capture: bool = False) -> list:
+                         capture: bool = False, controls: int = DEFAULT_CONTROLS) -> list:
     """
     Check one username on every platform. Large maps run a fast single-attempt
     sweep, then (see should_retry_timeouts; retry_timeouts=True/False forces
@@ -607,7 +671,7 @@ async def check_username(username: str, platforms: dict = None, progress_cb=None
                 await _retry_timeouts(session, results, plat_map, username, calm, capture)
         if control:
             await _control_probe(session, results, plat_map,
-                                 asyncio.Semaphore(calm), username)
+                                 asyncio.Semaphore(calm), username, controls)
     return results
 
 

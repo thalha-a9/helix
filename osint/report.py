@@ -20,8 +20,12 @@ def save_json(username: str, results: list, output_dir: str, extra: dict = None)
             "found":         len(found),
             "not_found":     len(results) - len(found) - len(errors),
             "errors":        len(errors),
+            "unconfirmed":   sum(1 for r in results if r.get("unconfirmed")),
         },
         "found":   found,
+        # A made-up name of the same length was found there too (see
+        # checker.same_length_control): listed so what was held back is visible.
+        "unconfirmed": [r for r in results if r.get("unconfirmed")],
         "errors":  errors,
         "intel":   extra or {},
     }

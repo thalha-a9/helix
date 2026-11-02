@@ -37,7 +37,8 @@ def test_control_probe_removes_every_catchall_on_the_mock_web():
     assert best["catchall_sites"] > 0
     assert best["false_positives"] == 0 and best["precision"] == 1.0
     assert best["recall"] == 1.0
-    assert best["control_discarded"] == best["catchall_sites"]
+    # short-name catch-alls are caught by the same-length control: unconfirmed
+    assert best["control_discarded"] + best["unconfirmed"] == best["catchall_sites"]
     assert report["params"]["concurrency"] == checker._dynamic_concurrency(40)
 
 

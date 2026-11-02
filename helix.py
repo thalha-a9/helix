@@ -18,7 +18,7 @@ def _check_deps():
 
 from osint              import netconfig, __version__
 from osint.checker      import (check_username, check_email, validate_username, validate_email,
-                                HAS_CURL_CFFI, MAX_CONCURRENCY)
+                                HAS_CURL_CFFI, MAX_CONCURRENCY, DEFAULT_CONTROLS)
 from osint.location     import annotate_locations, flag_conflicts, describe_subject_location, resolve_countries
 from osint.confidence   import score_identity
 from osint.relationships import (annotate_relations, build_relationships, edge_line,
@@ -191,16 +191,22 @@ def _effective_concurrency(n: int, requested) -> int:
 def _print_record(record: dict):
     """The end-of-run block a screen recording of a record attempt must show."""
     s, a = record["summary"], record["attempt"]
+    is_email = a.get("target_type") == "email"
     line = "=" * 66
     print(f"  {C}{B}{line}{RST}")
-    print(f"  {C}{B}  RECORD ATTEMPT | Helix {record['tool']['version']} | @{a['username']}{RST}")
+    print(f"  {C}{B}  RECORD ATTEMPT | Helix {record['tool']['version']} | "
+          f"{a['username'] if is_email else '@' + a['username']}{RST}")
     print(f"  {C}{B}{line}{RST}")
     print(f"  Started   {a['started_utc']}   Finished {a['finished_utc']}")
     print(f"  Duration  {a['wall_seconds']} s")
     print(f"  Sites     {s['attempted']} attempted | {G}{s['answered']} answered{RST} | "
           f"{Y}{s['unanswered']} no clear answer{RST}")
-    print(f"  Found     {G}{B}{s['found']}{RST} account{'' if s['found'] == 1 else 's'}, each verified live against two "
-          f"impossible usernames")
+    if is_email:
+        print(f"  Found     {G}{B}{s['found']}{RST} site{'' if s['found'] == 1 else 's'} with an account "
+              f"for this address")
+    else:
+        print(f"  Found     {G}{B}{s['found']}{RST} account{'' if s['found'] == 1 else 's'}, each verified live against two "
+              f"impossible usernames")
     for why, k in list(s["unanswered_by_reason"].items())[:6]:
         print(f"  {DIM}            {k:>5}  {why}{RST}")
     print(f"  Database  {record['database']['sites']} sites | sha256 {record['database']['sha256'][:16]}...")
@@ -325,7 +331,7 @@ async def run(args):
         print(f"  {DIM}           every probed platform logs your IP; "
               f"use --tor or --proxy for real investigations{RST}\n")
 
-    record=None
+    record=None;  email_record=None
     results=[];  email_results=[];  email_guesses={};  pivot_data={};  phash_matches=[]; loc_conflicts=[]
     real_name="";  real_name_source="";  identity_counts={}
     wayback_data={}; crt_data={}; paste_data={}; github_intel={}
@@ -364,6 +370,7 @@ async def run(args):
                                            control=not args.no_control,
                                            concurrency=concurrency,
                                            retry_timeouts=True if getattr(args, "record_attempt", False) else None,
+                                           controls=max(DEFAULT_CONTROLS, getattr(args, "controls", None) or 0),
                                            capture=getattr(args, "save_pages", False),
                                            retry_cb=lambda k: print(
                                                f"\n  {DIM}Re-checking {k} site(s) that timed out "
@@ -381,6 +388,13 @@ async def run(args):
                   f"'find' a random nonexistent username:")
             print(f"  {DIM}  {', '.join(ctrl_dropped[:12])}"
                   f"{f' ... +{len(ctrl_dropped)-12} more' if len(ctrl_dropped) > 12 else ''}{RST}")
+        unconfirmed = sorted(r["platform"] for r in results if r.get("unconfirmed"))
+        if unconfirmed:
+            print(f"\n  {Y}[unconfirmed]{RST} {len(unconfirmed)} platform(s) also showed an account for a "
+                  f"made-up name of the same length (any short name works there, or that name is "
+                  f"taken), so they are not reported:")
+            print(f"  {DIM}  {', '.join(unconfirmed[:12])}"
+                  f"{f' ... +{len(unconfirmed)-12} more' if len(unconfirmed) > 12 else ''}{RST}")
 
         # Local heuristic verifier
         results, purge_log = run_local_verifier(results, username)
@@ -662,6 +676,7 @@ async def run(args):
 
     # Email scan
     if email:
+        _email_start, _email_started_utc = time.time(), evidence.utc_now()
         if args.holehe:
             print(f"  {C}[*]{RST} holehe deep email scan...")
             from osint.adapters.holehe_adapter import load_with_fallback as holehe_run
@@ -682,6 +697,18 @@ async def run(args):
         if not args.holehe:
             print(f"  {Y}[tip]{RST} {DIM}--holehe checks 120+ platforms by email{RST}")
         print()
+
+        # Its own record, so a username record next to it stays as it was.
+        # The sites file lists every site the address was checked on.
+        if getattr(args, "record_attempt", False) and email_results:
+            email_record = evidence.write(out, f"{label}_email" if username else label, dict(
+                username=email, target_type="email", results=email_results,
+                platform_map={r["platform"]: {"url": r.get("url", ""),
+                                              "source": r.get("source", "")}
+                              for r in email_results},
+                started=_email_started_utc, finished=evidence.utc_now(),
+                wall_seconds=time.time() - _email_start, argv=sys.argv,
+                concurrency=0, control=False, pages=None))
 
     # Identity confidence
     if username:
@@ -835,8 +862,9 @@ async def run(args):
     if fmt in ("txt", "all"): print(f"  {G}[+]{RST} Text     -> {save_txt(label, all_r, out, extra=intel_bundle)}")
     print()
 
-    if record:
-        _print_record(record)
+    for rec in (record, email_record):
+        if rec:
+            _print_record(rec)
 
     if not args.no_browser:
         webbrowser.open(f"file://{os.path.abspath(gpath)}")
@@ -890,6 +918,10 @@ Operational security:
     g.add_argument("--no-control",      action="store_true",  dest="no_control",
         help="Skip the control probe that discards platforms which also 'find' a random "
              "nonexistent username (faster, but lets catch-all pages through)")
+    g.add_argument("--controls",        type=int, default=None, metavar="N",
+        help=f"Made-up names checked against every hit (default {DEFAULT_CONTROLS}, at least 3). "
+             "A short name always gets one of its own length; more catch sites that answer "
+             "only some names")
     g.add_argument("--concurrency",     type=int, default=None, metavar="N",
         help=f"Probes in flight at once (default: 20 to 60 scaled to the scan size, "
              f"max {MAX_CONCURRENCY}). Higher is faster on big databases; the sites "

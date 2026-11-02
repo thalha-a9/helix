@@ -48,13 +48,14 @@ def _git_sha() -> str:
 
 
 def start_mockweb(sites: int, seed: int, catchall_frac: float, dead_frac: float,
-                  latency_ms: float, dead_seconds: float):
+                  latency_ms: float, dead_seconds: float, short_catchall_frac: float = 0.0):
     """Launch the mock web in its own process; return (process, base_url, manifest)."""
     port = mockweb.free_port()
     proc = subprocess.Popen(
         [sys.executable, "-m", "bench.mockweb", "--port", str(port), "--sites", str(sites),
          "--seed", str(seed), "--catchall-frac", str(catchall_frac), "--dead-frac", str(dead_frac),
-         "--latency-ms", str(latency_ms), "--dead-seconds", str(dead_seconds)],
+         "--latency-ms", str(latency_ms), "--dead-seconds", str(dead_seconds),
+         "--short-catchall-frac", str(short_catchall_frac)],
         cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     base = f"http://127.0.0.1:{port}"
     deadline = time.time() + 15
@@ -85,7 +86,8 @@ def score(results: list, manifest: dict) -> dict:
     tp = found & truth
     fp = found - truth
     fn = truth - found
-    errors = sum(1 for r in results if r.get("error") and not r.get("control_failed"))
+    errors = sum(1 for r in results if r.get("error") and not r.get("control_failed")
+                 and not r.get("unconfirmed"))
     return {
         "truly_has_subject": len(truth),
         "found": len(found),
@@ -94,8 +96,9 @@ def score(results: list, manifest: dict) -> dict:
         "false_negatives": len(fn),
         "precision": (len(tp) / len(found)) if found else 1.0,
         "recall": (len(tp) / len(truth)) if truth else 1.0,
-        "catchall_sites": sum(1 for m in sites.values() if m["kind"] == "catchall"),
-        "catchall_reported": sorted(s for s in fp if sites[s]["kind"] == "catchall"),
+        "catchall_sites": sum(1 for m in sites.values() if m["kind"] in mockweb.CATCHALL_KINDS),
+        "catchall_reported": sorted(s for s in fp if sites[s]["kind"] in mockweb.CATCHALL_KINDS),
+        "unconfirmed": sum(1 for r in results if r.get("unconfirmed")),
         "control_discarded": sum(1 for r in results if r.get("control_failed")),
         "probe_errors": errors,
     }
@@ -117,8 +120,10 @@ async def run_once(base: str, manifest: dict, control: bool, concurrency) -> dic
 
 
 def run(sites=1000, seed=1, catchall_frac=0.02, dead_frac=0.0, latency_ms=50.0,
-        dead_seconds=30.0, control=True, concurrency=None, repeat=1) -> dict:
-    proc, base, manifest = start_mockweb(sites, seed, catchall_frac, dead_frac, latency_ms, dead_seconds)
+        dead_seconds=30.0, control=True, concurrency=None, repeat=1,
+        short_catchall_frac=0.02) -> dict:
+    proc, base, manifest = start_mockweb(sites, seed, catchall_frac, dead_frac, latency_ms,
+                                         dead_seconds, short_catchall_frac)
     try:
         runs = [asyncio.run(run_once(base, manifest, control, concurrency)) for _ in range(repeat)]
     finally:
@@ -134,6 +139,7 @@ def run(sites=1000, seed=1, catchall_frac=0.02, dead_frac=0.0, latency_ms=50.0,
         "host": {"system": _platform.system(), "machine": _platform.machine(),
                  "cpus": os.cpu_count()},
         "params": {"sites": sites, "seed": seed, "catchall_frac": catchall_frac,
+                   "short_catchall_frac": short_catchall_frac,
                    "dead_frac": dead_frac, "latency_ms": latency_ms, "dead_seconds": dead_seconds,
                    "control_probe": control,
                    "concurrency": checker._dynamic_concurrency(sites, concurrency),
@@ -148,13 +154,15 @@ def _print(report: dict):
     print(f"\nHelix {report['helix_version']} ({report['git_commit']}) | Python {report['python']} "
           f"| {report['host']['cpus']} CPUs")
     print(f"sites={p['sites']} concurrency={p['concurrency']} latency={p['latency_ms']}ms "
-          f"catch-all={p['catchall_frac']:.0%} dead={p['dead_frac']:.0%} "
+          f"catch-all={p['catchall_frac']:.0%} short catch-all={p.get('short_catchall_frac', 0):.0%} "
+          f"dead={p['dead_frac']:.0%} "
           f"control={'on' if p['control_probe'] else 'off'} repeat={p['repeat']}\n")
     print(f"  throughput   {b['sites_per_second']:>8.1f} sites/s   ({b['wall_seconds']}s wall)")
     print(f"  precision    {b['precision']:>8.3f}          false positives: {b['false_positives']}"
           f"{'  <- ' + ', '.join(b['catchall_reported'][:5]) if b['catchall_reported'] else ''}")
     print(f"  recall       {b['recall']:>8.3f}          found {b['true_positives']}/{b['truly_has_subject']}")
-    print(f"  control probe discarded {b['control_discarded']} | verifier purged {b['verifier_purged']} "
+    print(f"  control probe discarded {b['control_discarded']} | unconfirmed {b.get('unconfirmed', 0)} "
+          f"| verifier purged {b['verifier_purged']} "
           f"| probe errors {b['probe_errors']}\n")
 
 
@@ -164,6 +172,8 @@ def main():
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--catchall-frac", type=float, default=0.02)
     p.add_argument("--dead-frac", type=float, default=0.0)
+    p.add_argument("--short-catchall-frac", type=float, default=0.02,
+                   help="catch-alls that only accept short names (400 or 404 for longer ones)")
     p.add_argument("--latency-ms", type=float, default=50.0)
     p.add_argument("--dead-seconds", type=float, default=30.0,
                    help="how long a dead site hangs (longer than the engine's timeout)")
@@ -174,7 +184,8 @@ def main():
     a = p.parse_args()
 
     report = run(a.sites, a.seed, a.catchall_frac, a.dead_frac, a.latency_ms, a.dead_seconds,
-                 control=not a.no_control, concurrency=a.concurrency, repeat=a.repeat)
+                 control=not a.no_control, concurrency=a.concurrency, repeat=a.repeat,
+                 short_catchall_frac=a.short_catchall_frac)
     _print(report)
     if a.json:
         os.makedirs(os.path.dirname(os.path.abspath(a.json)), exist_ok=True)
