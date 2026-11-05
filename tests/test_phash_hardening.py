@@ -42,3 +42,24 @@ def test_pillow_warning_tracks_the_safe_version(monkeypatch):
     assert "known image-decoder vulnerabilities" in phash.pillow_warning()
     monkeypatch.setattr(PIL, "__version__", "13.0.0")
     assert phash.pillow_warning() == ""
+
+
+@pytest.mark.parametrize("url", [
+    "https://github.com/opengraph.png",                                   # every gist page
+    "https://github.githubassets.com/images/modules/open_graph/github-logo.png",
+    "https://dev-to-uploads.s3.amazonaws.com/uploads/articles/3ot.png",   # DEV's site card
+    "https://example.com/static/default-avatar.png",
+    "https://cdn.example.com/img/placeholder.jpg",
+])
+def test_site_wide_images_are_never_hashed_as_avatars(url):
+    # Two people's pages carrying the same site image must not read as "same picture".
+    assert phash.is_default_image(url)
+
+
+@pytest.mark.parametrize("url", [
+    "https://avatars.githubusercontent.com/u/177346026?v=4",
+    "https://media.dev.to/cdn-cgi/image/width=320/https://dev-to-uploads.s3.amazonaws.com/uploads/user/profile_image/1/a.png",
+    "https://pbs.twimg.com/profile_images/1/abc_400x400.jpg",
+])
+def test_real_profile_pictures_are_kept(url):
+    assert not phash.is_default_image(url)

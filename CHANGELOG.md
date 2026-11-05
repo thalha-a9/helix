@@ -1,5 +1,21 @@
 # Helix Changelog
 
+## v3.7.0 (2026-11-05)
+
+### Fixed
+- The same profile address listed by two databases was checked twice and, when it existed, reported twice: `dev.to/{username}` came from the built-in list and from Sherlock, `x.com/{username}` likewise, and 270 such repeats sat in `--all`. An entry whose profile address is already listed is now skipped (the built-in or earlier one is kept), and the loader says how many. WhatsMyName entries that probe an API now show the profile page people open (and still probe the API), so they are recognised too. `--all` now checks 11,663 sites, each once, instead of 11,963 entries.
+- GitHub's site-wide share images (on every gist and repository page) were not recognised as generic, so with `--phash` two people's gist pages could have read as "the same picture". They are now skipped like other default images, and that filter has tests.
+- holehe's rate-limited sites are named as such in a sealed email record, not "other error".
+- The sealed record said every account was checked against "two impossible usernames"; since 3.6.2 it is at least three. The record now stores how many (`attempt.controls`) and the end-of-run block says it.
+- `--permutations` without anyone to answer its question no longer runs the next line onto the prompt.
+- A scan where sites could not be reached ended with "None found", which reads like "this person has no accounts". With Tor not running, all 56 built-in sites failed and the scan still said "None found". Every scan now says how many sites gave no clear answer and why (bot checks, timeouts, proxy or Tor failures and so on), and when none answered it says nothing was checked. A failing SOCKS proxy or Tor is named as such instead of "other error".
+
+### Added
+- LeakCheck as a third `--breach` source, free and without a key. It is sent the first 24 characters of the address's SHA-256 hash, never the address, and returns breach names and dates only. Its breaches merge with the same ones from XposedOrNot and HIBP ("LinkedIn.com" and "LinkedIn" count once), and the data types it lists cover all its matches, so they are shown once rather than pinned on each breach. Requests are paced to its limit of one a second. Like the other breach sources it runs only with `--breach`, after the accounts are found and graded, and a test checks that a scan reports the same accounts and grades with and without it.
+
+### Changed
+- README and `--help` now explain `--controls`, `--permutations` (about 45 variants, each a full scan), `--providers`, `--output`, `--no-browser`, the database download timeouts and everything `--nsfw` covers.
+
 ## v3.6.2 (2026-11-02)
 
 ### Fixed

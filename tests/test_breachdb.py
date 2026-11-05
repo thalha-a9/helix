@@ -46,8 +46,17 @@ HIBP_BREACHED = [
 ]
 
 
+# LeakCheck names breaches by domain; these two are the same breaches as above.
+LC_BREACHED = {"success": True, "found": 2, "fields": ["email", "password", "username"],
+               "sources": [{"name": "LinkedIn.com", "date": "2012-05"},
+                           {"name": "Adobe.com", "date": "2013-10"}]}
+LC_ONLY = {"success": True, "found": 1, "fields": ["email", "phone"],
+           "sources": [{"name": "Badoo.com", "date": "2016-06"}]}
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     hibp_keys = []
+    leakcheck_queries = []
 
     def do_GET(self):
         u = urlparse(self.path)
@@ -66,6 +75,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if email == "pwned@example.com":
                 return self._json(200, HIBP_BREACHED)
             return self._json(404, None)
+        if u.path == "/leakcheck":
+            q = parse_qs(u.query).get("check", [""])[0]
+            Handler.leakcheck_queries.append(q)
+            if q == breachdb.leakcheck_hash("pwned@example.com"):
+                return self._json(200, LC_BREACHED)
+            if q == breachdb.leakcheck_hash("lc-only@example.com"):
+                return self._json(200, LC_ONLY)
+            if q == breachdb.leakcheck_hash("down@example.com"):
+                return self._json(200, {"success": False, "error": "Too many requests"})
+            return self._json(200, {"success": False, "error": "Not found"})
         self._json(404, None)
 
     def _json(self, code, body):
@@ -89,11 +108,12 @@ def api(monkeypatch):
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{port}"
-    srcs = [dict(s) for s in breachdb.SOURCES]
-    srcs[0]["url"] = base + "/xon?email={q}"
-    srcs[1]["url"] = base + "/hibp/{q}"
+    local = {"xposedornot": "/xon?email={q}", "hibp": "/hibp/{q}", "leakcheck": "/leakcheck?check={q}"}
+    srcs = [dict(s, url=base + local[s["id"]], min_interval=0) for s in breachdb.SOURCES]
+    assert {s["id"] for s in srcs} == set(local)   # a new source must get a local stand-in
     monkeypatch.setattr(breachdb, "SOURCES", srcs)
     Handler.hibp_keys = []
+    Handler.leakcheck_queries = []
     yield base
     httpd.shutdown()
     httpd.server_close()
@@ -128,7 +148,9 @@ async def test_breached_email_is_reported_with_merged_sources(api, monkeypatch):
     assert v["exposed"] is True
     by = {b["name"]: b for b in v["breaches"]}
     assert set(by) == {"Adobe", "LinkedIn", "Canva"}
-    assert by["LinkedIn"]["sources"] == ["XposedOrNot", "Have I Been Pwned"]
+    # LeakCheck's "LinkedIn.com" and "Adobe.com" are the same breaches, not new ones
+    assert by["LinkedIn"]["sources"] == ["XposedOrNot", "Have I Been Pwned", "LeakCheck"]
+    assert by["Adobe"]["sources"] == ["XposedOrNot", "LeakCheck"]
     assert by["LinkedIn"]["date"] == "2012-05-05"          # fuller date wins
     assert v["summary"].startswith("pwned@example.com appears in 3 breaches (2012 to 2019), "
                                    "passwords exposed in 3")
@@ -237,3 +259,62 @@ def test_console_listing_is_capped():
     assert sum(1 for line in lines if line.startswith("  - ")) == 8
     assert "+12 older breach(es)" in lines[-1]
     assert sum(1 for line in breachdb.format_lines(v) if line.startswith("  - ")) == 20
+
+
+# LeakCheck
+
+def test_leakcheck_is_sent_a_hash_never_the_address(api):
+    import asyncio
+    asyncio.run(breachdb.check_identifiers(["pwned@example.com", "nobody@example.com"]))
+    assert Handler.leakcheck_queries == [breachdb.leakcheck_hash("pwned@example.com"),
+                                         breachdb.leakcheck_hash("nobody@example.com")]
+    assert all("@" not in q and len(q) == 24 for q in Handler.leakcheck_queries)
+
+
+def test_leakcheck_hash_matches_its_documented_example():
+    assert breachdb.leakcheck_hash("example@example.com") == "31c5543c1734d25c7206f5fd"
+
+
+@pytest.mark.asyncio
+async def test_leakcheck_only_breach_is_reported_with_its_data_types(api, monkeypatch):
+    monkeypatch.delenv("HIBP_API_KEY", raising=False)
+    [v] = await breachdb.check_identifiers(["lc-only@example.com"])
+    assert v["exposed"] is True
+    [b] = v["breaches"]
+    assert b["name"] == "Badoo.com" and b["sources"] == ["LeakCheck"]
+    assert b["data_classes"] == []            # its field list is not per breach
+    lines = breachdb.format_lines(v)
+    assert any("LeakCheck lists these data types across its 1 match(es), not per breach: "
+               "email, phone" in line for line in lines)
+
+
+@pytest.mark.asyncio
+async def test_leakcheck_not_found_is_clean_and_other_errors_are_not(api, monkeypatch):
+    monkeypatch.setenv("HIBP_API_KEY", "good-key")
+    [clean] = await breachdb.check_identifiers(["nobody@example.com"])
+    lc = next(s for s in clean["sources"] if s["source"] == "LeakCheck")
+    assert lc["status"] == "ok" and "LeakCheck" in clean["summary"]
+    [down] = await breachdb.check_identifiers(["down@example.com"])
+    lc = next(s for s in down["sources"] if s["source"] == "LeakCheck")
+    assert lc["status"] == "error" and lc["detail"] == "Too many requests"
+
+
+def test_leakcheck_parser_keeps_names_dates_and_nothing_else():
+    b = breachdb.parse_leakcheck({"success": True, "found": 1, "fields": ["password"],
+                                  "sources": [{"name": "Some.Site", "date": "2020-01",
+                                               "password": "hunter2"}]})
+    assert b == [{"name": "Some.Site", "date": "2020-01", "records": None, "data_classes": [],
+                  "domain": "some.site", "verified": False, "aliases": ["Some"]}]
+    assert breachdb.parse_leakcheck({"success": False, "error": "Not found"}) == []
+
+
+@pytest.mark.asyncio
+async def test_leakcheck_is_paced_to_one_request_a_second(monkeypatch):
+    import time
+    calls = []
+    src = {"id": "pace-test", "min_interval": 0.3}
+    breachdb._LAST_CALL.pop("pace-test", None)
+    for _ in range(3):
+        await breachdb._pace(src)
+        calls.append(time.monotonic())
+    assert calls[1] - calls[0] >= 0.29 and calls[2] - calls[1] >= 0.29

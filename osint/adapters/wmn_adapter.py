@@ -258,6 +258,14 @@ async def fetch_wmn_platforms(timeout: int = 30, include_nsfw: bool = False) -> 
                 **extra,
             }
 
+        # Many entries check an API address but list the profile page people
+        # open as uri_pretty: show that one, probe the API. It also lets an
+        # entry be recognised as a site another database already lists.
+        pretty = site.get("uri_pretty", "")
+        if pretty and "{account}" in pretty and pretty.startswith("http") and pretty != uri:
+            pdef["check_url"] = url
+            pdef["url"] = pretty.replace("{account}", "{username}")
+
         platforms[name] = pdef
 
     # Post-process: fix known WMN URL issues

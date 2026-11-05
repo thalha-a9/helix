@@ -12,14 +12,14 @@
 ### Decode the digital DNA of any identity
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-3.6.2-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
+[![Version](https://img.shields.io/badge/Version-3.7.0-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
 [![License](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)](LICENSE)
 [![Platforms](https://img.shields.io/badge/Platforms-56%20builtin%20%7C%208%2C305%20with%20--all-a78bfa?style=flat-square)](https://github.com/thalha-a9/helix)
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-reproducible%20%7C%200%20false%20positives-00ff88?style=flat-square)](bench/README.md)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](https://github.com/thalha-a9/helix/pulls)
 
 **Helix** is an open-source username checker for OSINT. It checks a username<br>
-across **11,988 sites** (the Sherlock, WhatsMyName and Maigret databases plus 3,683 fediverse servers)<br>
+across **11,663 sites** (the Sherlock, WhatsMyName and Maigret databases plus 3,679 fediverse servers, each site checked once)<br>
 and re-checks every hit live before reporting it: a made-up username comes back with **0 accounts**.<br>
 Then it shows which accounts belong to the same person, in an interactive graph you can explore and export.
 
@@ -38,13 +38,13 @@ Then it shows which accounts belong to the same person, in an interactive graph 
 
 Most username checkers answer one question, *"Does this username exist on Platform X?"*, and leave you to sort the real hits from the false ones.
 
-Helix answers it across nearly 12,000 sites with every hit verified, then answers the harder one: **"Which of these accounts belong to the same person?"**
+Helix answers it across about 11,700 sites with every hit verified, then answers the harder one: **"Which of these accounts belong to the same person?"**
 
 It extracts cross-platform links the account holders declare, matches identical profile pictures by perceptual hash, infers timezone from commit patterns, discovers domains via certificate transparency, and plots every relationship as a glowing edge in a browser-based network graph, all in a single command.
 
 ```bash
 pipx install helix-osint
-helix-osint -u johndoe --all                    # 11,988 sites, every hit verified
+helix-osint -u johndoe --all                    # 11,663 sites, every hit verified
 helix-osint -u johndoe --phash --pivot --crt    # plus avatar matching, pivoting and domains
 ```
 
@@ -54,8 +54,10 @@ helix-osint -u johndoe --phash --pivot --crt    # plus avatar matching, pivoting
 
 Helix builds on Sherlock, WhatsMyName and Maigret. With `--all` it scans
 their site databases together with 3,683 Mastodon, Misskey, Lemmy and PeerTube
-servers: 11,988 sites on 30 Oct 2026, with adult sites and search pages left
-out (`--nsfw` adds adult sites back). What it adds is what happens after a
+servers: 11,663 sites on 4 Nov 2026, each checked once, with adult sites and
+search pages left out (`--nsfw` adds adult sites back). Until 3.6.3 the count
+was 11,988 because a profile address that two databases both list was counted
+(and checked) twice. What it adds is what happens after a
 site says "found":
 
 | | What Helix does | Why it matters |
@@ -88,7 +90,7 @@ the report is the expensive mistake.
 | `--wmn` | Loads WhatsMyName database at runtime: **~590 platforms** after unsafe entries are filtered out |
 | `--maigret` | Loads **Maigret** database at runtime: sophisticated detection with `presenceStrs`/`absenceStrs`, 24h cached |
 | `--fediverse` | **3,925 Mastodon, Misskey, Lemmy and PeerTube servers**, each its own website with its own users. Every server on the list passed a live test (an account that exists there was found, two made-up names were not) and had at least one active user a month. Checked through each server's standard user lookup; servers another database already lists are skipped, and 14 adult servers are only checked with `--nsfw` (reviewed by name, so report any we missed). `tools/update_fediverse.py` rebuilds the list |
-| `--all` | Full coverage in one flag: builtin + WhatsMyName + Sherlock + Maigret databases + fediverse servers (11,988 sites on 30 Oct 2026, adult sites and search pages excluded; the databases grow), every hit checked by the control probe |
+| `--all` | Full coverage in one flag: builtin + WhatsMyName + Sherlock + Maigret databases + fediverse servers (11,663 sites on 4 Nov 2026, each profile address once, adult sites and search pages excluded; the databases grow), every hit checked by the control probe |
 | `--concurrency N` | Probes in flight at once (default 20 to 60, scaled to the scan size; max 1,000). Raise it only on a fast, direct link: live, 250 in flight made 1,302 healthy sites time out on an ordinary connection. Sites that time out get one calm retry either way, and the end of every scan says how many sites answered |
 | `--save-pages` | Keeps the exact page received for every reported account: the raw bytes, response headers, the URL it ended on and the UTC time, each hashed with SHA-256, in `<name>_pages/` with a browsable `index.html`. Proof of what a profile showed at that moment, even if it is deleted later. Pages are saved as text so they cannot run scripts. For sites checked through an official API, the saved page is the API's answer. `--verify-pages DIR` re-checks every file |
 | `--record-attempt` | Writes sealed evidence of the scan, for a witnessed test, an audit or a published result: UTC start and finish, the exact site database and its SHA-256, the outcome for every site, and a fingerprint of the whole file, printed at the end so a screen recording can show it. An email scan (`-e`) gets its own record next to the username one. `--verify-evidence FILE [SITES]` checks it |
@@ -99,10 +101,17 @@ the report is the expensive mistake.
 | `--wayback` | **Wayback Machine**: when each found profile was first and last archived, in how many months, and the bio of the earliest capture (emails / @handles in it listed as leads; a username can change hands) |
 | `--crt` | **Certificate Transparency**: domains on certificates that list the subject's email, plus domains named exactly after the username (leads only; anyone can register a name). crt.sh outages are reported as not checked |
 | `--paste` | **Paste Intelligence**: public Gists of github.com/&lt;username&gt;. Pastebin text search has had no free source since psbdmp.ws shut down (2026); Pastebin *accounts* are covered by `--sherlock`, `--maigret` and `--all`. Unreachable sources are reported as not checked |
-| `--breach` | **Breach sweep**: every confirmed email against XposedOrNot, plus Have I Been Pwned when `HIBP_API_KEY` is set. Per-email verdict: which breaches, what was exposed, date range, which sources were checked and when (e.g. *"x@y appears in 7 breaches (2012 to 2024), passwords exposed in 5"*). A source that could not be reached is reported as not checked, never as clean. Metadata only, no credentials |
+| `--breach` | **Breach sweep**: every confirmed email against XposedOrNot and LeakCheck (powered by [LeakCheck](https://leakcheck.io), which is sent a SHA-256 hash of the address, never the address), plus Have I Been Pwned when `HIBP_API_KEY` is set. It runs after the accounts are found and graded and never changes them. Per-email verdict: which breaches, what was exposed, date range, which sources were checked and when (e.g. *"x@y appears in 7 breaches (2012 to 2024), passwords exposed in 5"*). A source that could not be reached is reported as not checked, never as clean. Metadata only, no credentials |
 | `--darkweb` / `--robin` | **Robin dark-web leads**: Ahmia .onion search for the username, confirmed emails and (when corroborated) real name; only hits that contain the exact term are kept. Includes the breach sweep. With `--ai`, the results go to the model as numbered sources and only statements that cite them are kept |
 | `--holehe` | **Deep email scan**: which of ~120 sites the address is registered on (holehe). Modules that would send the target a password-recovery email are skipped. Rate-limited sites are reported as not checked, never as "not registered". With `--email-permute`, accounts found for *guessed* addresses are listed as leads and never count as email confirmation |
 | `--ai` | **AI false-positive filter**: second verification pass via Claude, OpenRouter (free), or NVIDIA NIM (free) |
+| `--providers` | Lists which `--ai` providers are set up (their API keys found) and exits |
+| `--controls N` | How many made-up names every hit is checked against (default 3, at least 3). A short username always gets one of its own length. Raise it when a result must be defended; each extra name is one more request per hit |
+| `--permutations` | Generates about 45 variants of the username (`john_doe`, `johndoe1`, `realjohndoe`, `johndoe.dev` and so on), asks before scanning, then checks each one on every selected site, control probe included. With `--all` that is about 45 full scans, so use it with the built-in sites or one database |
+| `--nsfw` | Includes adult sites, which are left out by default everywhere: the adult entries of WhatsMyName, Sherlock and Maigret, 14 adult fediverse servers, and holehe's adult-site email checks |
+| `--wmn-timeout` / `--sherlock-timeout` / `--maigret-timeout` | Seconds to wait while downloading each site database (default 30). Raise them on a slow link: a download that fails or times out leaves that database out of the scan. Sherlock and Maigret are cached for 24 hours, so a second scan the same day does not download them again |
+| `--output DIR` | Where results are written (default `results/<name>`). Must be inside the current folder |
+| `--no-browser` | Don't open the interactive graph in a browser when the scan ends |
 
 ### Auto-Triggered
 - **Relationship map**: built from what the subject's own accounts *declare*: employers and former employers ("engineer at Globex", "ex-Initech", GitHub company field), organisations (public GitHub orgs, "maintainer of ..."), family members named by handle ("my wife @...") and accounts the bio mentions. Never inferred from shared surnames, followers or co-occurrence. Only accounts corroborated as the subject's (identity MEDIUM/HIGH) are read: a bio on an account that merely shares the handle may be a stranger's, so those declarations are counted but not mapped. Each edge carries its source, quote and a confidence that can never exceed the declaring account's; two independent accounts are needed for HIGH. Shown in the console, graph, report, JSON, CSV and TXT
@@ -220,7 +229,7 @@ python helix.py -u johndoe --pivot --pivot-depth 4
 # Permutations: scan johndoe1, john.doe, realjohndoe, etc.
 python helix.py -u johndoe --permutations
 
-# Full database (about 12,000 sites), with sealed evidence of the run
+# Full database (about 11,700 sites), with sealed evidence of the run
 python helix.py -u johndoe --all --record-attempt --no-browser
 python helix.py --verify-evidence results/johndoe/johndoe_evidence.json results/johndoe/johndoe_sites.json
 
@@ -387,23 +396,27 @@ Helix uses the right detection method per platform instead of naive HTTP 200 che
 Measured live on 29 Oct 2026, the full database at the time (8,381 sites), a username
 nobody has: **72 accounts "found" with the control probe off, 0 with it on.**
 
-<img src="docs/images/scan.svg" width="820" alt="Helix scanning a made-up username across all 11,988 sites: 111 catch-all sites dropped by the control probe, 0 accounts reported, sealed with a fingerprint">
+<img src="docs/images/scan.svg" width="820" alt="Helix 3.7.0 scanning a made-up username across all 11,663 sites: catch-all sites dropped by the control probe, 0 accounts reported, sealed with a fingerprint">
 
 Big username databases are full of sites that answer "found" for **any** name:
 login walls (Facebook and Instagram when logged out), catch-all pages, sites
 whose markup changed since the database entry was written. A single site like
 that puts a fake account in every report.
 
-So every hit is re-checked, at the same moment, against two random usernames
-that cannot exist. The hit survives only if it is found again (twice) and both
-random names get the same clear "no such user" answer. A site that "finds" a
+So every hit is re-checked, at the same moment, against made-up usernames that
+cannot exist: at least three (`--controls N` for more), two shaped like the
+name and, for a short name, one of exactly its length, because some sites
+accept any short name and refuse longer ones. The hit survives only if it is
+found again (twice) and every made-up name gets a clear "no such user" answer.
+When only the one of the same length is "found", the hit is reported as
+unconfirmed, with the reason, instead of as an account. A site that "finds" a
 random name is a catch-all; a random name that only gets a rate limit,
 challenge or gateway error proves nothing, so that hit is dropped as
 unverifiable. No per-site tuning: it holds across the whole database. Sites seen
 answering unknown names at random are blocked outright.
 
 Leads from the Maigret engine get the same treatment by URL: the page must name
-the user, two random names must both get the same clear answer, and a lead
+the user, the made-up names must all get the same clear answer, and a lead
 whose URL cannot be rebuilt for another name is not kept. `--no-control` turns
 the probe off (faster, **not** covered by the no-false-positive measurements).
 

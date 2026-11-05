@@ -57,7 +57,7 @@ async def test_email_only_scan_is_sealed(fake_email_scan, monkeypatch, tmp_path,
 
     assert f"RECORD ATTEMPT | Helix {helix.__version__} | {ADDRESS}" in out
     assert "1 site with an account for this address" in out
-    assert "impossible usernames" not in out     # no control probe ran for the email
+    assert "made-up usernames" not in out        # no control probe ran for the email
     assert ev["fingerprint"] in out
 
 
@@ -92,3 +92,19 @@ async def test_no_record_without_the_flag(fake_email_scan, monkeypatch, tmp_path
                           darkweb=False, report=False, record_attempt=False))
     res = os.path.join(tmp_path, "results", "jane_roe_at_example_com")
     assert not any(f.endswith("_evidence.json") for f in os.listdir(res))
+
+
+@pytest.mark.asyncio
+async def test_username_record_states_how_many_made_up_names(site, monkeypatch, tmp_path, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(helix, "PLATFORMS", {"Exampleweb": {
+        "url": site + "/u/{username}", "method": "status_code", "found": [200],
+        "category": "social", "color": "#fff"}})
+    from osint import checker
+    monkeypatch.setattr(checker, "CONTROL_RETRY_DELAY", 0)
+    await helix.run(_args(tmp_path, email=None, breach=False, darkweb=False, report=False,
+                          record_attempt=True, no_control=False, controls=5))
+    out = re.sub(r"\x1b\[[0-9;]*m", "", capsys.readouterr().out)
+    ev = _load(os.path.join(tmp_path, "results", "janeroe", "janeroe_evidence.json"))
+    assert ev["attempt"]["controls"] == 5
+    assert "1 account, each verified live against 5 made-up usernames" in out

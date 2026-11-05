@@ -90,14 +90,14 @@ def _error_text(e: Exception, model: str) -> str:
     return " ".join(str(text).split())[:300]
 
 # Every profile sent here already passed Helix's control probe: the same URL
-# with two made-up usernames gave a different answer. That is stronger than
+# with at least three made-up usernames gave a different answer. That is stronger than
 # any page title, so the model may only overrule it when the title itself is
 # a login wall or an error page. An older prompt ("platform name only ->
 # reject", "uncertain -> reject") made models purge real Steam, TikTok, VK and
 # Twitch accounts, whose titles are generic for every profile.
 SYSTEM_PROMPT = """You review accounts that an OSINT tool reported as found.
 
-Each one already passed a live check: the same URL with two made-up usernames
+Each one already passed a live check: the same URL with several made-up usernames
 returned a different answer, so the account almost certainly exists.
 
 Your only job is to catch pages that are not a profile at all. Purge an entry

@@ -134,3 +134,18 @@ def test_maigret_fetch_flags_and_load_filters(monkeypatch, tmp_path):
 def test_cache_files_were_renamed_so_flagless_caches_are_not_reused():
     assert sherlock_adapter._CACHE_FILE.name == "sherlock_data_v2.json"
     assert maigret_adapter._CACHE_FILE.name == "maigret_data_v3.json"  # v3: all absence strings
+
+
+def test_wmn_shows_the_profile_page_and_probes_the_api(monkeypatch):
+    payload = {"sites": [
+        {"name": "dev.to", "uri_check": "https://dev.to/api/users/by_username?url={account}",
+         "uri_pretty": "https://dev.to/{account}", "e_code": 200, "e_string": "\"username\"",
+         "m_string": "Not Found", "m_code": 404, "cat": "coding"},
+        {"name": "Plain", "uri_check": "https://plain.example/{account}", "e_code": 200,
+         "e_string": "profile", "m_string": "not found", "m_code": 404, "cat": "social"},
+    ]}
+    monkeypatch.setattr(wmn_adapter.netconfig, "new_session", lambda **kw: _FakeSession(payload))
+    p = asyncio.run(wmn_adapter.fetch_wmn_platforms())
+    assert p["dev.to"]["url"] == "https://dev.to/{username}"
+    assert p["dev.to"]["check_url"] == "https://dev.to/api/users/by_username?url={username}"
+    assert "check_url" not in p["Plain"] and p["Plain"]["url"] == "https://plain.example/{username}"

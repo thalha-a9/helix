@@ -13,10 +13,18 @@ who owns it. Every finding is a lead for the investigator to adjudicate.
 Sources are data (SOURCES below), because breach APIs change and rot:
   xposedornot  free, no key          https://xposedornot.com/api_doc
   hibp         needs HIBP_API_KEY    https://haveibeenpwned.com/API/v3
+  leakcheck    free, no key          https://docs.leakcheck.io/public-api/lookup
+               (powered by LeakCheck; sent a hash of the address, never the
+               address, and returns breach names and dates only)
+
+This runs only with --breach, after the accounts are found, checked against
+made-up names and graded, and nothing here changes them.
 """
 
 import asyncio
+import hashlib
 import os
+import time
 import re
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -44,7 +52,24 @@ SOURCES = [
         "url": "https://haveibeenpwned.com/api/v3/breachedaccount/{q}?truncateResponse=false",
         "key_env": "HIBP_API_KEY",
     },
+    {
+        "id": "leakcheck",
+        "label": "LeakCheck",
+        "kinds": ("email",),
+        "url": "https://leakcheck.io/api/public?check={q}",
+        "key_env": None,
+        "send": "sha256_24",       # the address itself never leaves the machine
+        "min_interval": 1.05,      # its public API allows 1 request per second
+    },
 ]
+
+
+def leakcheck_hash(email: str) -> str:
+    """What LeakCheck is sent instead of the address: SHA-256, first 24 hex characters."""
+    return hashlib.sha256(email.strip().lower().encode()).hexdigest()[:24]
+
+
+_SEND = {"sha256_24": leakcheck_hash}
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -119,7 +144,58 @@ def parse_hibp(data) -> List[Dict]:
     return out
 
 
-_PARSERS = {"xposedornot": parse_xposedornot, "hibp": parse_hibp}
+_DOMAIN_NAME = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)+$", re.I)
+
+
+def parse_leakcheck(data) -> List[Dict]:
+    """public lookup -> breaches (names and YYYY-MM dates only). LeakCheck names
+    breaches by domain ("LinkedIn.com"), so the bare name is kept as an alias
+    and the same breach from XposedOrNot or HIBP merges with it. Its "fields"
+    list covers all matches together, so it is not attached to any one breach."""
+    if not isinstance(data, dict) or not data.get("success"):
+        return []
+    out = []
+    for s in data.get("sources") or []:
+        if not isinstance(s, dict) or not s.get("name"):
+            continue
+        name = _clean(s["name"])
+        is_domain = bool(_DOMAIN_NAME.match(name))
+        out.append({
+            "name":         name,
+            "date":         _clean(s.get("date")),
+            "records":      None,
+            "data_classes": [],
+            "domain":       name.lower() if is_domain else "",
+            "verified":     False,
+            "aliases":      [name.rsplit(".", 1)[0]] if is_domain else [],
+        })
+    return out
+
+
+_PARSERS = {"xposedornot": parse_xposedornot, "hibp": parse_hibp, "leakcheck": parse_leakcheck}
+_LAST_CALL: Dict[str, float] = {}
+_PACE_LOCKS: Dict[int, asyncio.Lock] = {}
+
+
+def _pace_lock() -> asyncio.Lock:
+    # One per event loop: on Python 3.9 a lock made at import belongs to no
+    # running loop and fails when a later scan awaits it.
+    loop_id = id(asyncio.get_running_loop())
+    if loop_id not in _PACE_LOCKS:
+        _PACE_LOCKS[loop_id] = asyncio.Lock()
+    return _PACE_LOCKS[loop_id]
+
+
+async def _pace(src: Dict):
+    """Keep a source's own request rate (LeakCheck: one a second)."""
+    gap = src.get("min_interval")
+    if not gap:
+        return
+    async with _pace_lock():
+        wait = _LAST_CALL.get(src["id"], 0) + gap - time.monotonic()
+        if wait > 0:
+            await asyncio.sleep(wait)
+        _LAST_CALL[src["id"]] = time.monotonic()
 
 
 # Fetch one source
@@ -134,7 +210,9 @@ async def _query(session: aiohttp.ClientSession, src: Dict, identifier: str) -> 
                     "breaches": []}
         headers["hibp-api-key"] = key
 
-    url = src["url"].format(q=quote(identifier, safe="@"))
+    sent = _SEND[src["send"]](identifier) if src.get("send") else identifier
+    url = src["url"].format(q=quote(sent, safe="@"))
+    await _pace(src)
     try:
         async with session.get(url, headers=headers, timeout=TIMEOUT,
                                **netconfig.request_kwargs()) as resp:
@@ -148,6 +226,12 @@ async def _query(session: aiohttp.ClientSession, src: Dict, identifier: str) -> 
             if resp.status != 200:
                 return {"status": "error", "detail": f"HTTP {resp.status}", "breaches": []}
             data = await resp.json(content_type=None)
+            if src["id"] == "leakcheck" and isinstance(data, dict) and not data.get("success"):
+                # It answers 200 {"success": false, "error": "Not found"} for a clean address.
+                if str(data.get("error", "")).strip().lower() == "not found":
+                    return {"status": "ok", "detail": "", "breaches": []}
+                return {"status": "error", "detail": _clean(data.get("error")) or "no answer",
+                        "breaches": []}
     except asyncio.TimeoutError:
         return {"status": "error", "detail": "timeout", "breaches": []}
     except aiohttp.ClientResponseError as e:
@@ -158,7 +242,10 @@ async def _query(session: aiohttp.ClientSession, src: Dict, identifier: str) -> 
         return {"status": "error", "detail": netconfig.redact(str(e))[:80] or type(e).__name__,
                 "breaches": []}
 
-    return {"status": "ok", "detail": "", "breaches": _PARSERS[src["id"]](data)}
+    out = {"status": "ok", "detail": "", "breaches": _PARSERS[src["id"]](data)}
+    if src["id"] == "leakcheck" and isinstance(data, dict):
+        out["fields"] = [_clean(f) for f in data.get("fields") or [] if _clean(f)]
+    return out
 
 
 # Verdicts
@@ -261,7 +348,8 @@ async def check_identifiers(emails: List[str], session: aiohttp.ClientSession = 
             srcs = [s for s in SOURCES if "email" in s["kinds"]]
             answers = await asyncio.gather(*(_query(session, s, ident) for s in srcs))
             sources = [{"source": s["label"], "status": a["status"], "detail": a["detail"],
-                        "count": len(_merge([("", a["breaches"])]))}
+                        "count": len(_merge([("", a["breaches"])])),
+                        **({"fields": a["fields"]} if a.get("fields") else {})}
                        for s, a in zip(srcs, answers)]
             breaches = _merge([(s["label"], a["breaches"]) for s, a in zip(srcs, answers)
                                if a["status"] == "ok"])
@@ -303,6 +391,10 @@ def format_lines(v: Dict, limit: Optional[int] = None) -> List[str]:
         if b["data_classes"]:
             lines.append(f"      exposed: {', '.join(b['data_classes'])}")
         lines.append(f"      via: {', '.join(b['sources'])}")
+    for s in v.get("sources", []):
+        if s.get("fields"):
+            lines.append(f"  {s['source']} lists these data types across its {s['count']} match(es), "
+                         f"not per breach: {', '.join(s['fields'])}")
     if len(shown) < len(v["breaches"]):
         lines.append(f"  ... +{len(v['breaches']) - len(shown)} older breach(es) in the JSON/TXT/HTML report")
     return lines

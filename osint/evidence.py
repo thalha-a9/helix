@@ -39,8 +39,9 @@ COUNTING_RULES = {
     "answered": "sites that gave a clear answer: an account found, or a definite 'not found'. "
                 "A 'not found' that came with HTTP 401/403/407/408/425/429/451/999 or 5xx is "
                 "counted as no clear answer",
-    "found": "accounts kept after the live control probe (re-check + two impossible "
-             "usernames) and the local verifier",
+    "found": "accounts kept after the live control probe (re-check + made-up usernames, "
+             "at least three since 3.6.2, one of the name's own length for a short name) "
+             "and the local verifier",
     "unanswered": "sites with no clear answer, counted by reason (timeout, connection "
                   "error, bot check, control probe could not verify, ...)",
 }
@@ -58,6 +59,10 @@ _REASONS = (
     ("heuristic_purge", "verifier: false-positive pattern"),
     ("soft404_body", "verifier: not-found page"),
     ("Server disconnected", "connection error"),
+    ("not checked: rate-limited or blocked", "rate-limited or blocked"),
+    ("unexpected: General SOCKS server failure", "proxy or Tor could not connect"),
+    ("unexpected: Can not connect to proxy", "proxy or Tor could not connect"),
+    ("unexpected: Couldn't connect to proxy", "proxy or Tor could not connect"),
     ("Cannot connect", "connection error"),
     ("502, message='Bad Gateway', url='http", "proxy refused the host (HTTP 502 from the proxy)"),
     ("unexpected: Failed to perform, curl: (28)", "timeout"),
@@ -144,7 +149,7 @@ def summarise(results: List[dict]) -> Dict:
 def build(*, username: str, results: List[dict], platform_map: Dict[str, dict],
           started: str, finished: str, wall_seconds: float, argv: List[str],
           concurrency: int, control: bool, sites_file: str, pages: Optional[Dict] = None,
-          target_type: str = "username") -> Dict:
+          target_type: str = "username", controls: Optional[int] = None) -> Dict:
     """The evidence record, with `fingerprint` = SHA-256 of everything else.
 
     For an email scan `username` holds the address and target_type is "email";
@@ -170,6 +175,7 @@ def build(*, username: str, results: List[dict], platform_map: Dict[str, dict],
             "concurrency": concurrency,
             "control_probe": control,
             **({"target_type": target_type} if target_type != "username" else {}),
+            **({"controls": controls} if controls else {}),
         },
         "environment": {
             "python": _platform.python_version(),

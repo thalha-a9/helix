@@ -9,7 +9,7 @@ Verification stack (runs in order on every scan):
   2. AI verifier (--ai)       : optional, multi-provider (claude/openrouter/nvidia)
 """
 
-import asyncio, argparse, logging, os, sys, time, webbrowser
+import asyncio, argparse, logging, os, re, sys, time, webbrowser
 
 def _check_deps():
     import importlib.util
@@ -95,21 +95,62 @@ def _sanitize(results: list) -> list:
     return safe
 
 
+def profile_key(url: str) -> str:
+    """A profile URL template without scheme, www. or a trailing slash, lower
+    case: the same address in two databases is one site, checked once."""
+    u = re.sub(r"^https?://", "", (url or "").strip().lower())
+    return re.sub(r"^(www|m|mobile)\.", "", u).rstrip("/")
+
+
 def _merge_source(platform_map: dict, label: str, loaded: dict) -> None:
-    """Add a database's platforms, dropping definitions that cannot be scanned soundly."""
+    """Add a database's platforms, dropping definitions that cannot be scanned
+    soundly and ones whose profile address is already listed (the earlier
+    entry, built-in first, is kept)."""
     usable, unusable = filter_valid(loaded)
-    added = sum(1 for k in usable if k not in platform_map)
-    platform_map.update({k: v for k, v in usable.items() if k not in platform_map})
+    have = {profile_key(v.get("url", "")) for v in platform_map.values()}
+    new, repeats = {}, 0
+    for k, v in usable.items():
+        if k in platform_map:
+            continue
+        key = profile_key(v.get("url", ""))
+        if key in have:
+            repeats += 1
+            continue
+        have.add(key)
+        new[k] = v
+    added = len(new)
+    platform_map.update(new)
     search = sum(1 for why in unusable.values() if why == [SEARCH_PROBLEM])
     broken = len(unusable) - search
     parts = ([f"{broken} malformed entr{'y' if broken == 1 else 'ies'}"] if broken else []) + \
-            ([f"{search} search page{'' if search == 1 else 's'}"] if search else [])
+            ([f"{search} search page{'' if search == 1 else 's'}"] if search else []) + \
+            ([f"{repeats} already listed"] if repeats else [])
     note = f"  {DIM}({' and '.join(parts)} skipped){RST}" if parts else ""
     print(f"  {G}[+]{RST} {label}: +{added} -> total {len(platform_map)}{note}\n")
 
 
-def _print_found(found, note=""):
-    if not found: print(f"  {DIM}None found.{RST}"); return
+def unanswered_line(results) -> str:
+    """How many sites gave no clear answer, and why: a site that was not
+    reached is not a site without an account."""
+    s = evidence.summarise(results)
+    if not s["unanswered"]:
+        return ""
+    why = ", ".join(f"{k} {reason}" for reason, k in list(s["unanswered_by_reason"].items())[:3])
+    if not s["answered"]:
+        return (f"No site gave a clear answer ({why}), so nothing was checked: look at the "
+                f"connection, or that Tor or the proxy is running.")
+    return (f"{s['unanswered']} of {s['attempted']} sites gave no clear answer ({why}); "
+            f"an account there would not be found.")
+
+
+def _print_found(found, note="", results=None):
+    if not found:
+        answered = evidence.summarise(results)["answered"] if results is not None else None
+        if answered == 0:
+            print(f"  {Y}Nothing was checked: no site answered.{RST}")
+        else:
+            print(f"  {DIM}None found{f' among the {answered} sites that answered' if answered else ''}.{RST}")
+        return
     if note: print(f"  {DIM}{note}{RST}")
     cur_cat = None
     for r in sorted(found, key=lambda x: x["category"]):
@@ -205,8 +246,9 @@ def _print_record(record: dict):
         print(f"  Found     {G}{B}{s['found']}{RST} site{'' if s['found'] == 1 else 's'} with an account "
               f"for this address")
     else:
-        print(f"  Found     {G}{B}{s['found']}{RST} account{'' if s['found'] == 1 else 's'}, each verified live against two "
-              f"impossible usernames")
+        n = a.get("controls")
+        print(f"  Found     {G}{B}{s['found']}{RST} account{'' if s['found'] == 1 else 's'}, each verified live against "
+              f"{n or 'two'} made-up usernames")
     for why, k in list(s["unanswered_by_reason"].items())[:6]:
         print(f"  {DIM}            {k:>5}  {why}{RST}")
     print(f"  Database  {record['database']['sites']} sites | sha256 {record['database']['sha256'][:16]}...")
@@ -342,7 +384,9 @@ async def run(args):
             perms = generate_permutations(username)
             print(f"  {C}[*]{RST} {len(perms)} permutations available")
             try:   choice = input(f"  {DIM}Scan all? [y/N]: {RST}").strip().lower()
-            except EOFError: choice = "n"
+            except EOFError:
+                choice = "n"
+                print()            # no one to answer: end the prompt line
             if choice == "y":
                 pall = {}
                 for p in perms:
@@ -423,7 +467,9 @@ async def run(args):
                 started=_started_utc, finished=evidence.utc_now(),
                 wall_seconds=time.time() - _scan_start, argv=sys.argv,
                 concurrency=_effective_concurrency(len(platform_map), concurrency),
-                control=not args.no_control, pages=pages))
+                control=not args.no_control, pages=pages,
+                controls=None if args.no_control
+                else max(DEFAULT_CONTROLS, getattr(args, "controls", None) or 0)))
 
         # Maigret engine (leads only: verified by Helix)
         if args.maigret_engine:
@@ -511,8 +557,11 @@ async def run(args):
               f"{C}Cross-links {xlinks}{RST}  {DIM}Time {elapsed:.1f}s{RST}")
         if skipped:
             print(f"  {Y}[!]{RST} {DIM}{skipped} WAF platforms skipped: pip install curl-cffi{RST}")
+        gap = unanswered_line(results)
+        if gap:
+            print(f"  {Y}[!]{RST} {DIM}{gap}{RST}")
         print(f"  {B}{'-'*54}{RST}")
-        _print_found(found_u)
+        _print_found(found_u, results=results)
         print(f"\n  {G}*{RST}=OG-verified  {C}<->{RST}=bio  {DIM}[S]{RST}=Sherlock  {DIM}[W]{RST}=WMN  {DIM}[M]{RST}=Maigret  {DIM}[F]{RST}=Fediverse  {M}~{RST}=avatar\n")
 
         # Email permutation
@@ -910,11 +959,12 @@ Operational security:
     )
     p.add_argument("-u","--username",    default=None)
     p.add_argument("-e","--email",       default=None)
-    p.add_argument("--providers",        action="store_true")
+    p.add_argument("--providers",        action="store_true",
+                   help="List which --ai providers are set up and exit")
 
     g = p.add_argument_group("platform sources")
     g.add_argument("--all",             action="store_true",  dest="all_sources",
-        help="Full coverage: builtin + WhatsMyName + Sherlock + Maigret databases + fediverse servers (about 12,000 sites; a few minutes on a fast link, about 10 on a slow one)")
+        help="Full coverage: builtin + WhatsMyName + Sherlock + Maigret databases + fediverse servers (about 11,700 sites; a few minutes on a fast link, about 10 on a slow one)")
     g.add_argument("--no-control",      action="store_true",  dest="no_control",
         help="Skip the control probe that discards platforms which also 'find' a random "
              "nonexistent username (faster, but lets catch-all pages through)")
@@ -927,13 +977,16 @@ Operational security:
              f"max {MAX_CONCURRENCY}). Higher is faster on big databases; the sites "
              f"see the same requests either way, just sooner")
     g.add_argument("--wmn",             action="store_true")
-    g.add_argument("--wmn-timeout",     type=int,default=30,  dest="wmn_timeout")
+    g.add_argument("--wmn-timeout",     type=int,default=30,  dest="wmn_timeout",
+        help="Seconds to wait for the WhatsMyName database download (default 30)")
     g.add_argument("--sherlock",        action="store_true")
-    g.add_argument("--sherlock-timeout",type=int,default=30,  dest="sherlock_timeout")
+    g.add_argument("--sherlock-timeout",type=int,default=30,  dest="sherlock_timeout",
+        help="Seconds to wait for the Sherlock database download (default 30)")
     g.add_argument("--maigret",         action="store_true",  help="Load Maigret database (github.com/soxoj/maigret)")
     g.add_argument("--fediverse",       action="store_true",
         help="Check about 3,900 Mastodon, Misskey, Lemmy and PeerTube servers, each its own site (live-tested list)")
-    g.add_argument("--maigret-timeout", type=int,default=30,  dest="maigret_timeout")
+    g.add_argument("--maigret-timeout", type=int,default=30,  dest="maigret_timeout",
+        help="Seconds to wait for the Maigret database download (default 30)")
     g.add_argument("--maigret-engine",  action="store_true",  dest="maigret_engine",
         help="Run the installed Maigret engine as a lead source, every hit is "
              "re-fetched and verified by Helix before it is reported (pip install maigret)")
@@ -956,7 +1009,8 @@ Operational security:
     g3.add_argument("--pivot",          action="store_true")
     g3.add_argument("--pivot-depth",    type=int,default=3,   dest="pivot_depth")
     g3.add_argument("--phash",          action="store_true")
-    g3.add_argument("--permutations",   action="store_true")
+    g3.add_argument("--permutations",   action="store_true",
+        help="Also scan about 45 variants of the username (asks first; each is a full scan)")
     g3.add_argument("--ai",             default=None,
         type=lambda s: s.lower(),
         choices=["claude","openrouter","nvidia"],metavar="PROVIDER",
@@ -976,8 +1030,10 @@ Operational security:
     p.add_argument("--report",    action="store_true", help="Generate PDF/HTML investigation report")
     p.add_argument("--email-permute", action="store_true", dest="email_permute",
                    help="Generate likely email permutations from username + check with holehe")
-    p.add_argument("--output",    default=None)
-    p.add_argument("--no-browser",action="store_true", dest="no_browser")
+    p.add_argument("--output",    default=None, metavar="DIR",
+                   help="Results folder (default results/<name>), inside the current folder")
+    p.add_argument("--no-browser",action="store_true", dest="no_browser",
+                   help="Don't open the graph in a browser at the end")
     p.add_argument("--record-attempt", action="store_true", dest="record_attempt",
                    help="Write sealed evidence of this scan (witnessed tests, audits): UTC times, "
                         "the exact site database (with its SHA-256), per-site outcomes and a "

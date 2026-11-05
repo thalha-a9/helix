@@ -70,7 +70,9 @@ MATCH_THRESHOLD = 6
 _DEFAULT_IMAGE = re.compile(
     r"missing\.png|default_profile|og-default|default[-_]?avatar|avatar[-_]?default|"
     r"no[-_]?avatar|placeholder|anonymous|/defaults?/|/og/image/|web-capture|"
-    r"/background/|/opengraph/|card\.jpg|uploads/articles/|og[-_]image|social[-_]?(?:card|preview)",
+    r"/background/|/opengraph/|card\.jpg|uploads/articles/|og[-_]image|social[-_]?(?:card|preview)|"
+    # GitHub's site-wide share images (gists, repos), the same for everyone
+    r"github\.com/opengraph\.png|githubassets\.com/images/modules/open_graph/",
     re.I)
 
 
