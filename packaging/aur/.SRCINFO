@@ -1,6 +1,6 @@
 pkgbase = helix-osint
 	pkgdesc = OSINT username checker that verifies every hit live and maps how the accounts connect
-	pkgver = 3.6.2
+	pkgver = 3.7.0
 	pkgrel = 1
 	url = https://github.com/thalha-a9/helix
 	arch = any
@@ -17,7 +17,7 @@ pkgbase = helix-osint
 	optdepends = python-pillow: avatar matching (--phash)
 	optdepends = holehe: email account check (--holehe)
 	optdepends = python-weasyprint: PDF reports (--report)
-	source = https://files.pythonhosted.org/packages/source/h/helix-osint/helix_osint-3.6.2.tar.gz
-	sha256sums = 134ccc0f5fcdd680c8951987740395606fb871777830f25e2ed85ee65fe02e3b
+	source = https://files.pythonhosted.org/packages/source/h/helix-osint/helix_osint-3.7.0.tar.gz
+	sha256sums = 5a758183e8ff6ecb79fe37784430e68bb785a26ac1a7095f186a439b006427bf
 
 pkgname = helix-osint
