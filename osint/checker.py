@@ -649,9 +649,9 @@ async def check_username(username: str, platforms: dict = None, progress_cb=None
     results   = []
     done      = 0
 
-    connector = netconfig.build_connector(
-        limit=limit, force_close=True, **_CLEANUP_CLOSED
-    )
+    # Keep pooled transports for aiohttp's normal SSL shutdown; force_close can
+    # leave already-closed SSL transports for the connector to abort again.
+    connector = netconfig.build_connector(limit=limit, **_CLEANUP_CLOSED)
     async with netconfig.new_session(connector=connector) as session:
         tasks = [
             check_platform(session, name, plat, username, semaphore, fast=fast,
