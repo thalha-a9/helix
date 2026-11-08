@@ -642,7 +642,7 @@ async def check_username(username: str, platforms: dict = None, progress_cb=None
     results   = []
     done      = 0
 
-    connector = netconfig.build_connector(limit=limit)
+    connector = netconfig.build_connector(limit=limit, force_close=True)
     async with netconfig.new_session(connector=connector) as session:
         tasks = [
             check_platform(session, name, plat, username, semaphore, fast=fast,
