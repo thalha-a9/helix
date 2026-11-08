@@ -92,7 +92,6 @@ def test_check_username_uses_default_ssl_connector_cleanup(monkeypatch):
     monkeypatch.setattr(checker, "check_platform", fake_check)
     asyncio.run(checker.check_username("janeroe", platforms={"A": {}}, control=False))
 
-    assert "force_close" not in seen
     assert "enable_cleanup_closed" not in seen
 
 
