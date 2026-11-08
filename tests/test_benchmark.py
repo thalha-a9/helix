@@ -77,7 +77,7 @@ def test_check_username_honours_concurrency(monkeypatch):
     assert seen["sem"] == 250
 
 
-def test_check_username_does_not_force_close_ssl_connections(monkeypatch):
+def test_check_username_uses_default_ssl_connector_cleanup(monkeypatch):
     seen = {}
     build_connector = checker.netconfig.build_connector
 
@@ -92,7 +92,8 @@ def test_check_username_does_not_force_close_ssl_connections(monkeypatch):
     monkeypatch.setattr(checker, "check_platform", fake_check)
     asyncio.run(checker.check_username("janeroe", platforms={"A": {}}, control=False))
 
-    assert seen.get("force_close", False) is False
+    assert "force_close" not in seen
+    assert "enable_cleanup_closed" not in seen
 
 
 def test_concurrency_warning_names_the_file_descriptor_limit():
