@@ -92,10 +92,7 @@ def test_check_username_force_closes_without_ssl_cleanup(monkeypatch):
     monkeypatch.setattr(checker, "check_platform", fake_check)
     asyncio.run(checker.check_username("janeroe", platforms={"A": {}}, control=False))
 
-<<<<<<< HEAD
-=======
     assert seen.get("force_close") is True
->>>>>>> 8479da40b50a2d3b8533917a96705f5abf26c02d
     assert "enable_cleanup_closed" not in seen
 
 
