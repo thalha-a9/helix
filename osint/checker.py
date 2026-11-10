@@ -6,7 +6,6 @@ import asyncio
 import aiohttp
 import hashlib
 import re
-import sys
 from html import unescape as _unescape
 import random
 from urllib.parse import urlparse
@@ -593,12 +592,6 @@ async def _control_probe(session, results: list, plat_map: dict,
 # more attempt at this calmer concurrency (the control probe runs at it too).
 CALM_CONCURRENCY = 60
 
-# aiohttp's enable_cleanup_closed works around a CPython SSL leak fixed in
-# 3.12.7 and 3.13.1; on fixed versions aiohttp warns that it is ignored.
-_CLEANUP_CLOSED = ({"enable_cleanup_closed": True}
-                   if sys.version_info < (3, 12, 7)
-                   or (3, 13, 0) <= sys.version_info < (3, 13, 1) else {})
-
 # At the calm limit most timeouts are dead hosts, and retrying them costs more
 # than it finds. Retry only when the sweep ran hotter than the calm limit or
 # when enough sites timed out that the link was clearly overloaded.
@@ -649,9 +642,7 @@ async def check_username(username: str, platforms: dict = None, progress_cb=None
     results   = []
     done      = 0
 
-    connector = netconfig.build_connector(
-        limit=limit, force_close=True, **_CLEANUP_CLOSED
-    )
+    connector = netconfig.build_connector(limit=limit, force_close=True)
     async with netconfig.new_session(connector=connector) as session:
         tasks = [
             check_platform(session, name, plat, username, semaphore, fast=fast,
