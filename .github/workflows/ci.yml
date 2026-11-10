@@ -7,7 +7,9 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # setup-python has no Python 3.9 build for the image ubuntu-latest now
+    # points to, so 3.9 runs on ubuntu-22.04, where it does.
+    runs-on: ${{ matrix.python-version == '3.9' && 'ubuntu-22.04' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
