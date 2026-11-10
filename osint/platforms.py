@@ -21,10 +21,18 @@ _BIO_PATTERNS_SOCIAL = {
     "website":  r"(https?://(?!twitter\.com|x\.com|instagram\.com)[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}[^\s\"\'<>]*)",
 }
 
+# "known" is an account that exists on the site. The daily site check looks
+# for it to prove the rule still finds a real account. 36 of them were found
+# and confirmed by the control probe on 10 Nov 2026; the rest (Instagram,
+# Facebook, YouTube, Reddit, Pinterest, Tumblr, HackerNews, npm, Codepen,
+# ProductHunt, Replit, Bitbucket, Patreon, Wattpad, Spotify, LinkedIn) could
+# not be reached from the address that test ran from and are well-known
+# accounts the daily check will confirm or flag.
 PLATFORMS = {
 
     # Social
     "Twitter/X": {
+        "known": "google",
         "url":             "https://x.com/{username}",
         "method":          "text_not_present",
         # X's server-rendered not-found page (checked 2026-10); the older
@@ -35,6 +43,7 @@ PLATFORMS = {
         "bio_patterns": _BIO_PATTERNS_SOCIAL, "bio_extract": True,
     },
     "Instagram": {
+        "known": "nasa",
         # Logged out, only a real account's page carries its og:title,
         # "Name (@user) - Instagram photos and videos" (@ is HTML-escaped).
         # Unknown names and login walls have none, the old "not found" text
@@ -45,6 +54,7 @@ PLATFORMS = {
         "category": "social", "color": "#E1306C",
     },
     "TikTok": {
+        "known": "google",
         # A real account's page embeds its user record ("uniqueId"); an
         # unknown name gets statusCode 10221 and no record.
         "url": "https://www.tiktok.com/@{username}",
@@ -53,39 +63,46 @@ PLATFORMS = {
         "category": "social", "color": "#010101",
     },
     "Facebook": {
+        "known": "nasa",
         "url": "https://www.facebook.com/{username}",
         "method": "text_not_present", "not_found_text": "The link you followed may be broken",
         "tls_impersonate": True, "requires_tls": True,
         "category": "social", "color": "#1877F2",
     },
     "LinkedIn": {
+        "known": "williamhgates",
         "url": "https://www.linkedin.com/in/{username}",
         "method": "text_not_present", "not_found_text": "Page not found",
         "tls_impersonate": True,
         "category": "social", "color": "#0A66C2",
     },
     "Pinterest": {
+        "known": "nasa",
         "url": "https://www.pinterest.com/{username}/",
         "method": "og_meta",
         "og_not_found": ["Page Not Found", "Pinterest – The world"],
         "category": "social", "color": "#E60023",
     },
     "Snapchat": {
+        "known": "nasa",
         "url": "https://www.snapchat.com/add/{username}",
         "method": "og_meta", "og_found": ["{username}"],
         "category": "social", "color": "#FFFC00",
     },
     "Tumblr": {
+        "known": "nasa",
         "url": "https://{username}.tumblr.com/",
         "method": "text_not_present", "not_found_text": "There\u2019s nothing here",
         "category": "social", "color": "#35465C",
     },
     "Mastodon": {
+        "known": "nasa",
         "url": "https://mastodon.social/@{username}",
         "method": "og_meta", "og_not_found": ["Page not found", "Error 404"],
         "category": "social", "color": "#6364FF",
     },
     "Bluesky": {
+        "known": "google",
         # SPA: static HTML never contains "Profile not found". Use AT Protocol API instead.
         "url":       "https://bsky.app/profile/{username}.bsky.social",
         "check_url": "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={username}.bsky.social",
@@ -93,12 +110,14 @@ PLATFORMS = {
         "category": "social", "color": "#0085FF",
     },
     "Threads": {
+        "known": "google",
         "url": "https://www.threads.com/@{username}",
         "method": "text_not_present", "not_found_text": "isn\u2019t available",
         "tls_impersonate": True,
         "category": "social", "color": "#000000",
     },
     "VK": {
+        "known": "google",
         # VK answers 404 for an unregistered short name and 200 (often a bare
         # login wall without the name in it) for a registered one.
         "url": "https://vk.com/{username}",
@@ -106,6 +125,7 @@ PLATFORMS = {
         "category": "social", "color": "#4C75A3",
     },
     "Telegram": {
+        "known": "google",
         # Telegram og:title for existing = "Telegram: Contact @{username}"
         # For non-existent = "Telegram: Contact @{username}" BUT page body says "If you have Telegram, you can contact": unreliable
         # Better: check for specific text that only appears on valid profiles
@@ -116,12 +136,14 @@ PLATFORMS = {
 
     # Developer / Security
     "GitHub": {
+        "known": "nasa",
         "url": "https://github.com/{username}",
         "method": "og_meta", "og_not_found": ["Page not found", "Not Found"],
         "category": "dev", "color": "#f0f6fc",
         "bio_extract": True, "bio_patterns": _BIO_PATTERNS_DEVELOPER,
     },
     "GitLab": {
+        "known": "john",
         # Groups share the user URL space (gitlab.com/torvalds is a group), so
         # the profile page cannot tell them apart. The users API only returns
         # real user accounts: a group or a missing name returns [].
@@ -131,11 +153,13 @@ PLATFORMS = {
         "category": "dev", "color": "#FC6D26",
     },
     "HackerNews": {
+        "known": "pg",
         "url": "https://news.ycombinator.com/user?id={username}",
         "method": "text_not_present", "not_found_text": "No such user",
         "category": "dev", "color": "#FF6600",
     },
     "HackerOne": {
+        "known": "john",
         "url": "https://hackerone.com/{username}",
         "method": "og_meta", "og_not_found": ["Page Not Found", "404"],
         "category": "dev", "color": "#494649",
@@ -146,6 +170,7 @@ PLATFORMS = {
         "category": "dev", "color": "#F26822",
     },
     "Replit": {
+        "known": "amasad",
         # Valid user og:title is "@username - Replit"
         # Invalid/homepage = "Replit" (caught by GENERIC_TITLES in verifier)
         # og_found check is the primary signal, title MUST contain @username
@@ -155,17 +180,20 @@ PLATFORMS = {
         "category": "dev", "color": "#F26207",
     },
     "Codepen": {
+        "known": "chriscoyier",
         "url": "https://codepen.io/{username}",
         "method": "og_meta", "og_not_found": ["CodePen", "doesn't exist"],
         "category": "dev", "color": "#AEAEAE",
     },
     "Dev.to": {
+        "known": "nasa",
         "url": "https://dev.to/{username}",
         "method": "og_meta", "og_not_found": ["Page not found", "404"],
         "category": "dev", "color": "#0A0A0A",
         "bio_extract": True, "bio_patterns": _BIO_PATTERNS_DEVELOPER,
     },
     "StackOverflow": {
+        "known": "john",
         # SO user URLs use numeric IDs, username search is unreliable; skip or use search
         # Use SO's search API as proxy: if username exists in top results, mark found
         "url": "https://stackoverflow.com/users/{username}",
@@ -173,6 +201,7 @@ PLATFORMS = {
         "category": "dev", "color": "#F58025",
     },
     "npm": {
+        "known": "sindresorhus",
         "url": "https://www.npmjs.com/~{username}",
         "method": "og_meta", "og_not_found": ["npm | Not found"],
         "category": "dev", "color": "#CB3837",
@@ -186,6 +215,7 @@ PLATFORMS = {
         "category": "dev", "color": "#3775A9",
     },
     "Bitbucket": {
+        "known": "atlassian",
         "url": "https://bitbucket.org/{username}",
         "method": "og_meta", "og_not_found": ["Page not found"],
         "category": "dev", "color": "#0052CC",
@@ -198,16 +228,19 @@ PLATFORMS = {
 
     # Content / Creative
     "YouTube": {
+        "known": "nasa",
         "url": "https://www.youtube.com/@{username}",
         "method": "og_meta", "og_not_found": ["404", "This page isn"],
         "category": "content", "color": "#FF0000",
     },
     "Twitch": {
+        "known": "nasa",
         "url": "https://www.twitch.tv/{username}",
         "method": "og_meta", "og_found": ["{username}"],
         "category": "content", "color": "#9146FF",
     },
     "Medium": {
+        "known": "nasa",
         # Non-existent users redirect to the homepage, og:title "Medium - Where good ideas find you"
         # Also catches: "Out of nothing, something" (older Medium 404)
         "url": "https://medium.com/@{username}",
@@ -219,11 +252,13 @@ PLATFORMS = {
         "category": "content", "color": "#000000",
     },
     "Substack": {
+        "known": "nasa",
         "url": "https://{username}.substack.com",
         "method": "text_not_present", "not_found_text": "This page does not exist",
         "category": "content", "color": "#FF6719",
     },
     "Patreon": {
+        "known": "kurzgesagt",
         "url": "https://www.patreon.com/{username}",
         # A removed account still answers 200, titled "Removed | Patreon"
         # (seen for patreon.com/jack, Oct 2026): it has no live profile.
@@ -233,31 +268,37 @@ PLATFORMS = {
         "category": "content", "color": "#FF424D",
     },
     "Behance": {
+        "known": "nasa",
         "url": "https://www.behance.net/{username}",
         "method": "og_meta", "og_not_found": ["Page Not Found"],
         "category": "content", "color": "#1769FF",
     },
     "Dribbble": {
+        "known": "google",
         "url": "https://dribbble.com/{username}",
         "method": "og_meta", "og_not_found": ["Dribbble - Page Not Found"],
         "category": "content", "color": "#EA4C89",
     },
     "Flickr": {
+        "known": "nasa",
         "url": "https://www.flickr.com/people/{username}",
         "method": "text_not_present", "not_found_text": "Page not found",
         "category": "content", "color": "#0063DC",
     },
     "Vimeo": {
+        "known": "google",
         "url": "https://vimeo.com/{username}",
         "method": "og_meta", "og_not_found": ["Vimeo", "Page Not Found"],
         "category": "content", "color": "#1AB7EA",
     },
     "SoundCloud": {
+        "known": "nasa",
         "url": "https://soundcloud.com/{username}",
         "method": "og_meta", "og_not_found": ["SoundCloud - 404"],
         "category": "content", "color": "#FF5500",
     },
     "Spotify": {
+        "known": "spotify",
         # Spotify og:title for existing = "{username}'s profile" or display name
         # For non-existent: redirects to homepage or returns generic title
         "url": "https://open.spotify.com/user/{username}",
@@ -265,11 +306,13 @@ PLATFORMS = {
         "category": "content", "color": "#1DB954",
     },
     "Bandcamp": {
+        "known": "nasa",
         "url": "https://bandcamp.com/{username}",
         "method": "text_not_present", "not_found_text": "Sorry, that something isn",
         "category": "content", "color": "#1DA0C3",
     },
     "Wattpad": {
+        "known": "wattpad",
         "url": "https://www.wattpad.com/user/{username}",
         "method": "og_meta", "og_not_found": ["Wattpad | 404"],
         "category": "content", "color": "#FF5A00",
@@ -277,6 +320,7 @@ PLATFORMS = {
 
     # Gaming
     "Steam": {
+        "known": "nasa",
         # Positive evidence only: rate-limit and error pages lack the not-found
         # text too, which made a missing marker read as "found".
         "url": "https://steamcommunity.com/id/{username}",
@@ -284,6 +328,7 @@ PLATFORMS = {
         "category": "gaming", "color": "#1B2838",
     },
     "Chess.com": {
+        "known": "google",
         # Use Chess.com's public API: returns 404 for non-existent users. Zero false positives.
         "url":       "https://www.chess.com/member/{username}",
         "check_url": "https://api.chess.com/pub/player/{username}",
@@ -291,6 +336,7 @@ PLATFORMS = {
         "category": "gaming", "color": "#81B64C",
     },
     "Lichess": {
+        "known": "nasa",
         # Lichess API returns 404 for non-existent users
         "url":       "https://lichess.org/@/{username}",
         "check_url": "https://lichess.org/api/user/{username}",
@@ -298,11 +344,13 @@ PLATFORMS = {
         "category": "gaming", "color": "#FFFFFF",
     },
     "Roblox": {
+        "known": "torvalds",
         "url": "https://www.roblox.com/user.aspx?username={username}",
         "method": "text_not_present", "not_found_text": "Page cannot be found",
         "category": "gaming", "color": "#00A2FF",
     },
     "Itch.io": {
+        "known": "nasa",
         "url": "https://{username}.itch.io",
         "method": "text_not_present", "not_found_text": "is not a valid",
         "category": "gaming", "color": "#FA5C5C",
@@ -310,6 +358,7 @@ PLATFORMS = {
 
     # Forums / Community
     "Reddit": {
+        "known": "nasa",
         # JSON API: valid user returns {"kind":"t2","data":{"name":"...","is_employee":...}}
         # Invalid user returns HTTP 404. Text-present on "is_employee" is 100% reliable.
         "url":       "https://www.reddit.com/user/{username}",
@@ -325,11 +374,13 @@ PLATFORMS = {
         "category": "forum", "color": "#B92B27",
     },
     "ProductHunt": {
+        "known": "rrhoover",
         "url": "https://www.producthunt.com/@{username}",
         "method": "og_meta", "og_not_found": ["Page not found"],
         "category": "forum", "color": "#DA552F",
     },
     "Lobsters": {
+        "known": "google",
         "url": "https://lobste.rs/~{username}",
         "method": "text_not_present", "not_found_text": "Unknown user",
         "category": "forum", "color": "#AC130D",
@@ -337,6 +388,7 @@ PLATFORMS = {
 
     # Professional / Other
     "Keybase": {
+        "known": "microsoft",
         "url": "https://keybase.io/{username}",
         # Profile pages no longer carry og:title, so use the public API. It
         # answers {"them":[null]} for unknown names and includes the user's
@@ -354,22 +406,26 @@ PLATFORMS = {
         },
     },
     "About.me": {
+        "known": "google",
         "url": "https://about.me/{username}",
         "method": "og_meta", "og_not_found": ["about.me | 404"],
         "category": "other", "color": "#00ACED",
     },
     "Gravatar": {
+        "known": "google",
         "url": "https://en.gravatar.com/{username}",
         "method": "text_not_present", "not_found_text": "Ooops",
         "category": "other", "color": "#1E8CBE",
     },
     "Linktree": {
+        "known": "google",
         "url": "https://linktr.ee/{username}",
         "method": "og_meta", "og_not_found": ["Linktree. The Only Link You", "Page Not Found"],
         "category": "other", "color": "#43E55E",
         "bio_extract": True, "bio_patterns": _BIO_PATTERNS_SOCIAL,
     },
     "Ko-fi": {
+        "known": "microsoft",
         # og:title for real user: "Support {name} on Ko-fi!"
         # og:title for non-existent: generic "Ko-fi" (caught by verifier GENERIC_TITLES)
         # Use text_present on profile URL which only appears on real profile pages
@@ -378,16 +434,19 @@ PLATFORMS = {
         "category": "other", "color": "#FF5E5B",
     },
     "Buy Me a Coffee": {
+        "known": "nasa",
         "url": "https://www.buymeacoffee.com/{username}",
         "method": "og_meta", "og_not_found": ["Page not found", "404"],
         "category": "other", "color": "#FFDD00",
     },
     "Carrd": {
+        "known": "nasa",
         "url": "https://{username}.carrd.co",
         "method": "text_not_present", "not_found_text": "doesn't exist",
         "category": "other", "color": "#2AADD6",
     },
     "Peerlist": {
+        "known": "david",
         "url": "https://peerlist.io/{username}",
         "method": "og_meta", "og_not_found": ["404", "Not Found"],
         "category": "other", "color": "#00AA45",

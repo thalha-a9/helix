@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Helix already checks about 11,700 sites: the Sherlock, WhatsMyName and Maigret databases plus about 3,700 fediverse servers. If a site is missing, adding it to one of those projects helps every tool. For a site that only makes sense in Helix, fill this in.
+        Helix already checks about 12,000 sites: the Sherlock, WhatsMyName and Maigret databases plus about 3,700 fediverse servers. If a site is missing, adding it to one of those projects helps every tool. For a site that only makes sense in Helix, fill this in.
   - type: input
     id: site
     attributes:

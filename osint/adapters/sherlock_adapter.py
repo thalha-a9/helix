@@ -2,7 +2,7 @@
 Helix: Sherlock Adapter  (with 24-hour local cache)
 Cache: ~/.cache/helix/sherlock_data_v2.json: avoids re-downloading on every run.
 """
-import aiohttp, json, time
+import aiohttp, json, re, time
 from pathlib import Path
 from typing import Dict, Optional
 from osint import netconfig
@@ -20,7 +20,7 @@ SHERLOCK_URL = SHERLOCK_URLS[0]  # kept for backward compat
 _CACHE_DIR  = Path.home() / ".cache" / "helix"
 # v2: entries carry Sherlock's isNSFW flag as "nsfw"; version-1 caches dropped
 # it, so the 19 adult sites were scanned even without --nsfw.
-_CACHE_FILE = _CACHE_DIR / "sherlock_data_v2.json"
+_CACHE_FILE = _CACHE_DIR / "sherlock_data_v4.json"
 
 
 def without_nsfw(platforms: Dict[str, dict], include_nsfw: bool) -> Dict[str, dict]:
@@ -90,20 +90,42 @@ async def fetch_sherlock_platforms(timeout: int = 30) -> Dict[str, dict]:
         method = _METHOD_MAP.get(error_type)
         if not method:
             continue
+        # A lookup that has to be POSTed cannot be made by a plain GET.
+        if str(info.get("request_method") or "GET").upper() not in ("GET", "HEAD"):
+            continue
         url  = url_tmpl.replace("{}", "{username}")
         pdef: dict = {
             "url": url, "method": method,
             "category": "sherlock", "color": "#a78bfa", "source": "sherlock",
         }
+        # Where Sherlock asks another address than the profile page (an API),
+        # ask that one and show the profile page.
+        probe = info.get("urlProbe")
+        if isinstance(probe, str) and "{}" in probe and probe.startswith("http"):
+            pdef["check_url"] = probe.replace("{}", "{username}")
         if method == "status_code":
             pdef["found"] = [200]
         elif method == "text_not_present":
+            # Every "not found" text counts, not only the first: Archive.org
+            # lists three, Discord two.
             em = info.get("errorMsg", "")
-            pdef["not_found_text"] = em[0] if isinstance(em, list) else em
+            texts = [t for t in (em if isinstance(em, list) else [em]) if isinstance(t, str) and t]
+            pdef["not_found_text"] = texts[0] if texts else ""
+            if len(texts) > 1:
+                pdef["not_found_texts"] = texts
         elif method == "response_url":
             pdef["error_url"] = info.get("errorUrl", "")
+        headers = info.get("headers")
+        if isinstance(headers, dict) and headers and all(
+                isinstance(k, str) and isinstance(v, str) and not re.search(r"[\r\n]", k + v)
+                for k, v in headers.items()):
+            pdef["headers"] = dict(headers)
         if info.get("isNSFW"):
             pdef["nsfw"] = True
+        # The account Sherlock lists as existing here, for the daily site check.
+        claimed = info.get("username_claimed")
+        if isinstance(claimed, str) and re.fullmatch(r"[A-Za-z0-9._\-]{1,50}", claimed):
+            pdef["known"] = claimed
         platforms[name] = pdef
 
     _save_cache(platforms)

@@ -6,3 +6,4 @@ graft tools
 global-exclude __pycache__ *.py[cod]
 prune private
 exclude tests/test_privacy.py
+graft integrations

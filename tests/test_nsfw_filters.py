@@ -132,8 +132,8 @@ def test_maigret_fetch_flags_and_load_filters(monkeypatch, tmp_path):
 
 
 def test_cache_files_were_renamed_so_flagless_caches_are_not_reused():
-    assert sherlock_adapter._CACHE_FILE.name == "sherlock_data_v2.json"
-    assert maigret_adapter._CACHE_FILE.name == "maigret_data_v3.json"  # v3: all absence strings
+    assert sherlock_adapter._CACHE_FILE.name == "sherlock_data_v4.json"  # v4: probe address, all texts
+    assert maigret_adapter._CACHE_FILE.name == "maigret_data_v5.json"  # v5: engine addresses
 
 
 def test_wmn_shows_the_profile_page_and_probes_the_api(monkeypatch):
@@ -149,3 +149,47 @@ def test_wmn_shows_the_profile_page_and_probes_the_api(monkeypatch):
     assert p["dev.to"]["url"] == "https://dev.to/{username}"
     assert p["dev.to"]["check_url"] == "https://dev.to/api/users/by_username?url={username}"
     assert "check_url" not in p["Plain"] and p["Plain"]["url"] == "https://plain.example/{username}"
+
+
+# What the databases know beyond the address
+
+def test_sherlock_probe_address_every_not_found_text_headers_and_known_account(monkeypatch, tmp_path):
+    payload = {
+        "Api": {"url": "https://api.example/{}", "urlProbe": "https://api.example/lookup/{}.json",
+                "errorType": "message", "errorMsg": ["no such account", "temporarily offline"],
+                "headers": {"Accept": "application/json"}, "username_claimed": "blue"},
+        "One": {"url": "https://one.example/{}", "errorType": "message", "errorMsg": "gone"},
+        "Posted": {"url": "https://posted.example/{}", "errorType": "status_code",
+                   "request_method": "POST", "request_payload": {"name": "{}"}},
+        "Injected": {"url": "https://inj.example/{}", "errorType": "status_code",
+                     "headers": {"X": "1\r\nHost: evil.example"}, "username_claimed": "not a name"},
+    }
+    monkeypatch.setattr(sherlock_adapter, "_CACHE_FILE", tmp_path / "s.json")
+    monkeypatch.setattr(sherlock_adapter, "_CACHE_DIR", tmp_path)
+    monkeypatch.setattr(sherlock_adapter.netconfig, "new_session", lambda **kw: _FakeSession(payload))
+    p = asyncio.run(sherlock_adapter.fetch_sherlock_platforms())
+    assert p["Api"]["url"] == "https://api.example/{username}"
+    assert p["Api"]["check_url"] == "https://api.example/lookup/{username}.json"
+    assert p["Api"]["not_found_texts"] == ["no such account", "temporarily offline"]
+    assert p["Api"]["headers"] == {"Accept": "application/json"} and p["Api"]["known"] == "blue"
+    assert p["One"]["not_found_text"] == "gone" and "not_found_texts" not in p["One"]
+    assert "Posted" not in p                     # a POST lookup is not asked with a GET
+    assert "headers" not in p["Injected"] and "known" not in p["Injected"]
+
+
+def test_wmn_skips_posted_lookups_and_carries_headers_and_a_known_account(monkeypatch):
+    payload = {"sites": [
+        {"name": "Posted", "uri_check": "https://posted.example/api", "post_body": "user={account}",
+         "e_code": 200, "e_string": "ok", "m_string": "", "m_code": 404, "cat": "social",
+         "known": ["a"]},
+        {"name": "PostedInUrl", "uri_check": "https://p2.example/{account}", "post_body": "x=1",
+         "e_code": 200, "e_string": "ok", "m_string": "no", "m_code": 404, "cat": "social"},
+        {"name": "Api", "uri_check": "https://api.example/u/{account}", "e_code": 200,
+         "e_string": "profile", "m_string": "not found", "m_code": 404, "cat": "social",
+         "headers": {"Accept": "application/json"}, "known": ["john", "jane"]},
+    ]}
+    monkeypatch.setattr(wmn_adapter.netconfig, "new_session", lambda **kw: _FakeSession(payload))
+    p = asyncio.run(wmn_adapter.fetch_wmn_platforms())
+    assert "Posted" not in p and "PostedInUrl" not in p
+    assert p["Api"]["headers"] == {"Accept": "application/json"} and p["Api"]["known"] == "john"
+    assert p["__wmn_filter_stats__"]["posted"] == 1

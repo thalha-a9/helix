@@ -27,9 +27,22 @@ python -m pytest
 The tests run offline and take under a minute. CI runs them on Python 3.9,
 3.11, 3.12, 3.13 and 3.14.
 
+## Adding a site in one line
+
+Let Helix work the rule out:
+
+```bash
+python helix.py --learn "https://example.com/u/{username}" --known an-account-that-exists
+```
+
+It prints the steps it took and one line of JSON. Add that line to
+`osint/data/sites.json` and open a pull request. The line keeps the `known`
+account, so the daily site check proves the rule every day. More in
+[docs/LEARN.md](docs/LEARN.md).
+
 ## Adding or fixing a built-in site
 
-Built-in sites live in `osint/platforms.py`. About 8,250 more come from the
+Built-in sites live in `osint/platforms.py`. About 8,200 more come from the
 Sherlock, WhatsMyName and Maigret databases, so a fix there helps every tool
 that uses them; open it upstream when you can. The fediverse servers are a
 generated list: rebuild it with `python tools/update_fediverse.py`.

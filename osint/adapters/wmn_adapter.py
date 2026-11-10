@@ -10,6 +10,8 @@ Key improvements over v1.1:
     status_code fallback (the root cause of most WMN false positives) is
     used only when no content-based signal is available.
 """
+import re
+
 import aiohttp
 from typing import Dict
 from urllib.parse import urlparse
@@ -194,6 +196,7 @@ async def fetch_wmn_platforms(timeout: int = 30, include_nsfw: bool = False) -> 
     platforms = {}
     blocked   = 0
     dead      = 0
+    posted    = 0
 
     for site in sites:
         name     = site.get("name", "")
@@ -205,6 +208,12 @@ async def fetch_wmn_platforms(timeout: int = 30, include_nsfw: bool = False) -> 
         category = _CATEGORY_MAP.get(raw_cat, "other")
 
         if not name or not uri or "{account}" not in uri:
+            continue
+
+        # A lookup that has to be POSTed cannot be made by a plain GET: asked
+        # that way the site answers something else, for every name.
+        if site.get("post_body"):
+            posted += 1
             continue
 
         # Filter NSFW by default
@@ -266,6 +275,18 @@ async def fetch_wmn_platforms(timeout: int = 30, include_nsfw: bool = False) -> 
             pdef["check_url"] = url
             pdef["url"] = pretty.replace("{account}", "{username}")
 
+        headers = site.get("headers")
+        if isinstance(headers, dict) and headers and all(
+                isinstance(k, str) and isinstance(v, str) and not re.search(r"[\r\n]", k + v)
+                for k, v in headers.items()):
+            pdef["headers"] = dict(headers)
+
+        # An account WhatsMyName lists as existing here, for the daily site check.
+        for claimed in site.get("known") or []:
+            if isinstance(claimed, str) and re.fullmatch(r"[A-Za-z0-9._\-]{1,50}", claimed):
+                pdef["known"] = claimed
+                break
+
         platforms[name] = pdef
 
     # Post-process: fix known WMN URL issues
@@ -287,6 +308,7 @@ async def fetch_wmn_platforms(timeout: int = 30, include_nsfw: bool = False) -> 
         "_meta":   True,
         "blocked": blocked,
         "dead":    dead,
+        "posted":  posted,
         "loaded":  len(platforms) - 1,
     }
 

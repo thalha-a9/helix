@@ -25,6 +25,14 @@ SEARCH_URL = re.compile(
 SEARCH_PROBLEM = "search page: finds mentions of the name, not an account"
 
 
+def profile_key(url: str) -> str:
+    """A profile URL template without scheme, www. or a trailing slash, lower
+    case: the same address in two databases is one site, checked once. It is
+    also the name a site goes by in the daily site check."""
+    u = re.sub(r"^https?://", "", (url or "").strip().lower())
+    return re.sub(r"^(www|m|mobile)\.", "", u).rstrip("/")
+
+
 def is_search_url(url) -> bool:
     return isinstance(url, str) and bool(SEARCH_URL.search(url))
 
@@ -87,6 +95,47 @@ def problems(pdef: dict) -> List[str]:
                 and all(isinstance(c, int) and 100 <= c <= 599 for c in codes)):
             out.append(f"status_code with bad 'found' codes {codes!r}")
 
+    if "found_texts" in pdef and not (isinstance(pdef["found_texts"], list) and pdef["found_texts"]
+                                      and all(_non_empty_str(t) for t in pdef["found_texts"])):
+        out.append("found_texts is not a list of texts")
+    headers = pdef.get("headers")
+    if headers is not None and not (isinstance(headers, dict) and all(
+            isinstance(k, str) and isinstance(v, str) and k.strip()
+            and not re.search(r"[\r\n]", k + v) for k, v in headers.items())):
+        out.append("headers is not a map of header names to single-line values")
+
+    fallbacks = pdef.get("fallbacks")
+    if fallbacks is not None:
+        if not isinstance(fallbacks, list) or not all(isinstance(fb, dict) for fb in fallbacks):
+            out.append("fallbacks is not a list of definitions")
+        else:
+            for i, fb in enumerate(fallback_defs(pdef)):
+                if "fallbacks" in fb:
+                    out.append(f"fallback {i + 1} has fallbacks of its own")
+                out += [f"fallback {i + 1}: {why}" for why in problems({k: v for k, v in fb.items()
+                                                                        if k != "fallbacks"})]
+
+    return out
+
+
+# What a fallback rule takes from its site: where the profile lives and how
+# the site is labelled. How to ask and how to read the answer are its own.
+_INHERITED = ("url", "category", "color", "source", "nsfw")
+
+
+def fallback_defs(pdef: dict) -> List[dict]:
+    """
+    The other ways to ask this site, each a complete definition.
+
+    A site may list `fallbacks`: more rules for the same account, used when
+    the first one gets no clear answer (a fediverse server whose lookup API is
+    rate-limited still answers WebFinger). Each is used as a whole: the hit
+    and the made-up names of the control probe are always read by one rule.
+    """
+    out = []
+    for fb in (pdef or {}).get("fallbacks") or []:
+        if isinstance(fb, dict):
+            out.append({**{k: pdef[k] for k in _INHERITED if k in pdef}, **fb})
     return out
 
 

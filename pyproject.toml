@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "helix-osint"
 dynamic = ["version"]
-description = "OSINT identity mapper: finds a username across about 11,700 sites, verifies every hit live, and graphs how the accounts connect"
+description = "OSINT identity mapper: finds a username across about 12,000 sites, verifies every hit live, and graphs how the accounts connect"
 authors = [{name = "Thalha Ahmed", email = "sheikthalah035@gmail.com"}]
 license = "MIT"
 license-files = ["LICENSE"]
@@ -34,7 +34,7 @@ dependencies = ["aiohttp>=3.9.0,<4.0.0"]
 
 [project.optional-dependencies]
 socks = ["aiohttp-socks>=0.8.4"]
-dev   = ["pytest>=8", "pytest-asyncio>=0.23", "aiohttp-socks>=0.8.4"]
+dev   = ["pytest>=8", "pytest-asyncio>=0.23", "aiohttp-socks>=0.8.4", "phonenumbers>=8.13"]
 tls   = ["curl-cffi>=0.6.2"]
 # --phash decodes pictures from strangers' accounts: Pillow 13 fixes 20 decoder
 # vulnerabilities but needs Python 3.11+, so older Pythons get the best they can.
@@ -43,10 +43,11 @@ phash = ["imagehash>=4.3.1", "Pillow>=13.0.0; python_version >= '3.11'",
 email = ["holehe>=1.4.4", "httpx[socks]"]
 ai    = ["anthropic>=0.25.0", "openai>=1.0.0"]
 pdf   = ["weasyprint>=60.0"]
+phone = ["phonenumbers>=8.13"]
 full  = ["curl-cffi>=0.6.2", "imagehash>=4.3.1", "Pillow>=13.0.0; python_version >= '3.11'",
          "Pillow>=11.3.0; python_version < '3.11'", "holehe>=1.4.4",
          "httpx[socks]", "anthropic>=0.25.0", "openai>=1.0.0", "weasyprint>=60.0",
-         "aiohttp-socks>=0.8.4"]
+         "aiohttp-socks>=0.8.4", "phonenumbers>=8.13"]
 
 [project.urls]
 Homepage      = "https://github.com/thalha-a9/helix"
@@ -63,6 +64,9 @@ helix       = "helix:main"
 
 [tool.setuptools]
 py-modules = ["helix"]
+
+[tool.setuptools.package-data]
+osint = ["data/*.json"]
 
 [tool.setuptools.dynamic]
 version = {attr = "osint.__version__"}

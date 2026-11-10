@@ -14,8 +14,8 @@ changelog section as notes.
    - Repository: `helix`
    - Workflow: `release.yml`
    - Environment: `pypi`
-2. **GitHub environment**: repository Settings -> Environments -> New
-   environment -> `pypi`. Optionally require your own approval before each
+2. **GitHub environment**: repository Settings, Environments, New
+   environment, `pypi`. Optionally require your own approval before each
    publish.
 
 ## Each release

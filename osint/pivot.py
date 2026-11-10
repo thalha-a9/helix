@@ -44,6 +44,9 @@ async def pivot_scan(
 
     visited:   Set[str] = {root_username.lower()}
     pivot_map: Dict     = {}
+    # Aliases whose owners asked to be left out are never followed.
+    from osint import leftout
+    left_out = leftout.load()
 
     # Seed first level from initial scan
     level: List[tuple] = []   # (username, depth, via_platform)
@@ -52,7 +55,8 @@ async def pivot_scan(
             for alias in _extract_aliases(r["bio_links"]):
                 if alias not in visited:
                     visited.add(alias)
-                    level.append((alias, 1, r["platform"]))
+                    if not leftout.is_left_out(alias, left_out):
+                        level.append((alias, 1, r["platform"]))
 
     if not level:
         return pivot_map
@@ -98,7 +102,8 @@ async def pivot_scan(
                         for alias in _extract_aliases(r["bio_links"]):
                             if alias not in visited:
                                 visited.add(alias)
-                                level.append((alias, depth + 1, r["platform"]))
+                                if not leftout.is_left_out(alias, left_out):
+                                    level.append((alias, depth + 1, r["platform"]))
 
         await asyncio.sleep(0.3)   # gentle pause between levels
 

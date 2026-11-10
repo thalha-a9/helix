@@ -9,7 +9,7 @@ Verification stack (runs in order on every scan):
   2. AI verifier (--ai)       : optional, multi-provider (claude/openrouter/nvidia)
 """
 
-import asyncio, argparse, logging, os, re, sys, time, webbrowser
+import asyncio, argparse, logging, os, sys, time, webbrowser
 
 def _check_deps():
     import importlib.util
@@ -24,16 +24,17 @@ from osint.confidence   import score_identity
 from osint.relationships import (annotate_relations, build_relationships, edge_line,
                                  unconfirmed_declarations)
 from osint.subject      import approved_identifiers, names_on_profiles
-from osint.platform_schema import filter_valid, SEARCH_PROBLEM
+from osint.platform_schema import profile_key      # noqa: F401  (part of helix's API)
 from osint.graph        import generate_graph
 from osint.report       import save_json, save_csv, save_txt
 from osint.platforms    import PLATFORMS, CATEGORY_META
+_SHIPPED_PLATFORMS = PLATFORMS
 from osint.permutations import generate_permutations
 from osint.verifier     import run_local_verifier
 from osint.phash        import HAS_PHASH, hash_all_avatars, find_matches
 from osint.pdf_report   import generate_pdf_report, HAS_WEASYPRINT
 from osint.email_permutations import generate_email_permutations
-from osint                import evidence, capture
+from osint                import evidence, capture, sources
 
 G="\033[92m"; Y="\033[93m"; C="\033[96m"; M="\033[95m"; R="\033[91m"
 DIM="\033[2m"; B="\033[1m"; RST="\033[0m"
@@ -88,6 +89,7 @@ def _sanitize(results: list) -> list:
         entry = {**defaults, **r}
         entry.pop("_page_text", None)  # internal only: never written to reports
         entry.pop("_capture", None)    # raw bytes: saved by osint.capture, never inlined
+        entry.pop("_retry_after", None)
         for k in ("platform","url","category","error","og_title","final_url"):
             if entry[k] is not None:
                 entry[k] = str(entry[k]).encode("utf-8","replace").decode("utf-8")
@@ -95,38 +97,15 @@ def _sanitize(results: list) -> list:
     return safe
 
 
-def profile_key(url: str) -> str:
-    """A profile URL template without scheme, www. or a trailing slash, lower
-    case: the same address in two databases is one site, checked once."""
-    u = re.sub(r"^https?://", "", (url or "").strip().lower())
-    return re.sub(r"^(www|m|mobile)\.", "", u).rstrip("/")
-
-
 def _merge_source(platform_map: dict, label: str, loaded: dict) -> None:
-    """Add a database's platforms, dropping definitions that cannot be scanned
-    soundly and ones whose profile address is already listed (the earlier
-    entry, built-in first, is kept)."""
-    usable, unusable = filter_valid(loaded)
-    have = {profile_key(v.get("url", "")) for v in platform_map.values()}
-    new, repeats = {}, 0
-    for k, v in usable.items():
-        if k in platform_map:
-            continue
-        key = profile_key(v.get("url", ""))
-        if key in have:
-            repeats += 1
-            continue
-        have.add(key)
-        new[k] = v
-    added = len(new)
-    platform_map.update(new)
-    search = sum(1 for why in unusable.values() if why == [SEARCH_PROBLEM])
-    broken = len(unusable) - search
-    parts = ([f"{broken} malformed entr{'y' if broken == 1 else 'ies'}"] if broken else []) + \
-            ([f"{search} search page{'' if search == 1 else 's'}"] if search else []) + \
-            ([f"{repeats} already listed"] if repeats else [])
-    note = f"  {DIM}({' and '.join(parts)} skipped){RST}" if parts else ""
-    print(f"  {G}[+]{RST} {label}: +{added} -> total {len(platform_map)}{note}\n")
+    """Add a database's platforms (see osint.sources.merge) and say how many."""
+    _say_merged(label, sources.merge(platform_map, loaded), len(platform_map))
+
+
+def _say_merged(label: str, counts: dict, total: int) -> None:
+    skipped = sources.merge_note(counts)
+    note = f"  {DIM}({skipped} skipped){RST}" if skipped else ""
+    print(f"  {G}[+]{RST} {label}: +{counts['added']} -> total {total}{note}\n")
 
 
 def unanswered_line(results) -> str:
@@ -208,8 +187,8 @@ def scan_health_warning(results: list, threshold: float = 0.5) -> str:
     if not results:
         return ""
     dead = sum(1 for r in results
-               if str(r.get("error") or "") in ("connection_error", "timeout")
-               or str(r.get("error") or "").startswith("Cannot connect"))
+               if str(r.get("error") or "") == "timeout"
+               or str(r.get("error") or "").startswith(("connection_error", "Cannot connect")))
     if dead / len(results) < threshold:
         return ""
     return (f"{dead} of {len(results)} sites could not be reached, so these results do not "
@@ -238,6 +217,8 @@ def _print_record(record: dict):
     print(f"  {C}{B}  RECORD ATTEMPT | Helix {record['tool']['version']} | "
           f"{a['username'] if is_email else '@' + a['username']}{RST}")
     print(f"  {C}{B}{line}{RST}")
+    print(f"  Purpose   {a.get('purpose', evidence.PURPOSE_NOT_STATED)}"
+          + (f"   Collector {a['collector']}" if a.get("collector") else ""))
     print(f"  Started   {a['started_utc']}   Finished {a['finished_utc']}")
     print(f"  Duration  {a['wall_seconds']} s")
     print(f"  Sites     {s['attempted']} attempted | {G}{s['answered']} answered{RST} | "
@@ -252,6 +233,10 @@ def _print_record(record: dict):
     for why, k in list(s["unanswered_by_reason"].items())[:6]:
         print(f"  {DIM}            {k:>5}  {why}{RST}")
     print(f"  Database  {record['database']['sites']} sites | sha256 {record['database']['sha256'][:16]}...")
+    off = record["database"].get("switched_off")
+    if off:
+        print(f"  {DIM}            {off['count']:>5}  more sites left out: switched off by the "
+              f"daily site check{RST}")
     print(f"  Evidence  {record['_paths']['evidence']}")
     print(f"  {B}FINGERPRINT  {record['fingerprint']}{RST}")
     print(f"  {DIM}Check it:  {_prog_name()} --verify-evidence {record['_paths']['evidence']} "
@@ -283,7 +268,17 @@ async def run(args):
     username = args.username.strip().lstrip("@") if args.username else None
     email    = args.email.strip()               if args.email    else None
 
-    if not username and not email:
+    phone_info = None
+    if getattr(args, "phone", None):
+        from osint import phone as phonelib
+        if not (getattr(args, "purpose", None) or "").strip():
+            print(f"{R}[!] --phone needs --purpose: say why this number is looked up{RST}\n"); sys.exit(1)
+        try:
+            phone_info = phonelib.report(args.phone, show=getattr(args, "show_number", False))
+        except ValueError as e:
+            print(f"{R}[!] --phone: {e}{RST}\n"); sys.exit(1)
+
+    if not username and not email and not phone_info:
         print(f"{R}[!] Provide -u username and/or -e email{RST}\n"); sys.exit(1)
     if username:
         ok, msg = validate_username(username)
@@ -292,40 +287,47 @@ async def run(args):
         ok, msg = validate_email(email)
         if not ok: print(f"{R}[!] {msg}{RST}\n"); sys.exit(1)
 
-    platform_map = dict(PLATFORMS)
+    # People who asked to be left out are not looked up, whatever the options.
+    from osint import leftout
+    downloads = args.wmn or args.sherlock or args.maigret or getattr(args, "fediverse", False)
+    if downloads:
+        await leftout.refresh()                      # with the databases, once a day
+    left_out_tokens = leftout.load()
+    for ident in (username, email, phone_info and phone_info["_e164"]):
+        if ident and leftout.is_left_out(ident, left_out_tokens):
+            if phone_info and ident == phone_info["_e164"]:
+                ident = phone_info["number"]
+            print(f"  {Y}[!]{RST} {ident} {leftout.REFUSAL}")
+            print(f"  {DIM}    How the list works: docs/LEFT_OUT.md{RST}\n")
+            sys.exit(3)
 
-    # WhatsMyName
-    if args.wmn:
-        print(f"  {C}[*]{RST} Fetching WhatsMyName database...")
-        from osint.adapters.wmn_adapter import load_with_fallback as wmn_load
-        wmn  = await wmn_load(timeout=args.wmn_timeout, include_nsfw=getattr(args,"nsfw",False))
-        _merge_source(platform_map, "WhatsMyName", wmn)
+    nsfw = getattr(args, "nsfw", False)
+    platform_map = await sources.load(
+        wmn=args.wmn, sherlock=args.sherlock, maigret=args.maigret,
+        fediverse=getattr(args, "fediverse", False), nsfw=nsfw,
+        builtin=None if PLATFORMS is _SHIPPED_PLATFORMS else PLATFORMS,
+        own_file=getattr(args, "sites_file", None),
+        timeouts={"wmn": args.wmn_timeout, "sherlock": args.sherlock_timeout,
+                  "maigret": args.maigret_timeout},
+        on_start=lambda text: print(f"  {C}[*]{RST} {text}"), on_merged=_say_merged)
 
-    # Sherlock
-    if args.sherlock:
-        print(f"  {C}[*]{RST} Fetching Sherlock database...")
-        from osint.adapters.sherlock_adapter import load_with_fallback as sh_load
-        sh   = await sh_load(timeout=args.sherlock_timeout, include_nsfw=getattr(args,"nsfw",False))
-        _merge_source(platform_map, "Sherlock", sh)
-
-    # Maigret
-    if args.maigret:
-        print(f"  {C}[*]{RST} Fetching Maigret database...")
-        from osint.adapters.maigret_adapter import load_with_fallback as mg_load
-        mg   = await mg_load(timeout=args.maigret_timeout, include_nsfw=getattr(args,"nsfw",False))
-        _merge_source(platform_map, "Maigret", mg)
-
-    # Fediverse servers (shipped list, no download)
-    if getattr(args, "fediverse", False):
-        from osint.adapters.fediverse_adapter import describe, host_of, load_platforms
-        print(f"  {C}[*]{RST} Loading fediverse servers ({describe()})...")
-        known = {host_of(d.get(k, "")) for d in platform_map.values() for k in ("url", "check_url")}
-        fv = load_platforms(include_nsfw=getattr(args, "nsfw", False), skip_hosts=known)
-        _merge_source(platform_map, "Fediverse", fv)
+    # Sites the daily check found dead or broken are left out, and said so.
+    left_out, off_list = [], {}
+    if not getattr(args, "include_off", False):
+        from osint import health
+        if downloads:
+            await health.refresh_switched_off()     # with the databases, once a day
+        off_list = health.load_switched_off()
+        platform_map, left_out = health.apply_switched_off(platform_map, off_list)
+        if left_out:
+            print(f"  {DIM}[i] {len(left_out)} site(s) left out: dead or broken on "
+                  f"{health.OFF_AFTER} daily checks in a row (list of "
+                  f"{str(off_list.get('updated_utc', ''))[:10] or 'unknown date'}). "
+                  f"--include-off scans them anyway.{RST}\n")
 
     # Strip leading dots/underscores so output dir isn't hidden on Linux
     # e.g. .rxzikhx. -> rxzikhx_
-    _raw_label = username or email.replace("@","_at_").replace(".","_")
+    _raw_label = username or (email.replace("@","_at_").replace(".","_") if email else "phone")
     label = _raw_label.lstrip("._") or _raw_label.replace(".","_").replace("-","_") or "scan"
     _raw_out = args.output or os.path.join("results", label)
     out = os.path.realpath(_raw_out)
@@ -336,6 +338,7 @@ async def run(args):
     targets = []
     if username: targets.append(f"{C}@{username}{RST}")
     if email:    targets.append(f"{M}{email}{RST}")
+    if phone_info: targets.append(f"{M}{phone_info['number']}{RST}")
     print(f"  {DIM}Target   :{RST} {' + '.join(targets)}")
     print(f"  {DIM}Platforms:{RST} {len(platform_map)}")
     concurrency = getattr(args, "concurrency", None)
@@ -381,7 +384,8 @@ async def run(args):
     # Username scan
     if username:
         if args.permutations:
-            perms = generate_permutations(username)
+            perms = [p for p in generate_permutations(username)
+                     if not leftout.is_left_out(p, left_out_tokens)]
             print(f"  {C}[*]{RST} {len(perms)} permutations available")
             try:   choice = input(f"  {DIM}Scan all? [y/N]: {RST}").strip().lower()
             except EOFError:
@@ -416,12 +420,22 @@ async def run(args):
                                            retry_timeouts=True if getattr(args, "record_attempt", False) else None,
                                            controls=max(DEFAULT_CONTROLS, getattr(args, "controls", None) or 0),
                                            capture=getattr(args, "save_pages", False),
+                                           recover=not getattr(args, "no_recover", False),
+                                           recover_cb=lambda k: print(
+                                               f"\n  {DIM}Asking {k} site(s) again that gave no "
+                                               f"clear answer...{RST}", end="", flush=True),
                                            retry_cb=lambda k: print(
                                                f"\n  {DIM}Re-checking {k} site(s) that timed out "
                                                f"on the fast pass...{RST}", end="", flush=True))
         # Runs before _sanitize strips the raw page text it reads from.
         annotate_locations(raw_results)
         annotate_relations(raw_results)
+        if phone_info:
+            # Does a found account show the number? Read from the page already
+            # received, before that text is dropped. No request is made.
+            for r in raw_results:
+                if r.get("found") and phonelib.shown_in(r.get("_page_text") or "", phone_info["_number"]):
+                    r["shows_phone"] = True
         captures = {r["platform"]: r.pop("_capture") for r in raw_results if "_capture" in r}
         results = _sanitize(raw_results)
         prog.finish()
@@ -468,6 +482,11 @@ async def run(args):
                 wall_seconds=time.time() - _scan_start, argv=sys.argv,
                 concurrency=_effective_concurrency(len(platform_map), concurrency),
                 control=not args.no_control, pages=pages,
+                purpose=getattr(args, "purpose", None) or "",
+                collector=getattr(args, "collector", None) or "",
+                switched_off=({"count": len(left_out),
+                               "list_updated_utc": off_list.get("updated_utc", "")}
+                              if left_out else None),
                 controls=None if args.no_control
                 else max(DEFAULT_CONTROLS, getattr(args, "controls", None) or 0)))
 
@@ -757,7 +776,9 @@ async def run(args):
                               for r in email_results},
                 started=_email_started_utc, finished=evidence.utc_now(),
                 wall_seconds=time.time() - _email_start, argv=sys.argv,
-                concurrency=0, control=False, pages=None))
+                concurrency=0, control=False, pages=None,
+                purpose=getattr(args, "purpose", None) or "",
+                collector=getattr(args, "collector", None) or ""))
 
     # Identity confidence
     if username:
@@ -801,6 +822,28 @@ async def run(args):
             print(f"  {DIM}  ... +{len(relationships)-15} more in the report{RST}")
         print()
 
+    # Phone number (only with --phone): offline facts, accounts that show it,
+    # and with --breach the breach lists. Nothing is ever sent to the number.
+    phone_report = {}
+    if phone_info:
+        print(f"  {B}Phone{RST}  {phone_info['number']}: {phonelib.describe(phone_info)}")
+        showing = sorted(r["platform"] for r in results if r.get("found") and r.get("shows_phone"))
+        if username:
+            print(f"  {DIM}  {'Shown on: ' + ', '.join(showing) if showing else 'None of the accounts found shows this number'}{RST}")
+        phone_breaches = []
+        if args.breach:
+            from osint.adapters.breachdb import check_phone, format_lines as _phone_lines
+            phone_breaches = await check_phone(phone_info["_e164"], shown_as=phone_info["number"])
+            for v in phone_breaches:
+                lines = _phone_lines(v, limit=8)
+                print(f"  {R if v['exposed'] else (G if v['exposed'] is False else Y)}"
+                      f"[{'!' if v['exposed'] else '-'}]{RST} {lines[0]}")
+                for line in lines[1:]:
+                    print(f"  {DIM}  {line}{RST}")
+        print(f"  {DIM}  {phonelib.LEAD_NOTE}{RST}\n")
+        phone_report = {**{k: v for k, v in phone_info.items() if not k.startswith("_")},
+                        "shown_on": showing, "breaches": phone_breaches}
+
     # Breach sweep + Robin dark-web leads (approved identifiers only)
     breach_verdicts = [];  darkweb = {}
     if args.breach or args.darkweb:
@@ -820,7 +863,7 @@ async def run(args):
                     for line in lines[1:]:
                         print(f"  {DIM}  {line}{RST}")
                 print(f"  {DIM}  Breach hits confirm an identifier leaked, not who owns it.{RST}\n")
-            elif args.breach:
+            elif args.breach and not phone_info:
                 print(f"  {Y}[!]{RST} --breach needs an email: pass -e, or confirm a GitHub "
                       f"account that exposes one\n")
         if args.darkweb:
@@ -856,6 +899,57 @@ async def run(args):
                     print(f"  {DIM}    {an['rejected']} uncited statement(s) discarded{RST}")
             print(f"  {DIM}  Dark-web hits are leads: a page naming a handle is not "
                   f"proof the subject wrote it.{RST}\n")
+
+    # Self-check: what the person can do about each account found
+    self_check = {}
+    if getattr(args, "me", False):
+        from osint import mine
+        mine_found = [r for r in results + email_results if r.get("found")]
+        guide = await mine.load_guide()
+        with_link = mine.attach(mine_found, guide)
+        counts = evidence.summarise(results + email_results)
+        page_path = os.path.join(out, f"{label}_my_accounts.html")
+        with open(page_path, "w", encoding="utf-8") as f:
+            f.write(mine.page(username or "", email or "", mine_found, counts["answered"],
+                              counts["unanswered"],
+                              breaches=breach_verdicts if (args.breach and email) else None,
+                              when=evidence.utc_now()[:10]))
+        print(f"  {B}Your accounts{RST}  {DIM}{len(mine_found)} found; {with_link} with a deletion page "
+              f"on record ({mine.GUIDE_NAME}){RST}")
+        for line in mine.terminal_lines(mine_found):
+            print(f"  {DIM if line.startswith('    ') else ''}{line}{RST}")
+        if not guide:
+            print(f"  {Y}[!]{RST} {DIM}The deletion guide could not be fetched: the page gives the "
+                  f"erasure request for every account instead.{RST}")
+        no_link = [r for r in mine_found if not r.get("delete")]
+        if no_link:
+            letter_path = os.path.join(out, f"{label}_erasure_request.txt")
+            with open(letter_path, "w", encoding="utf-8") as f:
+                f.write(mine.erasure_request(username or email, no_link))
+            print(f"  {G}[+]{RST} Erasure request for the {len(no_link)} other(s) -> {letter_path}")
+        print(f"  {G}[+]{RST} {B}Your page{RST} -> {page_path}\n")
+        self_check = {"page": page_path, "accounts": len(mine_found), "with_deletion_page": with_link,
+                      "guide": mine.GUIDE_NAME if guide else None}
+
+    # Watch: add this scan to the username's history and say what changed
+    watch_report = {}
+    if username and getattr(args, "watch", False):
+        from osint import watch
+        try:
+            sealed, prev, changes, wpath = watch.record(
+                out, label, watch.snapshot(username, results, platform_map, _started_utc, len(left_out),
+                                           purpose=getattr(args, "purpose", None) or ""))
+            count = len(watch.load_history(wpath))
+            print(f"  {B}Watch{RST}  {DIM}{wpath}{RST}")
+            for line in watch.summary_lines(sealed, prev, changes, count):
+                colour = G if line.startswith("[new]") else R if line.startswith("[removed]") else \
+                    C if line.startswith("[changed]") else DIM
+                print(f"  {colour}{line}{RST}")
+            print(f"  {DIM}Snapshot hash {sealed['hash']}{RST}\n")
+            watch_report = {"history": wpath, "snapshots": count, "snapshot_hash": sealed["hash"],
+                            "compared_with": prev["taken_utc"] if prev else None, "changes": changes}
+        except ValueError as e:
+            print(f"  {R}[!] Watch history not added to: {e}{RST}\n")
 
     # PDF/HTML Report
     if getattr(args,'report',False):
@@ -905,6 +999,13 @@ async def run(args):
         "relationships": relationships,
         "breaches":      breach_verdicts,
         "darkweb":       darkweb,
+        "watch":         watch_report,
+        "self_check":    self_check,
+        "phone":         phone_report,
+        "purpose":       evidence.one_line(getattr(args, "purpose", None)) or evidence.PURPOSE_NOT_STATED,
+        "sites_left_out": {"count": len(left_out),
+                           "list_updated_utc": off_list.get("updated_utc", ""),
+                           "sites": left_out},
     }
     if fmt in ("json","all"): print(f"  {G}[+]{RST} JSON     -> {save_json(label, all_r, out, extra=intel_bundle)}")
     if fmt in ("csv", "all"): print(f"  {G}[+]{RST} CSV      -> {save_csv(label, all_r, out, extra=intel_bundle)}")
@@ -917,6 +1018,30 @@ async def run(args):
 
     if not args.no_browser:
         webbrowser.open(f"file://{os.path.abspath(gpath)}")
+
+
+async def learn_site(args) -> int:
+    """helix --learn URL: work out a site's rule and save it as one line."""
+    from osint import learn as learner
+    url = args.learn.strip()
+    if args.known:
+        ok, msg = validate_username(args.known.strip().lstrip("@"))
+        if not ok:
+            print(f"{R}[!] --known: {msg}{RST}\n"); return 1
+    print(f"  {C}[*]{RST} Learning {url}")
+    result = await learner.learn(url, known=(args.known or "").strip().lstrip("@") or None,
+                                 name=args.site_name)
+    for step in result.steps:
+        print(f"  {DIM}    {step}{RST}")
+    if not result.ok:
+        print(f"  {Y}[!]{RST} Nothing learned: {result.why}.\n")
+        return 1
+    path = sources.save_own(result.name, result.pdef, getattr(args, "sites_file", None))
+    print(f"  {G}[+]{RST} Saved as {B}{result.name}{RST} in {path}. Your scans include it from now on.")
+    print(f"  {DIM}    To offer it to everyone, add this line to osint/data/sites.json "
+          f"in a pull request:{RST}")
+    print(f"  {result.line()}\n")
+    return 0
 
 
 def _prog_name() -> str:
@@ -964,7 +1089,7 @@ Operational security:
 
     g = p.add_argument_group("platform sources")
     g.add_argument("--all",             action="store_true",  dest="all_sources",
-        help="Full coverage: builtin + WhatsMyName + Sherlock + Maigret databases + fediverse servers (about 11,700 sites; a few minutes on a fast link, about 10 on a slow one)")
+        help="Full coverage: builtin + WhatsMyName + Sherlock + Maigret databases + fediverse servers (about 12,000 sites; a few minutes on a fast link, about 10 on a slow one)")
     g.add_argument("--no-control",      action="store_true",  dest="no_control",
         help="Skip the control probe that discards platforms which also 'find' a random "
              "nonexistent username (faster, but lets catch-all pages through)")
@@ -972,6 +1097,24 @@ Operational security:
         help=f"Made-up names checked against every hit (default {DEFAULT_CONTROLS}, at least 3). "
              "A short name always gets one of its own length; more catch sites that answer "
              "only some names")
+    g.add_argument("--learn",           default=None, metavar="URL",
+        help="Learn a new site from its profile address, with {username} where the name "
+             "goes: \"https://example.com/u/{username}\". Helix works out the rule, proves "
+             "it with the control probe and saves the site to your list")
+    g.add_argument("--known",           default=None, metavar="NAME",
+        help="With --learn: an account that exists on the site. Without it Helix tries "
+             "common names until one exists")
+    g.add_argument("--site-name",       default=None, metavar="NAME", dest="site_name",
+        help="With --learn: what to call the site (default: its host name)")
+    g.add_argument("--sites-file",      default=None, metavar="FILE", dest="sites_file",
+        help="Your own site list (default ~/.config/helix/sites.json, or $HELIX_SITES): "
+             "--learn saves to it and every scan reads it")
+    g.add_argument("--include-off",     action="store_true",  dest="include_off",
+        help="Also scan the sites the daily site check switched off (dead or broken on "
+             "3 checks in a row). They are left out by default and the scan says how many")
+    g.add_argument("--no-recover",      action="store_true",  dest="no_recover",
+        help="Skip the second attempt for sites that gave no clear answer (rate limits, "
+             "bot checks, server errors). Faster, but fewer sites answer")
     g.add_argument("--concurrency",     type=int, default=None, metavar="N",
         help=f"Probes in flight at once (default: 20 to 60 scaled to the scan size, "
              f"max {MAX_CONCURRENCY}). Higher is faster on big databases; the sites "
@@ -1038,6 +1181,44 @@ Operational security:
                    help="Write sealed evidence of this scan (witnessed tests, audits): UTC times, "
                         "the exact site database (with its SHA-256), per-site outcomes and a "
                         "fingerprint of the whole file, printed at the end for the video")
+    p.add_argument("--serve", action="store_true",
+                   help="Start a local web page (http://127.0.0.1:8765/) for people who do not use a "
+                        "terminal, in English, Hindi, Spanish, Arabic, Portuguese and Russian, with a "
+                        "small HTTP API. It listens on this computer only")
+    p.add_argument("--port", type=int, default=8765, metavar="N",
+                   help="With --serve: the port to listen on (default 8765)")
+    p.add_argument("--phone", default=None, metavar="NUMBER",
+                   help="A phone number with its country code (+919876543210). Opt-in, never part of "
+                        "--all, and it needs --purpose. Shows what the number itself says (country, "
+                        "carrier at issue, kind of line; offline, needs pip install helix-osint[phone]), "
+                        "whether the accounts found for -u show it, and with --breach whether it is "
+                        "in known breaches (HIBP_API_KEY). Nothing is ever sent to the number")
+    p.add_argument("--show-number", action="store_true", dest="show_number",
+                   help="With --phone: write the number in full in the output. By default its "
+                        "middle digits are hidden, and the sealed record never holds it in full")
+    p.add_argument("--me", action="store_true",
+                   help="Check yourself: scan every source for your own username (-u) and, with "
+                        "-e, your address against the breach lists, then show for each account "
+                        "where to delete it and write <name>_my_accounts.html. Same as --all "
+                        "(and --breach with -e) with the purpose \"my own accounts\"")
+    p.add_argument("--left-out-token", default=None, metavar="NAME", dest="left_out_token",
+                   help="Print the token for a username or email address, to ask that it is never "
+                        "looked up with Helix (see docs/LEFT_OUT.md), and exit. The name itself "
+                        "is not sent anywhere")
+    p.add_argument("--purpose", default=None, metavar="TEXT",
+                   help="Why this scan is run, in your words (\"my own accounts\", \"audit agreed "
+                        "with the client on 3 Nov\"). Sealed into the --record-attempt evidence and "
+                        "kept in the report and the --watch history; without it they say \"not stated\"")
+    p.add_argument("--collector", default=None, metavar="NAME",
+                   help="Who runs this scan (a name, a case or badge number). Sealed into the "
+                        "--record-attempt evidence when given")
+    p.add_argument("--watch", action="store_true",
+                   help="Keep a history for this username and say what changed since the last "
+                        "--watch scan: new, removed and changed accounts. Each snapshot is "
+                        "hashed and chained to the one before (in <name>_watch/). Run it from "
+                        "the same folder each time, for example daily from cron")
+    p.add_argument("--verify-watch", metavar="DIR", dest="verify_watch",
+                   help="Re-check a --watch history (every snapshot's hash and the chain) and exit")
     p.add_argument("--save-pages", action="store_true", dest="save_pages",
                    help="Keep the exact page received for every reported account: raw bytes, "
                         "headers and UTC time, each SHA-256 hashed, in <name>_pages/ with an "
@@ -1053,6 +1234,9 @@ Operational security:
     args = p.parse_args()
     if args.verify_evidence:
         sys.exit(evidence.main(args.verify_evidence[:2]))
+    if args.verify_watch:
+        from osint import watch
+        sys.exit(watch.main([args.verify_watch]))
     if args.verify_pages:
         problems = capture.verify(args.verify_pages)
         for prob in problems:
@@ -1061,6 +1245,11 @@ Operational security:
             print(f"OK: every saved page in {args.verify_pages} matches its manifest")
         sys.exit(1 if problems else 0)
     args.pivot_depth = min(max(getattr(args,"pivot_depth",3),1),4)
+    if args.me:
+        from osint.mine import PURPOSE as _MY_OWN
+        args.all_sources = True
+        args.breach = args.breach or bool(args.email) or bool(args.phone)
+        args.purpose = args.purpose or _MY_OWN
     if args.all_sources:
         args.wmn = args.sherlock = args.maigret = args.fediverse = True
 
@@ -1070,6 +1259,17 @@ Operational security:
         netconfig.set_proxy(netconfig.TOR_PROXY if args.tor else args.proxy)
     except ValueError as e:
         print(f"{R}[!] {e}{RST}\n"); sys.exit(1)
+
+    if args.learn:
+        sys.exit(asyncio.run(learn_site(args)))
+    if args.serve:
+        from osint import web
+        web.serve(args.port)
+        sys.exit(0)
+    if args.left_out_token:
+        from osint import leftout
+        print(leftout.token(args.left_out_token))
+        sys.exit(0)
 
     try:
         asyncio.run(run(args))

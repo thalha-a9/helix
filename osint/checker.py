@@ -6,12 +6,15 @@ import asyncio
 import aiohttp
 import hashlib
 import re
+import socket
 from html import unescape as _unescape
 import random
 from urllib.parse import urlparse
 from typing import Optional
 from osint.platforms import PLATFORMS
 from osint import netconfig
+from osint.evidence import _no_answer
+from osint.platform_schema import fallback_defs
 
 try:
     from curl_cffi.requests import AsyncSession as CurlSession
@@ -28,13 +31,22 @@ USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
 ]
 
-def _headers() -> dict:
-    return {
+def _headers(platform: Optional[dict] = None) -> dict:
+    """Request headers: a browser's, then any the site's definition lists
+    (an app id or an accept type its lookup needs)."""
+    headers = {
         "User-Agent":      random.choice(USER_AGENTS),
         "Accept-Language": random.choice(["en-US,en;q=0.9", "en-GB,en;q=0.9"]),
         "Accept":          "text/html,application/xhtml+xml,*/*;q=0.8",
         "DNT": "1",
     }
+    own = (platform or {}).get("headers")
+    if isinstance(own, dict):
+        lower = {k.lower(): k for k in headers}
+        for k, v in own.items():
+            headers.pop(lower.get(str(k).lower(), ""), None)
+            headers[str(k)] = str(v)
+    return headers
 
 TIMEOUT     = aiohttp.ClientTimeout(total=14, connect=7)
 _MAX_BODY_BYTES = 512 * 1024  # 512KB cap: prevents memory exhaustion (#14)
@@ -239,7 +251,7 @@ async def check_platform(session, name: str, platform: dict,
             try:
                 if HAS_CURL_CFFI and platform.get("tls_impersonate"):
                     async with CurlSession(impersonate="chrome120") as curl:
-                        r   = await curl.get(probe_url, headers=_headers(), timeout=timeout.total,
+                        r   = await curl.get(probe_url, headers=_headers(platform), timeout=timeout.total,
                                              allow_redirects=True, **netconfig.curl_kwargs())
                         await _apply(result, platform, username, r.status_code, r.text, str(r.url), probe_url)
                         if capture and result["found"]:
@@ -248,13 +260,16 @@ async def check_platform(session, name: str, platform: dict,
                 else:
                     # Increase read_bufsize to handle large headers (fixes Twitter 8190-byte error)
                     async with session.get(
-                        probe_url, headers=_headers(), timeout=timeout,
+                        probe_url, headers=_headers(platform), timeout=timeout,
                         allow_redirects=True, ssl=True,
                         read_bufsize=2**16, **netconfig.request_kwargs(),
                     ) as r:
                         raw_bytes = await netconfig.read_body(r, _MAX_BODY_BYTES)
                         text = raw_bytes.decode("utf-8", errors="ignore")
                         await _apply(result, platform, username, r.status, text, str(r.url), probe_url)
+                        wait = _retry_after(r.headers)
+                        if wait is not None:
+                            result["_retry_after"] = wait
                         if capture and result["found"]:
                             result["_capture"] = _snap(r.status, probe_url, str(r.url),
                                                        r.headers, raw_bytes)
@@ -264,8 +279,8 @@ async def check_platform(session, name: str, platform: dict,
             except asyncio.TimeoutError:
                 result["error"] = "timeout"
                 if attempt < retries: await asyncio.sleep(1.5 * (attempt + 1))
-            except aiohttp.ClientConnectorError:
-                result["error"] = "connection_error"; break
+            except aiohttp.ClientConnectorError as e:
+                result["error"] = _connect_error(e); break
             except aiohttp.ClientError as e:
                 result["error"] = str(e)[:80]; break
             except KeyboardInterrupt:
@@ -274,6 +289,33 @@ async def check_platform(session, name: str, platform: dict,
                 result["error"] = f"unexpected: {str(e)[:60]}"; break
 
     return result
+
+
+DNS_ERROR = "connection_error: host name does not resolve"
+DNS_TEMPORARY = "connection_error: name lookup failed"
+CERT_ERROR = "connection_error: invalid HTTPS certificate"
+
+
+def _connect_error(e: Exception) -> str:
+    """Why a connection failed, as far as it can be told. A host name that
+    does not resolve is a dead site, not a busy one, and a certificate error
+    will not go away on a second attempt, so both are named."""
+    if isinstance(e, getattr(aiohttp, "ClientConnectorCertificateError", ())):
+        return CERT_ERROR
+    os_error = getattr(e, "os_error", None)
+    if isinstance(os_error, socket.gaierror):
+        temporary = os_error.errno == getattr(socket, "EAI_AGAIN", -3)
+        return DNS_TEMPORARY if temporary else DNS_ERROR
+    return "connection_error"
+
+
+def _retry_after(headers) -> Optional[float]:
+    """Seconds a rate-limited site asked for (Retry-After), when it said."""
+    try:
+        value = headers.get("Retry-After")
+        return max(0.0, float(value)) if value is not None else None
+    except (TypeError, ValueError, AttributeError):
+        return None                    # an HTTP date, or no usable header
 
 
 def _snap(status, requested_url, final_url, headers, body) -> dict:
@@ -333,9 +375,15 @@ async def _apply(result: dict, platform: dict, username: str,
         if result["found"]: result["confidence"] = "medium"
 
     elif method == "text_present":
-        # Replace {username} in found_text pattern
-        ft = platform.get("found_text", "").replace("{username}", username)
-        result["found"] = (status == 200) and (ft.lower() in text.lower())
+        # Any one of the found texts will do ({username} is filled in). A
+        # text that is the same on every profile ("js-user-profile-actions")
+        # says a profile was shown, not whose: name_in_page asks for the name.
+        fts = [t.replace("{username}", username).lower()
+               for t in (platform.get("found_texts") or [platform.get("found_text", "")]) if t]
+        low = text.lower()
+        result["found"] = (status == 200) and any(ft in low for ft in fts)
+        if result["found"] and platform.get("name_in_page") and not names_user(text, username):
+            result["found"] = False
         if result["found"]: result["confidence"] = "medium"
 
     elif method == "response_url":
@@ -538,39 +586,62 @@ async def _control_probe(session, results: list, plat_map: dict,
             r = await check_platform(session, platform, pdef, name, semaphore)
         return r
 
-    async def verify(hit):
-        pdef, name = plat_map[hit["platform"]], hit["platform"]
+    async def verify_with(pdef, name):
+        """(reason, blocked): the whole probe read by one rule. `blocked` says
+        the rule got no clear answer, as opposed to a wrong one."""
         # Hit and control are fetched together so both answers come from the
         # same moment: a site that served the scan a transient 200 (overload,
         # error page) and a clean 404 a minute later must not "confirm" it.
         control, again = await asyncio.gather(settled(pdef, ctrl, name),
                                               settled(pdef, username, name))
         if control.get("found"):
-            return CONTROL_ERROR
+            return CONTROL_ERROR, False
         if not definitive_negative(control, pdef):
-            return CONTROL_INCONCLUSIVE
+            return CONTROL_INCONCLUSIVE, True
         if not again.get("found"):
-            return RECHECK_ERROR
+            # A hit that now gets a refusal or an error was blocked, which is
+            # not the same as the site saying the account is gone.
+            return RECHECK_ERROR, bool(_no_answer(again))
         # A second random name must get the same "no such user" answer: a
         # one-off 403/500 under load is not the site's answer for unknown names.
         control2 = await settled(pdef, ctrl2, name)
         if control2.get("found"):
-            return CONTROL_ERROR
-        if (not definitive_negative(control2, pdef)
-                or control2.get("status_code") != control.get("status_code")):
-            return CONTROL_INCONCLUSIVE
+            return CONTROL_ERROR, False
+        if not definitive_negative(control2, pdef):
+            return CONTROL_INCONCLUSIVE, True
+        if control2.get("status_code") != control.get("status_code"):
+            return CONTROL_INCONCLUSIVE, False
         for extra in extras:
             r = await settled(pdef, extra, name)
             if r.get("found"):
-                return CONTROL_UNCONFIRMED if same_length else CONTROL_ERROR
+                return (CONTROL_UNCONFIRMED if same_length else CONTROL_ERROR), False
             if not definitive_negative(r, pdef):
-                return CONTROL_INCONCLUSIVE
+                return CONTROL_INCONCLUSIVE, True
         # And the hit must hold a third time. A site that answers unknown names
         # at random now has to land "found" three times and "not found" twice
         # in a row to slip through.
-        if not (await settled(pdef, username, name)).get("found"):
-            return RECHECK_ERROR
-        return None
+        last = await settled(pdef, username, name)
+        if not last.get("found"):
+            return RECHECK_ERROR, bool(_no_answer(last))
+        return None, False
+
+    async def verify(hit):
+        name = hit["platform"]
+        pdef = plat_map[name]
+        reason, blocked = await verify_with(pdef, name)
+        if not blocked:
+            return reason
+        # The rule was blocked part of the way (rate limit, bot check). Where
+        # the site can be asked another way, the whole probe is run again by
+        # that rule alone: the hit twice more and every made-up name.
+        for other in fallback_defs(pdef):
+            again, again_blocked = await verify_with(other, name)
+            if again is None:
+                hit["verified_by"] = "fallback"
+                return None
+            if not again_blocked:
+                return again
+        return reason
 
     reasons = await asyncio.gather(*(verify(h) for h in hits))
     discarded = []
@@ -623,15 +694,128 @@ async def _retry_timeouts(session, results: list, plat_map: dict, username: str,
     return len(idx)
 
 
+# Second attempt
+
+# Seconds to wait before asking a site again, by what stood in the way.
+RECOVERY_WAIT = {"rate": 6.0, "server": 3.0}
+MAX_RETRY_AFTER = 20.0
+
+
+def unanswered_kind(r: dict) -> str:
+    """
+    '' when the result is a clear answer (the counting rule in osint.evidence),
+    else what stood in the way: timeout, dns, certificate, connect, botcheck,
+    rate, refused, server, or other.
+    """
+    if not _no_answer(r):
+        return ""
+    error = str(r.get("error") or "")
+    if error:
+        if error == "timeout":
+            return "timeout"
+        if error == DNS_ERROR:
+            return "dns"
+        if error == CERT_ERROR:
+            return "certificate"
+        if error.startswith(("connection_error", "Server disconnected", "Cannot connect")):
+            return "connect"
+        if error.startswith("waf_blocked"):
+            return "botcheck"
+        return "other"
+    status = r.get("status_code")
+    if status == 429:
+        return "rate"
+    if status in (401, 403, 407, 451, 999):
+        return "refused"
+    return "server"
+
+
+# Not asked a second time: a host name that does not exist and a broken
+# certificate stay that way, timeouts have their own retry rule above, and
+# the last two are verdicts, not failures.
+_NO_SECOND_ATTEMPT = ("dns", "certificate", "timeout")
+_FINAL_ERRORS = ("requires curl_cffi", "soft404_body")
+
+
+async def _recover(session, results: list, plat_map: dict, username: str,
+                   concurrency: int, capture: bool = False, recover_cb=None) -> dict:
+    """
+    One more attempt for every site that gave no clear answer, in this order:
+
+      1. another way to ask the same site, where its definition lists one
+         (`fallbacks`: WebFinger on a fediverse server whose API is limited);
+      2. the same request again, after the pause a rate limit or server
+         error calls for;
+      3. the same request with a browser's TLS fingerprint, when curl_cffi
+         is installed and the site answered with a bot check or a refusal.
+
+    A result is replaced only by a clear answer. Hits found here go through
+    the control probe like any other, read by the rule that found them: the
+    returned map gives that rule for every site it changed.
+    """
+    kw = {"capture": True} if capture else {}
+    todo = []
+    for i, r in enumerate(results):
+        kind = unanswered_kind(r)
+        if not kind or kind in _NO_SECOND_ATTEMPT:
+            continue
+        if str(r.get("error") or "").startswith(_FINAL_ERRORS):
+            continue
+        todo.append((i, kind))
+    changed = {}
+    if not todo:
+        return changed
+    if recover_cb:
+        recover_cb(len(todo))
+    sem = asyncio.Semaphore(concurrency)
+
+    async def second_attempt(i, kind):
+        first = results[i]
+        name = first["platform"]
+        pdef = plat_map[name]
+        for other in fallback_defs(pdef):
+            r = await check_platform(session, name, other, username, sem, fast=True, **kw)
+            if not unanswered_kind(r):
+                return r, "fallback", other
+        wait = RECOVERY_WAIT.get(kind, 0.0)
+        if kind == "rate" and first.get("_retry_after") is not None:
+            wait = first["_retry_after"]
+        if wait:
+            await asyncio.sleep(min(wait, MAX_RETRY_AFTER))
+        r = await check_platform(session, name, pdef, username, sem, fast=True, **kw)
+        if not unanswered_kind(r):
+            return r, "retry", None
+        if (HAS_CURL_CFFI and not pdef.get("tls_impersonate")
+                and unanswered_kind(r) in ("botcheck", "refused")):
+            as_browser = {**pdef, "tls_impersonate": True}
+            r = await check_platform(session, name, as_browser, username, sem, fast=True, **kw)
+            if not unanswered_kind(r):
+                return r, "tls", as_browser
+        return None, "", None
+
+    outcomes = await asyncio.gather(*(second_attempt(i, kind) for i, kind in todo))
+    for (i, _kind), (r, how, rule) in zip(todo, outcomes):
+        if r is None:
+            continue
+        r["recovered"] = how
+        results[i] = r
+        if rule is not None:
+            changed[r["platform"]] = rule
+    return changed
+
+
 async def check_username(username: str, platforms: dict = None, progress_cb=None,
                          control: bool = True, concurrency: Optional[int] = None,
                          retry_cb=None, retry_timeouts: Optional[bool] = None,
-                         capture: bool = False, controls: int = DEFAULT_CONTROLS) -> list:
+                         capture: bool = False, controls: int = DEFAULT_CONTROLS,
+                         recover: bool = True, recover_cb=None) -> list:
     """
     Check one username on every platform. Large maps run a fast single-attempt
     sweep, then (see should_retry_timeouts; retry_timeouts=True/False forces
-    it) retry the sites that timed out, calling retry_cb(count) first, then
-    the control probe verifies every hit.
+    it) retry the sites that timed out, calling retry_cb(count) first. Sites
+    that still gave no clear answer get a second attempt (see _recover;
+    recover=False skips it, recover_cb(count) is called first), then the
+    control probe verifies every hit.
     """
     plat_map  = platforms or PLATFORMS
     n         = len(plat_map)
@@ -660,9 +844,16 @@ async def check_username(username: str, platforms: dict = None, progress_cb=None
                 if retry_cb:
                     retry_cb(timed_out)
                 await _retry_timeouts(session, results, plat_map, username, calm, capture)
+        if recover:
+            changed = await _recover(session, results, plat_map, username, calm,
+                                     capture, recover_cb)
+            if changed:
+                plat_map = {**plat_map, **changed}
         if control:
             await _control_probe(session, results, plat_map,
                                  asyncio.Semaphore(calm), username, controls)
+    for r in results:
+        r.pop("_retry_after", None)
     return results
 
 

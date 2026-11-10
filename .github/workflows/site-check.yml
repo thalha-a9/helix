@@ -1,0 +1,60 @@
+name: Site check
+
+# Checks every site Helix can scan once a day (python -m osint.health check):
+# a made-up name must get "no such user", and where a database lists an
+# account that exists, that account must be found. The record, the list of
+# switched-off sites and the status page are published on the `status`
+# branch, which GitHub Pages serves. Scans read switched_off.json from there.
+#
+# The branch holds one commit, replaced each day: the record keeps its own
+# history of the last 90 checks, and daily commits of a 2 MB file would grow
+# the repository without end.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.repository == 'thalha-a9/helix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt curl-cffi
+
+      - name: Fetch the record so far
+        run: |
+          mkdir -p status
+          if git fetch --depth 1 origin status 2>/dev/null; then
+            git show FETCH_HEAD:state.json > status/state.json
+          fi
+
+      - name: Check every site
+        run: python -m osint.health check --state status/state.json --out status --where "GitHub Actions runner"
+
+      - name: Publish the record, the list and the page
+        run: |
+          cd status
+          touch .nojekyll
+          git init -q -b status
+          git add state.json switched_off.json index.html .nojekyll
+          git -c user.name=thalha-a9 -c user.email=sheikthalah035@gmail.com \
+            commit -q -m "Site check $(date -u +%F)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" status

@@ -65,30 +65,9 @@ async def _get(s, url, method="GET", **kw):
 
 
 async def _known_user(s, d, sw):
-    if sw in MASTODON_API:
-        for path in ("/api/v2/instance", "/api/v1/instance", "/api/v1/directory?local=true&limit=1"):
-            st, j = await _get(s, f"https://{d}{path}")
-            if st != 200 or not j:
-                continue
-            if isinstance(j, list):
-                return j[0].get("username") if j else None
-            u = ((j.get("contact") or {}).get("account") or {}).get("username") or \
-                (j.get("contact_account") or {}).get("username")
-            if u:
-                return u
-    elif sw in MISSKEY:
-        st, j = await _get(s, f"https://{d}/api/users", "POST", json={"limit": 1, "origin": "local", "sort": "+follower"})
-        return j[0]["username"] if st == 200 and isinstance(j, list) and j else None
-    elif sw == "lemmy":
-        st, j = await _get(s, f"https://{d}/api/v3/site")
-        admins = (j or {}).get("admins") or []
-        return admins[0]["person"]["name"] if st == 200 and admins else None
-    elif sw == "peertube":
-        st, j = await _get(s, f"https://{d}/api/v1/accounts?count=20&sort=-createdAt")
-        for a in (j or {}).get("data") or []:
-            if a.get("host") == d:
-                return a["name"]
-    return None
+    sys.path.insert(0, ROOT)
+    from osint.adapters.fediverse_adapter import known_account
+    return await known_account(s, d, sw)
 
 
 async def _exists(s, d, sw, u):

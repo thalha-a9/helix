@@ -1,0 +1,28 @@
+name: Leave me out
+description: Ask that your username or email address is never looked up with Helix.
+title: "Leave out: <token>"
+labels: ["left out"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not write your username or address here. This page is public.
+
+        Run `helix --left-out-token YOURNAME` (or `python helix.py --left-out-token YOURNAME`) on your own computer and paste the 64 characters it prints. The name is not sent anywhere; the token cannot be turned back into it. One request for each username or address.
+
+        If you cannot run Helix, see docs/LEFT_OUT.md for another way.
+  - type: input
+    id: token
+    attributes:
+      label: Token
+      description: The 64 characters printed by --left-out-token.
+      placeholder: 3f1c... (64 characters)
+    validations:
+      required: true
+  - type: checkboxes
+    id: mine
+    attributes:
+      label: This is mine
+      options:
+        - label: The username or address behind this token is my own, or I act for the person it belongs to.
+          required: true

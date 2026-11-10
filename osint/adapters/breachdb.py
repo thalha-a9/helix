@@ -48,7 +48,7 @@ SOURCES = [
     {
         "id": "hibp",
         "label": "Have I Been Pwned",
-        "kinds": ("email",),
+        "kinds": ("email", "phone"),
         "url": "https://haveibeenpwned.com/api/v3/breachedaccount/{q}?truncateResponse=false",
         "key_env": "HIBP_API_KEY",
     },
@@ -324,7 +324,28 @@ def summarise(v: Dict) -> str:
     return f"{ident} could not be checked: {'; '.join(not_ok) or 'no source supports this identifier'}."
 
 
-async def check_identifiers(emails: List[str], session: aiohttp.ClientSession = None) -> List[Dict]:
+_PHONE_RE = re.compile(r"^\+[1-9][0-9]{6,14}$")
+
+
+async def check_phone(number: str, session: aiohttp.ClientSession = None, shown_as: str = "") -> List[Dict]:
+    """
+    One verdict for a phone number in international form (+919876543210),
+    from the sources that take one: Have I Been Pwned, which needs a key.
+    `shown_as` replaces the number in the verdict (a masked form), so a
+    report does not carry it in full.
+    """
+    if not _PHONE_RE.match(number or ""):
+        return []
+    verdicts = await check_identifiers([number], session, kind="phone")
+    for v in verdicts:
+        if shown_as:
+            v["identifier"] = shown_as
+            v["summary"] = summarise(v)
+    return verdicts
+
+
+async def check_identifiers(emails: List[str], session: aiohttp.ClientSession = None,
+                            kind: str = "email") -> List[Dict]:
     """
     One verdict per email:
       {identifier, kind, checked_at, sources:[{source,status,detail,count}],
@@ -334,7 +355,7 @@ async def check_identifiers(emails: List[str], session: aiohttp.ClientSession = 
     idents = []
     for e in emails or []:
         e = (e or "").strip().lower()
-        if _EMAIL_RE.match(e) and e not in idents:
+        if (_EMAIL_RE.match(e) if kind == "email" else _PHONE_RE.match(e)) and e not in idents:
             idents.append(e)
     if not idents:
         return []
@@ -345,7 +366,7 @@ async def check_identifiers(emails: List[str], session: aiohttp.ClientSession = 
     try:
         verdicts = []
         for ident in idents:
-            srcs = [s for s in SOURCES if "email" in s["kinds"]]
+            srcs = [s for s in SOURCES if kind in s["kinds"]]
             answers = await asyncio.gather(*(_query(session, s, ident) for s in srcs))
             sources = [{"source": s["label"], "status": a["status"], "detail": a["detail"],
                         "count": len(_merge([("", a["breaches"])])),
@@ -356,7 +377,7 @@ async def check_identifiers(emails: List[str], session: aiohttp.ClientSession = 
             any_ok = any(a["status"] == "ok" for a in answers)
             v = {
                 "identifier": ident,
-                "kind":       "email",
+                "kind":       kind,
                 "checked_at": _now(),
                 "sources":    sources,
                 "breaches":   breaches,

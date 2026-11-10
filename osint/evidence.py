@@ -17,6 +17,11 @@ Counting rules (stated in the file so nobody has to guess):
   answered   sites that gave a clear answer: found, or a definite "not found"
   found      accounts that survived the control probe and the verifier
   every other site is counted under the reason it gave no clear answer
+
+Every record also says why the scan was run (`attempt.purpose`, from
+--purpose, or "not stated") and, when given, who ran it
+(`attempt.collector`). A record that will be shown to someone else should
+answer both.
 """
 
 import hashlib
@@ -35,7 +40,9 @@ from osint import __version__, netconfig
 SCHEMA = "helix.record-attempt.v1"
 
 COUNTING_RULES = {
-    "attempted": "every site definition in the scanned database",
+    "attempted": "every site definition in the scanned database. Sites the daily site check "
+                 "switched off (dead or broken on three checks in a row) are not scanned; "
+                 "database.switched_off says how many and which list",
     "answered": "sites that gave a clear answer: an account found, or a definite 'not found'. "
                 "A 'not found' that came with HTTP 401/403/407/408/425/429/451/999 or 5xx is "
                 "counted as no clear answer",
@@ -44,11 +51,18 @@ COUNTING_RULES = {
              "and the local verifier",
     "unanswered": "sites with no clear answer, counted by reason (timeout, connection "
                   "error, bot check, control probe could not verify, ...)",
+    "second_attempt": "sites that gave no clear answer at first and a clear one when asked "
+                      "again, counted by how: 'retry' the same request, 'fallback' another "
+                      "rule for the same site (WebFinger on a fediverse server), 'tls' the "
+                      "same request with a browser's TLS fingerprint. A hit found this way "
+                      "went through the same control probe, read by the same rule",
 }
 
 # error prefix -> reason bucket
 _REASONS = (
     ("timeout", "timeout"),
+    ("connection_error: host name does not resolve", "host name does not resolve"),
+    ("connection_error: invalid HTTPS certificate", "invalid HTTPS certificate"),
     ("connection_error", "connection error"),
     ("waf_blocked", "bot-check page"),
     ("requires curl_cffi", "needs curl_cffi (not installed)"),
@@ -68,6 +82,15 @@ _REASONS = (
     ("unexpected: Failed to perform, curl: (28)", "timeout"),
     ("400, message='Got more than", "oversized response header"),
 )
+
+
+PURPOSE_NOT_STATED = "not stated"
+
+
+def one_line(text, limit: int = 200) -> str:
+    """Free text as it is sealed into a record: one line, printable, bounded."""
+    text = "".join(ch if ch.isprintable() else " " for ch in str(text or ""))
+    return " ".join(text.split())[:limit]
 
 
 def reason_of(error: str) -> str:
@@ -142,6 +165,8 @@ def summarise(results: List[dict]) -> Dict:
         "unanswered": attempted - len(found) - len(clean_negative),
         "unanswered_by_reason": dict(sorted(reasons.items(), key=lambda kv: -kv[1])),
         "retried_after_timeout": retried,
+        "second_attempt": dict(sorted(Counter(r["recovered"] for r in results
+                                              if r.get("recovered")).items())),
         "sources": dict(Counter(r.get("source", "builtin") for r in results)),
     }
 
@@ -149,7 +174,9 @@ def summarise(results: List[dict]) -> Dict:
 def build(*, username: str, results: List[dict], platform_map: Dict[str, dict],
           started: str, finished: str, wall_seconds: float, argv: List[str],
           concurrency: int, control: bool, sites_file: str, pages: Optional[Dict] = None,
-          target_type: str = "username", controls: Optional[int] = None) -> Dict:
+          target_type: str = "username", controls: Optional[int] = None,
+          switched_off: Optional[Dict] = None, purpose: str = "",
+          collector: str = "") -> Dict:
     """The evidence record, with `fingerprint` = SHA-256 of everything else.
 
     For an email scan `username` holds the address and target_type is "email";
@@ -176,6 +203,8 @@ def build(*, username: str, results: List[dict], platform_map: Dict[str, dict],
             "control_probe": control,
             **({"target_type": target_type} if target_type != "username" else {}),
             **({"controls": controls} if controls else {}),
+            "purpose": one_line(purpose) or PURPOSE_NOT_STATED,
+            **({"collector": one_line(collector)} if one_line(collector) else {}),
         },
         "environment": {
             "python": _platform.python_version(),
@@ -188,6 +217,7 @@ def build(*, username: str, results: List[dict], platform_map: Dict[str, dict],
             "sites": len(platform_map),
             "sha256": sites_hash,
             "file": os.path.basename(sites_file),
+            **({"switched_off": switched_off} if switched_off else {}),
         },
         "counting_rules": COUNTING_RULES,
         **({"pages": {"dir": os.path.basename(pages["_dir"]), "count": len(pages["pages"]),
@@ -236,8 +266,25 @@ _CREDENTIALS = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/@\s]+@")
 
 
 def _redact_argv(argv: List[str]) -> List[str]:
-    """Any user:pass@ in any argument is removed, whatever flag it came with."""
-    return [_CREDENTIALS.sub(r"\1***@", str(a)) for a in argv]
+    """Any user:pass@ in any argument is removed, whatever flag it came with,
+    and a phone number given with --phone never enters a record in full."""
+    out, hide_next = [], False
+    for a in map(str, argv):
+        if hide_next:
+            a, hide_next = _mask_phone(a), False
+        elif a == "--phone":
+            hide_next = True
+        elif a.startswith("--phone="):
+            a = "--phone=" + _mask_phone(a.split("=", 1)[1])
+        out.append(_CREDENTIALS.sub(r"\1***@", a))
+    return out
+
+
+def _mask_phone(value: str) -> str:
+    digits = re.sub(r"\D", "", value)
+    if len(digits) <= 6:
+        return "+" + "x" * len(digits)
+    return "+" + digits[:4] + "x" * (len(digits) - 7) + digits[-3:]
 
 
 def _load_json(path: str):

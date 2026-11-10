@@ -1,0 +1,6 @@
+{
+ "rule": "dead or broken on 3 checks in a row; back on at the first check that finds it working",
+ "schema": "helix.switched-off.v1",
+ "sites": {},
+ "updated_utc": ""
+}

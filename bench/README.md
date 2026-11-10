@@ -67,6 +67,40 @@ All 130 catch-all sites were discarded by the control probe in both runs.
 Records: `results/2026-10-29_mockweb_6000_default.json`,
 `results/2026-10-29_mockweb_6000_c300.json`.
 
+### Live: sealed release run, 10 Nov 2026, Helix 4.0.0
+
+Made-up name `ofdsld3h2nwe`, `--all --record-attempt`, default concurrency,
+one cloud data-centre address, 4 CPUs.
+
+| Sites attempted | Answered | Accounts | Time |
+|---|---|---|---|
+| 11,956 | 10,663 (89.2%) | **0** | 290.5 s |
+
+Not answered, 1,293: 296 bot-check pages, 184 timeouts, 156 sites whose rule
+finds made-up names (discarded by the control probe), 155 HTTP 403, 113
+invalid certificates, 85 hosts the test network's own proxy refused, the rest
+smaller. 272 sites answered only on the second attempt (161 by WebFinger, 78
+when asked again, 33 with a browser's TLS fingerprint).
+
+This is the first sealed run with Maigret's engine sites asked at their real
+address, so its answered count is not comparable with earlier records: in
+those, several thousand "answers" were 404s from an address no profile lives
+at. The switched-off list was empty for this run. With the 654 sites that
+were dead or broken in three checks that day left out, the same scan answered
+10,652 of 11,302 (94.2%) in 217 s (a measurement, not the shipped default).
+
+Evidence: `results/2026-11-10_release_4.0.0_madeup/` (compressed),
+fingerprint `18fe1e9284bac2d32f2c3a474d56be777f7e6a0a0f7f6f9a201b7d5af3059a61`.
+
+```bash
+helix-osint --verify-evidence \
+  bench/results/2026-11-10_release_4.0.0_madeup/ofdsld3h2nwe_evidence.json.gz \
+  bench/results/2026-11-10_release_4.0.0_madeup/ofdsld3h2nwe_sites.json.gz
+```
+
+Speed against Maigret and Sherlock the same day: [SPEED.md](SPEED.md). The
+open accuracy test on real accounts: [ACCURACY.md](ACCURACY.md).
+
 ### Live: final sealed record rehearsal, 29 Oct 2026, Helix 3.5.0 (release code)
 
 Full database with adult sites and search pages excluded (the default),

@@ -38,6 +38,26 @@ def clean_proxy_env(monkeypatch):
     netconfig.set_proxy(None)
 
 
+@pytest.fixture(autouse=True)
+def own_switched_off_cache(monkeypatch, tmp_path):
+    """Tests never read or write the user's downloaded switched-off list."""
+    from osint import health
+    monkeypatch.setattr(health, "_CACHE_OFF", tmp_path / "switched_off_cache.json")
+
+
+@pytest.fixture(autouse=True)
+def own_left_out_cache(monkeypatch, tmp_path):
+    """Tests never read or write the user's downloaded left-out list."""
+    from osint import leftout
+    monkeypatch.setattr(leftout, "_CACHE", tmp_path / "left_out_cache.json")
+
+
+@pytest.fixture(autouse=True)
+def own_sites_file(monkeypatch, tmp_path):
+    """Tests never read or write the user's learned sites."""
+    monkeypatch.setenv("HELIX_SITES", str(tmp_path / "own_sites.json"))
+
+
 @pytest.fixture
 def profile_html():
     """A realistic found-profile page."""
