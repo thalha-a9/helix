@@ -119,8 +119,10 @@ def test_only_helix_osint_is_installed():
     # The repository keeps one file at the old path (see the next test); it is
     # not a package and nothing installs it.
     old = os.path.join(root, "osint")
-    assert [os.path.relpath(os.path.join(d, f), old) for d, _, fs in os.walk(old) for f in fs
-            if "__pycache__" not in d] == [os.path.join("data", "left_out.json")]
+    # (A source archive does not carry it at all, so there the folder is absent.)
+    files = [os.path.relpath(os.path.join(d, f), old) for d, _, fs in os.walk(old) for f in fs
+             if "__pycache__" not in d]
+    assert files in ([], [os.path.join("data", "left_out.json")])
     manifest = open(os.path.join(root, "MANIFEST.in"), encoding="utf-8").read()
     assert "osint" not in manifest.replace("helix_osint", "")
 
