@@ -36,13 +36,13 @@ python helix.py --learn "https://example.com/u/{username}" --known an-account-th
 ```
 
 It prints the steps it took and one line of JSON. Add that line to
-`osint/data/sites.json` and open a pull request. The line keeps the `known`
+`helix_osint/data/sites.json` and open a pull request. The line keeps the `known`
 account, so the daily site check proves the rule every day. More in
 [docs/LEARN.md](docs/LEARN.md).
 
 ## Adding or fixing a built-in site
 
-Built-in sites live in `osint/platforms.py`. About 8,200 more come from the
+Built-in sites live in `helix_osint/platforms.py`. About 8,200 more come from the
 Sherlock, WhatsMyName and Maigret databases, so a fix there helps every tool
 that uses them; open it upstream when you can. The fediverse servers are a
 generated list: rebuild it with `python tools/update_fediverse.py`.

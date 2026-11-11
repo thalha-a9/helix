@@ -13,8 +13,8 @@ import threading
 
 import pytest
 
-from osint.adapters import maigret_engine as me
-from osint.checker import (CONTROL_ERROR, CONTROL_INCONCLUSIVE, RECHECK_ERROR, check_username,
+from helix_osint.adapters import maigret_engine as me
+from helix_osint.checker import (CONTROL_ERROR, CONTROL_INCONCLUSIVE, RECHECK_ERROR, check_username,
                            control_username, definitive_negative, validate_username)
 
 CATCH_ALL = (b'<html><head><meta property="og:title" content="Log in or sign up">'
@@ -230,7 +230,7 @@ async def test_engine_lead_with_id_based_url_skips_control(base):
 # Maigret database templates
 
 def test_maigret_placeholders_are_filled():
-    from osint.adapters.maigret_adapter import _translate
+    from helix_osint.adapters.maigret_adapter import _translate
     r = _translate("X", {"url": "{urlMain}{urlSubpath}/u/{username}",
                          "urlMain": "https://x.example", "urlSubpath": "/forum",
                          "absenceStrs": ["nope"]})
@@ -239,7 +239,7 @@ def test_maigret_placeholders_are_filled():
 
 def test_maigret_entry_with_unfillable_placeholder_is_dropped():
     """Regression: Rutracker's {urlMain} had no value and was requested literally."""
-    from osint.adapters.maigret_adapter import _translate
+    from helix_osint.adapters.maigret_adapter import _translate
     assert _translate("Rutracker", {"url": "{urlMain}forum/profile.php?u={username}"}) is None
 
 
@@ -248,7 +248,7 @@ def test_maigret_entry_with_unfillable_placeholder_is_dropped():
 
 @pytest.mark.asyncio
 async def test_control_that_stays_rate_limited_is_inconclusive(base, monkeypatch):
-    import osint.checker as ck
+    import helix_osint.checker as ck
     monkeypatch.setattr(ck, "CONTROL_RETRY_DELAY", 0)
     r = by_name(await check_username("janeroe", platforms={"Blocked": plat(base, "blocked")}))
     assert r["Blocked"]["found"] is False
@@ -290,7 +290,7 @@ def test_definitive_negative(control, method, ok):
 
 @pytest.mark.asyncio
 async def test_rate_limited_control_is_retried_once(base, monkeypatch):
-    import osint.checker as ck
+    import helix_osint.checker as ck
     monkeypatch.setattr(ck, "CONTROL_RETRY_DELAY", 0)
     RETRY["n"] = 0
     r = by_name(await check_username("janeroe", platforms={"Retry": plat(base, "retry")}))
@@ -302,7 +302,7 @@ async def test_rate_limited_control_is_retried_once(base, monkeypatch):
 async def test_one_off_error_for_the_random_name_is_not_proof(base, monkeypatch):
     """Live --all lesson: under load a catch-all site answered the control with a
     one-off 500, which looked like 'no such user'. Two random names must agree."""
-    import osint.checker as ck
+    import helix_osint.checker as ck
     monkeypatch.setattr(ck, "CONTROL_RETRY_DELAY", 0)
     ONEOFF["n"] = 0
     r = by_name(await check_username("janeroe", platforms={"OneOff": plat(base, "oneoff")}))

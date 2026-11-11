@@ -1,7 +1,7 @@
 import pytest
 
-from osint.platform_schema import filter_valid, problems
-from osint.platforms import PLATFORMS
+from helix_osint.platform_schema import filter_valid, problems
+from helix_osint.platforms import PLATFORMS
 
 
 def good(**kw):
@@ -56,7 +56,7 @@ def test_every_builtin_platform_passes_the_same_rules(name, pdef):
 # search pages are mentions, not accounts
 
 import pytest as _pytest
-from osint import platform_schema as _ps
+from helix_osint import platform_schema as _ps
 
 
 @_pytest.mark.parametrize("url", [
@@ -83,7 +83,7 @@ def test_profile_urls_are_not_mistaken_for_search(url):
 
 
 def test_no_builtin_platform_is_a_search_page():
-    from osint.platforms import PLATFORMS
+    from helix_osint.platforms import PLATFORMS
     assert [n for n, p in PLATFORMS.items()
             if _ps.is_search_url(p.get("check_url") or p.get("url"))] == []
 

@@ -14,7 +14,7 @@ import threading
 
 import pytest
 
-import helix
+from helix_osint import cli as helix
 
 from test_breachdb import api                     # noqa: F401  (fixture)
 from test_robin import ahmia, ONION_A             # noqa: F401  (fixture)
@@ -143,7 +143,7 @@ async def test_guessed_email_accounts_never_corroborate_identity(site, monkeypat
     async def fake_holehe(email, progress_cb=None, include_nsfw=False):
         return [{"platform": "Exampleweb", "url": "https://exampleweb", "found": True,
                  "category": "social", "color": "#fff", "source": "holehe", "target_type": "email"}]
-    import osint.adapters.holehe_adapter as hm
+    import helix_osint.adapters.holehe_adapter as hm
     monkeypatch.setattr(hm, "load_with_fallback", fake_holehe)
 
     await helix.run(_args(tmp_path, email=None, breach=False, darkweb=False,

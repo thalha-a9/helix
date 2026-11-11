@@ -6,9 +6,9 @@ import sys
 
 import pytest
 
-import helix
-from osint.termsafe import TerminalSafe
-from osint import __version__
+from helix_osint import cli as helix
+from helix_osint.termsafe import TerminalSafe
+from helix_osint import __version__
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -17,7 +17,7 @@ def test_version_is_single_sourced():
     with open(os.path.join(ROOT, "pyproject.toml"), encoding="utf-8") as f:
         pyproject = f.read()
     assert 'dynamic = ["version"]' in pyproject
-    assert 'version = {attr = "osint.__version__"}' in pyproject
+    assert 'version = {attr = "helix_osint.__version__"}' in pyproject
     assert re.fullmatch(r"\d+\.\d+\.\d+", __version__)
     assert f"v{__version__}" in helix.BANNER
 
@@ -100,3 +100,47 @@ def test_helix_own_colours_and_progress_survive():
     text = f"\r  {helix.G}##{helix.DIM}..{helix.RST} {helix.B}{helix.R}x{helix.RST}\n\ttab"
     out.write(text)
     assert buf.getvalue() == text
+
+
+# One package, one name
+
+def test_only_helix_osint_is_installed():
+    """A wheel that drops `osint/` or `helix.py` at the top of site-packages
+    can overwrite another project's files (PyPI has an `osint` project).
+    Found by the BlackArch review of 4.0.0."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(root, "pyproject.toml")
+    if not os.path.exists(path):
+        pytest.skip("pyproject.toml is not part of the installed package")
+    text = open(path, encoding="utf-8").read()
+    assert "py-modules" not in text
+    assert 'include = ["helix_osint*"]' in text
+    assert 'helix-osint = "helix_osint.cli:main"' in text and 'helix       = "helix_osint.cli:main"' in text
+    # The repository keeps one file at the old path (see the next test); it is
+    # not a package and nothing installs it.
+    old = os.path.join(root, "osint")
+    assert [os.path.relpath(os.path.join(d, f), old) for d, _, fs in os.walk(old) for f in fs
+            if "__pycache__" not in d] == [os.path.join("data", "left_out.json")]
+    manifest = open(os.path.join(root, "MANIFEST.in"), encoding="utf-8").read()
+    assert "osint" not in manifest.replace("helix_osint", "")
+
+
+def test_the_left_out_list_at_the_old_address_is_the_same_list():
+    """Helix 4.0.0 fetches the day's left-out list from osint/data/ in the
+    repository. That copy stays, byte for byte the same as the real list, so
+    a person added to the list is also left out by 4.0.0 installs."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    old = os.path.join(root, "osint", "data", "left_out.json")
+    new = os.path.join(root, "helix_osint", "data", "left_out.json")
+    if not os.path.exists(old):
+        pytest.skip("the old-address copy is in the repository, not in the installed package")
+    assert open(old, "rb").read() == open(new, "rb").read(), \
+        "copy helix_osint/data/left_out.json over osint/data/left_out.json"
+
+
+def test_python_dash_m_runs_the_program():
+    import subprocess
+    import sys
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out = subprocess.run([sys.executable, "-m", "helix_osint", "--version"], capture_output=True, text=True, cwd=root)
+    assert out.returncode == 0 and out.stdout.strip() == f"Helix v{helix.__version__}"

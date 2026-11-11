@@ -1,6 +1,6 @@
 # Helix in other tools
 
-Both integrations call Helix as a library (`osint.api.scan`), so they report
+Both integrations call Helix as a library (`helix_osint.api.scan`), so they report
 what a Helix scan reports: accounts confirmed by the control probe, never a
 site's bare "found". Install Helix first (`pipx install helix-osint`, or
 `pip install helix-osint` into the Python the other tool uses).

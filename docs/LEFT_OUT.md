@@ -23,7 +23,7 @@ or write to the maintainer through the address in `SECURITY.md`.
 
 ## How it works
 
-The list (`osint/data/left_out.json`) holds tokens, not names. A token is
+The list (`helix_osint/data/left_out.json`) holds tokens, not names. A token is
 made from the lower-case name with PBKDF2-HMAC-SHA256, 200,000 rounds and a
 fixed public salt. Before a scan, Helix makes the token for the name it was
 given and stops if the token is on the list. The same check covers the email
@@ -32,6 +32,12 @@ would follow.
 
 The list ships with every release. Scans that download the site databases
 also fetch the day's copy.
+
+The repository holds the list twice: `helix_osint/data/left_out.json`, and a
+copy at `osint/data/left_out.json`, where Helix 4.0.0 looks for it. A test
+fails unless the two are identical, so an entry is added to both
+(`cp helix_osint/data/left_out.json osint/data/left_out.json`). The copy is
+not part of the installed package.
 
 ## What it does and does not do
 

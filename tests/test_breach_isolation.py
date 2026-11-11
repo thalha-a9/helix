@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-import helix
+from helix_osint import cli as helix
 
 from test_breachdb import api                     # noqa: F401  (fixture)
 from test_cli_intel import _args, site            # noqa: F401  (fixture)

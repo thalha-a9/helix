@@ -2,8 +2,8 @@
 
 import asyncio
 
-from osint import checker
-from osint.adapters import maigret_adapter
+from helix_osint import checker
+from helix_osint.adapters import maigret_adapter
 
 # Olx.pl as Maigret lists it. Its user pages are keyed by seller ids, and some
 # random strings get a generic 200 page that has the second absence string.

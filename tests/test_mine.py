@@ -12,9 +12,9 @@ import threading
 
 import pytest
 
-import helix
-import osint.checker as ck
-from osint import mine
+from helix_osint import cli as helix
+import helix_osint.checker as ck
+from helix_osint import mine
 
 GUIDE_RAW = [
     {"name": "GitHub", "url": "https://github.com/settings/admin", "difficulty": "easy",

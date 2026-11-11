@@ -2,7 +2,7 @@
 
 import pytest
 
-from osint import checker
+from helix_osint import checker
 
 pytestmark = pytest.mark.asyncio
 
@@ -158,14 +158,14 @@ async def test_og_meta_non_200_is_never_found(base_result, profile_html):
 
 async def test_gitlab_group_is_not_reported_as_a_user(base_result):
     """gitlab.com/torvalds is a group; the users API returns [] for it."""
-    from osint.platforms import PLATFORMS
+    from helix_osint.platforms import PLATFORMS
     plat = PLATFORMS["GitLab"]
     r = await apply(base_result, plat, 200, "[]", username="torvalds")
     assert not r["found"]
 
 
 async def test_gitlab_real_user_is_found(base_result):
-    from osint.platforms import PLATFORMS
+    from helix_osint.platforms import PLATFORMS
     plat = PLATFORMS["GitLab"]
     body = '[{"id":1786152,"username":"gitlab-bot","name":"GitLab Bot","state":"active"}]'
     r = await apply(base_result, plat, 200, body, username="gitlab-bot")
@@ -173,7 +173,7 @@ async def test_gitlab_real_user_is_found(base_result):
 
 
 async def test_gitlab_username_match_is_exact_not_prefix(base_result):
-    from osint.platforms import PLATFORMS
+    from helix_osint.platforms import PLATFORMS
     plat = PLATFORMS["GitLab"]
     body = '[{"id":1,"username":"janeroe2","state":"active"}]'
     r = await apply(base_result, plat, 200, body, username="janeroe")
@@ -232,7 +232,7 @@ async def test_search_page_listing_a_longer_name_is_not_a_hit(base_result):
     ("Jack | creating podcasts | Patreon", True),
 ])
 async def test_patreon_removed_account_is_not_a_profile(base_result, title, found):
-    from osint.platforms import PLATFORMS
+    from helix_osint.platforms import PLATFORMS
     html = f'<meta property="og:title" content="{title}">'
     r = await apply(base_result, PLATFORMS["Patreon"], 200, html, username="jack")
     assert r["found"] is found

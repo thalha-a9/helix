@@ -16,12 +16,12 @@ import threading
 import aiohttp
 import pytest
 
-import osint.checker as ck
-from osint import evidence
-from osint.adapters import fediverse_adapter as fa
-from osint.checker import (CERT_ERROR, CONTROL_ERROR, DNS_ERROR, DNS_TEMPORARY, RECHECK_ERROR,
+import helix_osint.checker as ck
+from helix_osint import evidence
+from helix_osint.adapters import fediverse_adapter as fa
+from helix_osint.checker import (CERT_ERROR, CONTROL_ERROR, DNS_ERROR, DNS_TEMPORARY, RECHECK_ERROR,
                            check_username, unanswered_kind)
-from osint.platform_schema import fallback_defs, problems
+from helix_osint.platform_schema import fallback_defs, problems
 
 STATE = {"once": 0, "midway": 0, "stuck": 0, "hits": []}
 

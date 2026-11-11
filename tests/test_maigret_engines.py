@@ -10,9 +10,9 @@ name. Those sites counted as answered and could not find anyone.
 
 import pytest
 
-import osint.checker as ck
-from osint.adapters.maigret_adapter import _translate
-from osint.platform_schema import fallback_defs, problems
+import helix_osint.checker as ck
+from helix_osint.adapters.maigret_adapter import _translate
+from helix_osint.platform_schema import fallback_defs, problems
 
 # Engines as soxoj/maigret data.json defined them on 10 Nov 2026 (shortened).
 ENGINES = {
@@ -129,7 +129,7 @@ async def test_any_one_of_several_found_texts_is_enough():
 
 @pytest.mark.parametrize("engine,software", [("Mastodon", "mastodon"), ("Lemmy", "lemmy")])
 def test_fediverse_engines_get_helix_own_rule_with_webfinger(engine, software):
-    from osint.adapters.fediverse_adapter import platform_for
+    from helix_osint.adapters.fediverse_adapter import platform_for
     pdef = _translate("social.example", entry(engine, main="https://social.example"), ENGINES)
     own = platform_for("social.example", software)
     assert pdef["check_url"] == own["check_url"] and pdef["found_text"] == own["found_text"]

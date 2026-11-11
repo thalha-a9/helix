@@ -1,5 +1,19 @@
 # Helix Changelog
 
+## v4.1.0 (2026-11-11)
+
+### Changes you may notice
+
+1. **The Python package is now `helix_osint`, not `osint`.** Code that imports Helix must change `import osint` to `import helix_osint`, and `from osint.api import scan` to `from helix_osint.api import scan`. The old name is gone, not kept as an alias: `import osint` now fails, or loads a different project if one is installed.
+2. **`import helix` no longer works either.** The command line program moved from the top-level module `helix` to `helix_osint.cli`. Code that called `helix.main()` or `helix.run()` should use `helix_osint.cli`.
+3. **The module commands changed name with it:** `python -m osint.health` is now `python -m helix_osint.health`, `python -m osint.evidence` is `python -m helix_osint.evidence`.
+4. **Nothing changes for the commands.** `helix-osint`, `helix`, the Docker image and `python helix.py` from a source checkout work as before, with the same options and the same output. `python -m helix_osint` is new and does the same.
+5. **Files in the repository moved:** `osint/` is `helix_osint/`, and the lists people send pull requests for are now `helix_osint/data/sites.json` and `helix_osint/data/left_out.json`.
+6. The left-out list is kept at its old address in the repository too (`osint/data/left_out.json`), identical to the real one, so 4.0.0 installs still pick up new entries. That copy is not installed.
+
+### Fixed
+- Helix installed two things at the top level of Python's site-packages: a package named `osint` and a module named `helix`. Both names are too general to belong to one project, and `osint` is another project's name on PyPI, so the two could overwrite each other. Reported by noraj in the BlackArch review. Everything now lives in one package, `helix_osint`, and the wheel holds nothing else. The Maltego transform and the SpiderFoot module import the new name.
+
 ## v4.0.0 (2026-11-10)
 
 Measured on 10 Nov 2026 from one cloud data-centre address. Site totals change when the upstream lists change, so each number has its date.

@@ -2,7 +2,7 @@ name: Release
 
 # Push a tag like v3.6.0, or press "Run workflow" on main in the Actions tab
 # (works from a phone): this builds, tests, publishes to PyPI and makes the
-# GitHub release. Started by hand, it creates the tag from osint.__version__
+# GitHub release. Started by hand, it creates the tag from helix_osint.__version__
 # and then starts the Docker workflow for it. PyPI uses Trusted Publishing:
 # no API token is stored here. One-time setup is in docs/RELEASING.md.
 
@@ -26,14 +26,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Work out the tag from osint.__version__
+      - name: Work out the tag from helix_osint.__version__
         id: version
         run: |
-          version=$(python -c "import re;print(re.search(r'__version__ = \"(.+?)\"', open('osint/__init__.py').read()).group(1))")
+          version=$(python -c "import re;print(re.search(r'__version__ = \"(.+?)\"', open('helix_osint/__init__.py').read()).group(1))")
           tag="v$version"
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             if [ "$tag" != "$GITHUB_REF_NAME" ]; then
-              echo "::error::tag $GITHUB_REF_NAME does not match osint.__version__ ($version)"
+              echo "::error::tag $GITHUB_REF_NAME does not match helix_osint.__version__ ($version)"
               exit 1
             fi
           else
@@ -42,7 +42,7 @@ jobs:
               exit 1
             fi
             if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
-              echo "::error::$tag already exists: bump osint.__version__ first"
+              echo "::error::$tag already exists: bump helix_osint.__version__ first"
               exit 1
             fi
           fi

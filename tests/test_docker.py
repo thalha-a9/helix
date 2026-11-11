@@ -26,7 +26,7 @@ def test_dockerignore_is_an_allow_list():
     rules = _rules(_read(".dockerignore"))
     assert rules[0] == "*"
     allowed = {r[1:].rstrip("/") for r in rules if r.startswith("!")}
-    assert allowed == {"pyproject.toml", "README.md", "LICENSE", "MANIFEST.in", "helix.py", "osint"}
+    assert allowed == {"pyproject.toml", "README.md", "LICENSE", "MANIFEST.in", "helix_osint"}
 
 
 def test_dockerfile_copies_only_allowed_files():

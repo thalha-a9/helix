@@ -49,7 +49,7 @@ def test_found_lines_of_sherlock_and_maigret_are_read():
 def test_helix_results_come_from_its_json_report(tmp_path):
     out = tmp_path / "out"
     out.mkdir()
-    from osint.report import save_json
+    from helix_osint.report import save_json
     save_json("janeroe", [
         {"platform": "GitHub", "url": "https://github.com/janeroe", "found": True},
         {"platform": "X", "url": "https://x.com/janeroe", "found": False},

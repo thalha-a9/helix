@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from osint.modules import robin
+from helix_osint.modules import robin
 
 ONION_A = "juhanurmihxlp77nkq76byazcldy2hlmovfu2epvl5ankdibsot4csyd.onion"
 ONION_B = "abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefgh.onion"
@@ -203,7 +203,7 @@ def test_sources_are_numbered_per_type():
 
 @pytest.mark.asyncio
 async def test_analysis_goes_through_the_shared_ai_client(monkeypatch):
-    from osint.adapters import ai_verifier
+    from helix_osint.adapters import ai_verifier
     seen = {}
 
     async def fake_complete(provider, system, user, max_tokens=1000):

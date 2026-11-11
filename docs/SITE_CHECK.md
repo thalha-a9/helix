@@ -50,7 +50,7 @@ from a home line. Pass `--include-off` to scan everything.
 
 ## Where the list comes from
 
-- Every release ships the list as it was that day (`osint/data/switched_off.json`).
+- Every release ships the list as it was that day (`helix_osint/data/switched_off.json`).
 - The daily job publishes a fresh one on the `status` branch. A scan that
   downloads the site databases also fetches it, at most once a day. If the
   download fails, the list at hand stays in use.
@@ -58,8 +58,8 @@ from a home line. Pass `--include-off` to scan everything.
 ## Running it yourself
 
 ```bash
-python -m osint.health check --state status/state.json --out status
-python -m osint.health page  --state status/state.json --out status
+python -m helix_osint.health check --state status/state.json --out status
+python -m helix_osint.health page  --state status/state.json --out status
 ```
 
 `check` takes about 8 minutes for the full list on a fast link and writes

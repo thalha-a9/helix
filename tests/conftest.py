@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from osint import netconfig
+from helix_osint import netconfig
 
 
 # Fallback for environments without pytest-asyncio (e.g. system Python on Kali,
@@ -41,14 +41,14 @@ def clean_proxy_env(monkeypatch):
 @pytest.fixture(autouse=True)
 def own_switched_off_cache(monkeypatch, tmp_path):
     """Tests never read or write the user's downloaded switched-off list."""
-    from osint import health
+    from helix_osint import health
     monkeypatch.setattr(health, "_CACHE_OFF", tmp_path / "switched_off_cache.json")
 
 
 @pytest.fixture(autouse=True)
 def own_left_out_cache(monkeypatch, tmp_path):
     """Tests never read or write the user's downloaded left-out list."""
-    from osint import leftout
+    from helix_osint import leftout
     monkeypatch.setattr(leftout, "_CACHE", tmp_path / "left_out_cache.json")
 
 

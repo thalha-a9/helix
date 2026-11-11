@@ -59,21 +59,18 @@ Benchmarks    = "https://github.com/thalha-a9/helix/blob/main/bench/README.md"
 [project.scripts]
 # `helix-osint` is the name distribution packages ship: on Arch Linux (and so
 # BlackArch) `helix` is already the Helix text editor's binary.
-helix-osint = "helix:main"
-helix       = "helix:main"
-
-[tool.setuptools]
-py-modules = ["helix"]
+helix-osint = "helix_osint.cli:main"
+helix       = "helix_osint.cli:main"
 
 [tool.setuptools.package-data]
-osint = ["data/*.json"]
+helix_osint = ["data/*.json"]
 
 [tool.setuptools.dynamic]
-version = {attr = "osint.__version__"}
+version = {attr = "helix_osint.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["osint*"]
+include = ["helix_osint*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

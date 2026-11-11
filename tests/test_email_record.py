@@ -6,8 +6,8 @@ import re
 
 import pytest
 
-import helix
-from osint import evidence
+from helix_osint import cli as helix
+from helix_osint import evidence
 
 from test_cli_intel import _args, site          # noqa: F401  (fixture)
 
@@ -100,7 +100,7 @@ async def test_username_record_states_how_many_made_up_names(site, monkeypatch, 
     monkeypatch.setattr(helix, "PLATFORMS", {"Exampleweb": {
         "url": site + "/u/{username}", "method": "status_code", "found": [200],
         "category": "social", "color": "#fff"}})
-    from osint import checker
+    from helix_osint import checker
     monkeypatch.setattr(checker, "CONTROL_RETRY_DELAY", 0)
     await helix.run(_args(tmp_path, email=None, breach=False, darkweb=False, report=False,
                           record_attempt=True, no_control=False, controls=5))

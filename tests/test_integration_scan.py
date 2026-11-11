@@ -11,9 +11,9 @@ import threading
 
 import pytest
 
-from osint import location
-from osint.checker import check_username
-from osint.verifier import run_local_verifier
+from helix_osint import location
+from helix_osint.checker import check_username
+from helix_osint.verifier import run_local_verifier
 
 PROFILE_HTML = b"""<html><head>
 <meta property="og:title" content="Jane Roe (@janeroe)">

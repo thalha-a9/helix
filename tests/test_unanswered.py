@@ -1,6 +1,6 @@
 """A site that was not reached is not a site without an account: the scan says so."""
 
-import helix
+from helix_osint import cli as helix
 
 
 def _r(found=False, error=None, status=None):

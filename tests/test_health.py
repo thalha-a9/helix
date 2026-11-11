@@ -15,11 +15,11 @@ import threading
 
 import pytest
 
-import helix
-import osint.checker as ck
-from osint import evidence, health
-from osint.checker import CERT_ERROR, CONTROL_ERROR, CONTROL_INCONCLUSIVE, DNS_ERROR
-from osint.platform_schema import profile_key
+from helix_osint import cli as helix
+import helix_osint.checker as ck
+from helix_osint import evidence, health
+from helix_osint.checker import CERT_ERROR, CONTROL_ERROR, CONTROL_INCONCLUSIVE, DNS_ERROR
+from helix_osint.platform_schema import profile_key
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -396,14 +396,14 @@ def test_the_daily_job_runs_only_in_the_public_repository_and_keeps_one_commit()
     wf = open(path, encoding="utf-8").read()
     assert "if: github.repository == 'thalha-a9/helix'" in wf
     assert 'cron: "17 3 * * *"' in wf and "workflow_dispatch" in wf
-    assert "python -m osint.health check --state status/state.json --out status" in wf
+    assert "python -m helix_osint.health check --state status/state.json --out status" in wf
     assert "git push -q -f" in wf and " status\n" in wf
     assert health.OFF_URL == "https://raw.githubusercontent.com/thalha-a9/helix/status/switched_off.json"
 
 
 @pytest.mark.asyncio
 async def test_a_fediverse_server_is_proven_with_an_account_it_names_itself(base, monkeypatch):
-    from osint.adapters import fediverse_adapter
+    from helix_osint.adapters import fediverse_adapter
     asked = []
 
     async def named_by_the_server(domains, concurrency=60, progress_cb=None):

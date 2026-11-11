@@ -41,7 +41,7 @@ named by `--sites-file` or `$HELIX_SITES`). Every scan reads that list first,
 so your sites win over the same address in a downloaded database.
 
 To offer the site to everyone, `--learn` also prints it as one line of JSON.
-Add that line to `osint/data/sites.json` in a pull request:
+Add that line to `helix_osint/data/sites.json` in a pull request:
 
 ```json
 "example.com": {"url": "https://example.com/u/{username}", "category": "other", "color": "#22c55e", "source": "own", "method": "status_code", "found": [200], "known": "alice"}

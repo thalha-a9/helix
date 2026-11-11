@@ -1,4 +1,4 @@
-from osint import location
+from helix_osint import location
 
 
 # Gazetteer resolution

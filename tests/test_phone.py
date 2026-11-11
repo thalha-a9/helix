@@ -15,10 +15,10 @@ import pytest
 
 pytest.importorskip("phonenumbers")
 
-import helix                                    # noqa: E402
-import osint.checker as ck                      # noqa: E402
-from osint import evidence, leftout, phone      # noqa: E402
-from osint.adapters import breachdb             # noqa: E402
+from helix_osint import cli as helix                                    # noqa: E402
+import helix_osint.checker as ck                      # noqa: E402
+from helix_osint import evidence, leftout, phone      # noqa: E402
+from helix_osint.adapters import breachdb             # noqa: E402
 
 NUMBER = "+919876543210"
 

@@ -4,7 +4,6 @@
 !README.md
 !LICENSE
 !MANIFEST.in
-!helix.py
-!osint/
+!helix_osint/
 **/__pycache__
 **/*.pyc

@@ -2,7 +2,7 @@ import itertools
 
 import pytest
 
-from osint.confidence import score_identity, HIGH, MEDIUM, LOW
+from helix_osint.confidence import score_identity, HIGH, MEDIUM, LOW
 
 
 def profile(platform, **extra):
@@ -123,12 +123,12 @@ def test_status_code_only_detection_caps_at_medium():
 @pytest.mark.parametrize("selector", ["avatar", "cross_link", "email", "real_name", "location"])
 def test_no_single_non_username_selector_alone_reaches_high_without_username(selector):
     """Every finding has the username selector; only it plus a second can climb."""
-    from osint.confidence import _grade
+    from helix_osint.confidence import _grade
     assert _grade([selector], "high", False) == LOW
 
 
 def test_single_selector_is_never_high_exhaustively():
-    from osint.confidence import _grade
+    from helix_osint.confidence import _grade
     for sel, det, conflict in itertools.product(
             ["username", "avatar", "cross_link", "email", "real_name", "location"],
             ["high", "medium", "low"], [True, False]):
@@ -143,7 +143,7 @@ def test_counts_cover_every_found_profile():
 
 def test_status_code_detection_never_reaches_high():
     """README promise: status-code-only detection caps at MEDIUM (it never did)."""
-    from osint.confidence import score_identity
+    from helix_osint.confidence import score_identity
     def hit(p, method, link):
         return {"platform": p, "found": True, "confidence": "medium", "detection_method": method,
                 "bio_links": {"twitter": "janeroe"} if link else {}, "og_title": ""}

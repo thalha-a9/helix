@@ -4,7 +4,7 @@ import io
 
 import pytest
 
-from osint import phash
+from helix_osint import phash
 
 PIL = pytest.importorskip("PIL")
 from PIL import Image  # noqa: E402

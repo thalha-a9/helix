@@ -56,7 +56,7 @@ def main(argv):
         return 1
     sources = "all" if "all" in argv[2:] else "builtin"
     try:
-        from osint.api import LeftOut, scan_sync
+        from helix_osint.api import LeftOut, scan_sync
     except ImportError:
         print(message([], [("FatalError", "Helix is not installed for this Python: pip install helix-osint")]))
         return 1

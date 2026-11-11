@@ -1,5 +1,5 @@
 """
-Helix as a library (osint.api) and as a local web page (helix --serve).
+Helix as a library (helix_osint.api) and as a local web page (helix --serve).
 Both run the same scan as the command line and keep its rules: the control
 probe, the unanswered count, the left-out list.
 """
@@ -13,8 +13,8 @@ import threading
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
-import osint.checker as ck
-from osint import api, i18n, leftout, web
+import helix_osint.checker as ck
+from helix_osint import api, i18n, leftout, web
 
 
 class Handler(http.server.BaseHTTPRequestHandler):

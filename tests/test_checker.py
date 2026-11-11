@@ -1,6 +1,6 @@
 import pytest
 
-from osint import checker
+from helix_osint import checker
 
 
 @pytest.mark.parametrize("username", ["johndoe", "john.doe", "john_doe", "a-b", "x1"])
@@ -70,7 +70,7 @@ def test_extract_bio_links_finds_handles():
 
 def test_extract_bio_links_ignores_markup_and_cdn_hosts():
     """Regression: the og: namespace in <html prefix> was reported as a user's website."""
-    from osint.platforms import _BIO_PATTERNS_DEVELOPER
+    from helix_osint.platforms import _BIO_PATTERNS_DEVELOPER
     html = ('<html prefix="og: http://ogp.me/ns#">'
             '<link rel="dns-prefetch" href="https://github.githubassets.com">'
             '<link href="https://fonts.googleapis.com/css?family=x">'
@@ -80,7 +80,7 @@ def test_extract_bio_links_ignores_markup_and_cdn_hosts():
 
 
 def test_extract_bio_links_returns_nothing_when_only_noise():
-    from osint.platforms import _BIO_PATTERNS_DEVELOPER
+    from helix_osint.platforms import _BIO_PATTERNS_DEVELOPER
     html = '<html prefix="og: http://ogp.me/ns#"><link href="https://schema.org/Person"></html>'
     assert checker._extract_bio_links(html, {"website": _BIO_PATTERNS_DEVELOPER["website"]}) == {}
 
@@ -135,18 +135,18 @@ def test_dead_site_detection():
     "https://static.example.com/app.css",
 ])
 def test_media_files_are_never_bio_links(value):
-    from osint.checker import _is_bio_noise
+    from helix_osint.checker import _is_bio_noise
     assert _is_bio_noise(value)
 
 
 @pytest.mark.parametrize("value", ["https://krisnova.net", "https://jack.blog/about", "github.com/torvalds"])
 def test_real_sites_are_kept_as_bio_links(value):
-    from osint.checker import _is_bio_noise
+    from helix_osint.checker import _is_bio_noise
     assert not _is_bio_noise(value)
 
 
 def test_self_links_are_dropped():
-    from osint.checker import _drop_self_links
+    from helix_osint.checker import _drop_self_links
     # Live Dev.to / Linktree pages for "jack" (Oct 2026)
     assert _drop_self_links({"devto": "jack", "website": "https://dev.to/jack"},
                             "https://dev.to/jack", "Dev.to") == {}
@@ -158,26 +158,26 @@ def test_self_links_are_dropped():
 
 
 def test_platform_onion_mirror_is_not_a_bio_link():
-    from osint.checker import _is_bio_noise
+    from helix_osint.checker import _is_bio_noise
     assert _is_bio_noise("https://twitter3e4tixl4xyajtrzo62zg5vztmjuricljdp2c5kshju4avyoid.onion")
 
 
 def test_shortener_root_is_noise_but_short_links_are_not():
-    from osint.checker import _is_bio_noise
+    from helix_osint.checker import _is_bio_noise
     assert _is_bio_noise("https://t.co")                      # in every logged-out X page
     assert not _is_bio_noise("https://t.co/ZdBx5WABYx")       # a user's actual link
 
 
 def test_pivot_never_treats_a_website_as_an_alias():
-    from osint.pivot import _extract_aliases
+    from helix_osint.pivot import _extract_aliases
     assert _extract_aliases({"website": "https://t.co", "twitter": "maxtaco",
                              "github": "https://evil/x"}) == {"maxtaco"}
 
 
 @pytest.mark.asyncio
 async def test_keybase_api_answer_and_proofs():
-    from osint import checker
-    from osint.platforms import PLATFORMS
+    from helix_osint import checker
+    from helix_osint.platforms import PLATFORMS
     # Live API shapes (Oct 2026)
     real = ('{"status":{"code":0,"name":"OK"},"them":[{"basics":{"username":"max"},'
             '"proofs_summary":{"all":[{"proof_type":"twitter","nametag":"maxtaco",'
@@ -199,8 +199,8 @@ async def test_keybase_api_answer_and_proofs():
 
 def test_site_paths_are_not_handles():
     """Live Linktree page: youtube.com/channel/UC... was read as the handle "channel"."""
-    from osint.checker import _extract_bio_links
-    from osint.platforms import PLATFORMS
+    from helix_osint.checker import _extract_bio_links
+    from helix_osint.platforms import PLATFORMS
     html = ('<a href="https://www.youtube.com/channel/UCabc123">yt</a>'
             '<a href="https://twitter.com/intent/tweet?x=1">share</a>'
             '<a href="https://github.com/features">gh</a>'

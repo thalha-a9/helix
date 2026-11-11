@@ -10,7 +10,7 @@ import re
 
 import pytest
 
-from osint import evidence
+from helix_osint import evidence
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = sorted(glob.glob(os.path.join(ROOT, "*.md")) + glob.glob(os.path.join(ROOT, "docs", "*.md"))
@@ -83,8 +83,8 @@ def test_public_documents_follow_the_house_style(path):
     ("RESPONSIBLE_USE.md", ["not legal advice", "legitimate interests", "Digital Personal Data Protection Act, 2023",
                             "LEFT_OUT.md", "helix --me"]),
     ("LEFT_OUT.md", ["--left-out-token", "PBKDF2-HMAC-SHA256", "200,000", "Do not write the name itself"]),
-    ("SITE_CHECK.md", ["--include-off", "3 checks in a row", "python -m osint.health check"]),
-    ("LEARN.md", ["--learn", "--known", "osint/data/sites.json", "control probe"]),
+    ("SITE_CHECK.md", ["--include-off", "3 checks in a row", "python -m helix_osint.health check"]),
+    ("LEARN.md", ["--learn", "--known", "helix_osint/data/sites.json", "control probe"]),
 ])
 def test_each_guide_covers_its_command(doc, needs):
     text = " ".join(_read("docs", doc).split())
@@ -93,7 +93,7 @@ def test_each_guide_covers_its_command(doc, needs):
 
 
 def test_the_guides_state_the_numbers_the_code_uses():
-    from osint import health, leftout
+    from helix_osint import health, leftout
     assert f"{leftout.ROUNDS:,} rounds" in _read("docs", "LEFT_OUT.md")
     site_check = _read("docs", "SITE_CHECK.md")
     assert f"on {health.OFF_AFTER} checks in a row" in site_check

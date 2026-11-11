@@ -2,7 +2,7 @@
 
 import pytest
 
-from osint.subject import real_name_from_title
+from helix_osint.subject import real_name_from_title
 
 
 @pytest.mark.parametrize("title,platform,user,want", [
@@ -36,7 +36,7 @@ def _prof(platform, og, confidence="high"):
 
 
 def test_names_keep_their_source_and_most_shared_comes_first():
-    from osint.subject import names_on_profiles
+    from helix_osint.subject import names_on_profiles
     found = [_prof("Medium", "Patricia Torvalds – Medium"),
              _prof("GitHub", "Linus Torvalds - GitHub"),
              _prof("Snapchat", "Linus Torvalds on Snapchat")]
@@ -47,21 +47,21 @@ def test_names_keep_their_source_and_most_shared_comes_first():
 
 
 def test_names_ignore_unverified_profiles_and_merge_case():
-    from osint.subject import names_on_profiles
+    from helix_osint.subject import names_on_profiles
     found = [_prof("A", "Jane Roe - A"), _prof("B", "JANE ROE - B"),
              _prof("C", "Someone Else - C", confidence="medium")]
     assert names_on_profiles(found, "janeroe") == {"Jane Roe": ["A", "B"]}
 
 
 def test_a_tie_keeps_scan_order():
-    from osint.subject import names_on_profiles
+    from helix_osint.subject import names_on_profiles
     found = [_prof("A", "Jane Roe - A"), _prof("B", "John Doe - B")]
     assert list(names_on_profiles(found, "x")) == ["Jane Roe", "John Doe"]
 
 
 def test_entities_in_og_titles_are_decoded():
     """Instagram escapes its og:title (laptop recheck, Oct 2026)."""
-    from osint.checker import _extract_og_tag
+    from helix_osint.checker import _extract_og_tag
     html = '<meta property="og:title" content="Marco Migozzi (&#064;torvalds) &#x2022; Instagram photos and videos">'
     title = _extract_og_tag(html, "title")
     assert title == "Marco Migozzi (@torvalds) • Instagram photos and videos"

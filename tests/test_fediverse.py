@@ -9,10 +9,10 @@ import threading
 
 import pytest
 
-from osint.adapters import fediverse_adapter as fa
-from osint.checker import check_username
-from osint.fediverse_servers import GENERATED, SERVERS
-from osint.platform_schema import filter_valid
+from helix_osint.adapters import fediverse_adapter as fa
+from helix_osint.checker import check_username
+from helix_osint.fediverse_servers import GENERATED, SERVERS
+from helix_osint.platform_schema import filter_valid
 
 
 def test_the_shipped_list_is_sound():

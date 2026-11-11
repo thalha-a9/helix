@@ -19,10 +19,10 @@ import threading
 
 import pytest
 
-from osint import netconfig
-from osint.adapters import maigret_engine as me
-from osint.platforms import PLATFORMS
-from osint.verifier import run_local_verifier, _is_homepage_only
+from helix_osint import netconfig
+from helix_osint.adapters import maigret_engine as me
+from helix_osint.platforms import PLATFORMS
+from helix_osint.verifier import run_local_verifier, _is_homepage_only
 
 def _stand_in(script, body: str) -> None:
     """Install a fake `maigret` at `script` that runs `body` with this Python.

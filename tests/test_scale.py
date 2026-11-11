@@ -9,8 +9,8 @@ import time
 import aiohttp
 import pytest
 
-from osint import checker, netconfig
-from osint.platforms import PLATFORMS
+from helix_osint import checker, netconfig
+from helix_osint.platforms import PLATFORMS
 
 
 # DNS: never the aiodns resolver
@@ -145,7 +145,7 @@ async def test_steam_profile_page_is_found():
 # Terminal noise
 
 def test_network_noise_is_swallowed_but_real_errors_are_not():
-    import helix
+    from helix_osint import cli as helix
     calls = []
 
     class Loop:

@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 import pytest
 
-from osint.adapters import breachdb
+from helix_osint.adapters import breachdb
 
 XON_BREACHED = {
     "BreachMetrics": {},

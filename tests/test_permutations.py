@@ -2,8 +2,8 @@ import re
 
 import pytest
 
-from osint.permutations import generate_permutations
-from osint.email_permutations import generate_email_permutations
+from helix_osint.permutations import generate_permutations
+from helix_osint.email_permutations import generate_email_permutations
 
 VALID = re.compile(r'^[a-zA-Z0-9._\-]+$')
 

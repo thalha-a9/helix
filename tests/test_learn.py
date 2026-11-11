@@ -14,11 +14,11 @@ import threading
 
 import pytest
 
-import helix
-import osint.checker as ck
-from osint import learn, sources
-from osint.checker import check_username
-from osint.platform_schema import problems
+from helix_osint import cli as helix
+import helix_osint.checker as ck
+from helix_osint import learn, sources
+from helix_osint.checker import check_username
+from helix_osint.platform_schema import problems
 
 USERS = {"alice", "john"}
 

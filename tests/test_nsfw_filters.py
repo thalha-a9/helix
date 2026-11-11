@@ -9,7 +9,7 @@ import asyncio
 
 import pytest
 
-from osint.adapters import maigret_adapter, sherlock_adapter, wmn_adapter
+from helix_osint.adapters import maigret_adapter, sherlock_adapter, wmn_adapter
 
 
 # WhatsMyName

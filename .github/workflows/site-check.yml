@@ -1,6 +1,6 @@
 name: Site check
 
-# Checks every site Helix can scan once a day (python -m osint.health check):
+# Checks every site Helix can scan once a day (python -m helix_osint.health check):
 # a made-up name must get "no such user", and where a database lists an
 # account that exists, that account must be found. The record, the list of
 # switched-off sites and the status page are published on the `status`
@@ -47,7 +47,7 @@ jobs:
           fi
 
       - name: Check every site
-        run: python -m osint.health check --state status/state.json --out status --where "GitHub Actions runner"
+        run: python -m helix_osint.health check --state status/state.json --out status --where "GitHub Actions runner"
 
       - name: Publish the record, the list and the page
         run: |

@@ -8,7 +8,7 @@ import threading
 
 import pytest
 
-from osint import capture, checker, evidence
+from helix_osint import capture, checker, evidence
 
 
 # snapshot
@@ -154,7 +154,7 @@ def test_hits_carry_the_raw_page_only_when_capture_is_on(site):
 
 
 def test_cli_flags_exist():
-    import helix
+    from helix_osint import cli as helix
     import sys
     sys.argv = ["helix", "--help"]
     src = open(helix.__file__).read()

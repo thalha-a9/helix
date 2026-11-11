@@ -34,8 +34,8 @@ from datetime import datetime, timezone
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from osint import __version__, checker                      # noqa: E402
-from osint.verifier import run_local_verifier               # noqa: E402
+from helix_osint import __version__, checker                      # noqa: E402
+from helix_osint.verifier import run_local_verifier               # noqa: E402
 from bench import mockweb                                   # noqa: E402
 
 

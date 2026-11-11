@@ -69,7 +69,7 @@ class sfp_helix(SpiderFootPlugin):
             return
         self.results[username] = True
         try:
-            from osint.api import LeftOut, scan_sync
+            from helix_osint.api import LeftOut, scan_sync
         except ImportError:
             self.error("Helix is not installed for this Python: pip install helix-osint")
             self.errorState = True

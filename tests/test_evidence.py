@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from osint import evidence, netconfig
-from osint.platforms import PLATFORMS
+from helix_osint import evidence, netconfig
+from helix_osint.platforms import PLATFORMS
 
 
 def _r(name, found=False, error=None, source="builtin", **kw):
@@ -203,7 +203,7 @@ def test_abbreviated_flags_are_refused():
 
 def test_verifier_output_is_terminal_safe(tmp_path, capsys, monkeypatch):
     import sys
-    from osint import termsafe
+    from helix_osint import termsafe
     monkeypatch.setattr(sys, "stdout", sys.stdout)       # restored after the test
     ev = evidence.write(str(tmp_path), "jane", dict(
         username="jane\x1b[8m\x1b]0;x\x07", results=RESULTS, platform_map=SITES, started="s",

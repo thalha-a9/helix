@@ -14,9 +14,9 @@ detected, so tightening detection cannot silently zero out the tool.
 
 import pytest
 
-from osint import checker
-from osint.platforms import PLATFORMS
-from osint.verifier import run_local_verifier
+from helix_osint import checker
+from helix_osint.platforms import PLATFORMS
+from helix_osint.verifier import run_local_verifier
 
 ABSENT_USERNAME = "zzqx9nonexistentuser42"
 PRESENT_USERNAME = "janeroe"

@@ -1,6 +1,6 @@
 """False-positive engine: every purge layer needs a positive and a negative case."""
 
-from osint.verifier import (
+from helix_osint.verifier import (
     run_local_verifier, _has_soft_404_content, _has_waf_content,
     _is_registration_api_url, _is_bad_redirect, _username_valid_for_platform,
 )
@@ -136,7 +136,7 @@ def test_suspicious_redirects_are_still_purged(final):
 
 def test_probe_url_recorded_by_checker():
     import asyncio
-    from osint import checker
+    from helix_osint import checker
     r = {"url": "https://www.chess.com/member/x", "confidence": "low", "found": False,
          "bio_links": {}, "og_title": ""}
     asyncio.run(checker._apply(r, {"method": "status_code", "found": [200]}, "x", 200, "{}",

@@ -3,7 +3,7 @@ import os
 import aiohttp
 import pytest
 
-from osint import netconfig
+from helix_osint import netconfig
 
 
 def test_no_proxy_by_default():

@@ -2,8 +2,8 @@
 
 import pytest
 
-from osint import netconfig
-from osint.adapters import holehe_adapter as ha
+from helix_osint import netconfig
+from helix_osint.adapters import holehe_adapter as ha
 
 holehe = pytest.importorskip("holehe")
 

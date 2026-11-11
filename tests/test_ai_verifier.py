@@ -10,7 +10,7 @@ import types
 
 import pytest
 
-from osint.adapters import ai_verifier as ai
+from helix_osint.adapters import ai_verifier as ai
 
 
 class _StatusError(Exception):

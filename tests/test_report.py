@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from osint.report import save_json, save_csv, save_txt
+from helix_osint.report import save_json, save_csv, save_txt
 
 
 @pytest.fixture
@@ -91,7 +91,7 @@ def test_identity_confidence_in_csv_and_txt(tmp_path, results):
 
 
 def test_html_report_shows_identity_and_escapes_evidence(tmp_path, results):
-    from osint.pdf_report import _build_html
+    from helix_osint.pdf_report import _build_html
     results[0]["identity_confidence"] = "MEDIUM"
     results[0]["evidence"] = ["names '<script>x</script>'"]
     html = _build_html("janeroe", results)
@@ -106,7 +106,7 @@ def test_empty_results_do_not_crash(tmp_path):
 
 
 def test_github_intel_is_labelled_with_the_accounts_identity():
-    from osint.pdf_report import _build_html
+    from helix_osint.pdf_report import _build_html
     gh = {"emails": ["x@corp.com"], "orgs": [], "timezone": {}, "npm_packages": []}
     low = _build_html("jane", [{"platform": "GitHub", "found": True, "identity_confidence": "LOW",
                                 "url": "u", "category": "dev"}], github_intel=gh)
@@ -126,7 +126,7 @@ def _found(platform="Dev.to"):
 
 def test_profiles_table_survives_crt_data():
     """--crt reused the profile table's variable name and wiped every profile."""
-    from osint.pdf_report import _build_html
+    from helix_osint.pdf_report import _build_html
     crt = {"all_domains": [], "email_domains": [], "named_domains": ["janeroe.dev"],
            "status": {"username": "ok", "email": "not checked: HTTP 502"}}
     html = _build_html("janeroe", [_found()], crt_data=crt)
@@ -135,7 +135,7 @@ def test_profiles_table_survives_crt_data():
 
 
 def test_email_accounts_and_unchecked_sources_are_reported():
-    from osint.pdf_report import _build_html
+    from helix_osint.pdf_report import _build_html
     emails = [
         {"platform": "office365", "url": "https://office365.com", "found": True},
         {"platform": "spotify", "url": "https://spotify.com", "found": False},
@@ -153,7 +153,7 @@ def test_email_accounts_and_unchecked_sources_are_reported():
 
 
 def test_report_escapes_the_email_and_username():
-    from osint.pdf_report import _build_html
+    from helix_osint.pdf_report import _build_html
     html = _build_html("<b>x</b>", [], email="<script>@x.y")
     assert "<script>@x.y" not in html and "<b>x</b>" not in html
 
@@ -176,7 +176,7 @@ def test_csv_leaves_ordinary_values_alone(tmp_path):
 
 
 def test_email_only_report_is_named_after_the_address(tmp_path):
-    from osint.pdf_report import generate_pdf_report
+    from helix_osint.pdf_report import generate_pdf_report
     rp = generate_pdf_report(username="", results=[], output_dir=str(tmp_path),
                              email="jane.roe@example.com", email_results=[])
     name = os.path.basename(rp["html"])

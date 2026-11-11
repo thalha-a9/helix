@@ -9,11 +9,11 @@ import os
 
 import pytest
 
-from osint import relationships as rel
-from osint.graph import generate_graph
-from osint.pdf_report import _build_html
-from osint.report import save_csv, save_json, save_txt
-from osint.subject import approved_identifiers
+from helix_osint import relationships as rel
+from helix_osint.graph import generate_graph
+from helix_osint.pdf_report import _build_html
+from helix_osint.report import save_csv, save_json, save_txt
+from helix_osint.subject import approved_identifiers
 
 
 def _page(desc):

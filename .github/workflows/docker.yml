@@ -2,7 +2,7 @@ name: Docker
 
 # Publishes ghcr.io/thalha-a9/helix for linux/amd64 and linux/arm64 when a
 # release tag is pushed, or by hand (Actions > Docker > Run workflow) for the
-# version in osint/__init__.py. Changes to the image are build-tested on
+# version in helix_osint/__init__.py. Changes to the image are build-tested on
 # pushes to main and on pull requests, without publishing.
 on:
   push:
@@ -31,7 +31,7 @@ jobs:
       - name: Read the version
         id: version
         run: |
-          v=$(python3 -c "import re; print(re.search(r'__version__\s*=\s*[\"\']([^\"\']+)', open('osint/__init__.py').read()).group(1))")
+          v=$(python3 -c "import re; print(re.search(r'__version__\s*=\s*[\"\']([^\"\']+)', open('helix_osint/__init__.py').read()).group(1))")
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "Helix $v"
 

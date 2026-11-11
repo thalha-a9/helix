@@ -1,0 +1,905 @@
+"""
+Helix: Async Checker Engine
+"""
+
+import asyncio
+import aiohttp
+import hashlib
+import re
+import socket
+from html import unescape as _unescape
+import random
+from urllib.parse import urlparse
+from typing import Optional
+from helix_osint.platforms import PLATFORMS
+from helix_osint import netconfig
+from helix_osint.evidence import _no_answer
+from helix_osint.platform_schema import fallback_defs
+
+try:
+    from curl_cffi.requests import AsyncSession as CurlSession
+    HAS_CURL_CFFI = True
+except ImportError:
+    HAS_CURL_CFFI = False
+
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
+]
+
+def _headers(platform: Optional[dict] = None) -> dict:
+    """Request headers: a browser's, then any the site's definition lists
+    (an app id or an accept type its lookup needs)."""
+    headers = {
+        "User-Agent":      random.choice(USER_AGENTS),
+        "Accept-Language": random.choice(["en-US,en;q=0.9", "en-GB,en;q=0.9"]),
+        "Accept":          "text/html,application/xhtml+xml,*/*;q=0.8",
+        "DNT": "1",
+    }
+    own = (platform or {}).get("headers")
+    if isinstance(own, dict):
+        lower = {k.lower(): k for k in headers}
+        for k, v in own.items():
+            headers.pop(lower.get(str(k).lower(), ""), None)
+            headers[str(k)] = str(v)
+    return headers
+
+TIMEOUT     = aiohttp.ClientTimeout(total=14, connect=7)
+_MAX_BODY_BYTES = 512 * 1024  # 512KB cap: prevents memory exhaustion (#14)
+MAX_RETRIES = 2
+# Large database scans: one short attempt per site. Thousands of dead hosts
+# retried with long timeouts would otherwise dominate the run time.
+FAST_TIMEOUT = aiohttp.ClientTimeout(total=10, connect=5)
+FAST_SCAN_THRESHOLD = 200
+
+
+# WAF / bot-check page detection
+_WAF_SIGNATURES = [
+    "just a moment...", "checking your browser",
+    "enable javascript and cookies", "ddos protection by cloudflare",
+    "attention required!", "incapsula incident",
+    "please verify you are a human",
+]
+
+
+# API response "not found" detection
+_API_URL_PATTERNS = [
+    "/api/", "?username=", "/wp-json/", "_json", "checkusername",
+    "validate/username", "user/exist/", "/accounts/lookup", "username_available",
+    "2017-06-30/users", "api-proxy", "/accounts/", "check-username",
+]
+
+_API_NOT_FOUND_PATTERNS = [
+    # Username invalid / not found patterns from real API responses
+    '"valid":false',        '"valid": false',
+    '"available":true',     '"available": true',   # available=true -> not registered
+    '"users":[]',           '"users": []',
+    '"data":""',            '"data": ""',
+    '"data":[]',            '"data": []',
+    '"msg":"invalid',       '"msg": "invalid',
+    '"isValid":false',      '"isValid": false',
+    '"exists":false',       '"exists": false',
+    '"registered":false',   '"registered": false',
+    '"found":false',        '"found": false',
+    '"error":404',
+    '{"error"',             # any JSON error response
+    '"message":"Not Found"', '"status":"not_found"',
+    'invalid username',     'improper_format',
+    '"result":"ko"',        '"result": "ko"',
+]
+
+_DEAD_SITE_PATTERNS = [
+    "something new is coming", "site is dead", "rip 2004",
+    "under maintenance", "domain is for sale", "parked by godaddy",
+    "this domain is parked", "buy this domain",
+]
+
+def _is_api_url(url: str) -> bool:
+    u = url.lower()
+    return any(p in u for p in _API_URL_PATTERNS)
+
+def _api_says_not_found(text: str) -> bool:
+    """Return True if an API response body explicitly says user doesn't exist."""
+    t = text.strip()
+    # Pure empty array or empty object
+    if t in ("[]", "{}", '{"users":[]}'):
+        return True
+    return any(p in t for p in _API_NOT_FOUND_PATTERNS)
+
+def _is_dead_site(text: str) -> bool:
+    t = text.lower()[:2000]
+    return any(p in t for p in _DEAD_SITE_PATTERNS)
+
+def _is_waf_page(text: str) -> bool:
+    t = text[:3000].lower()
+    return any(sig in t for sig in _WAF_SIGNATURES)
+
+# Hard ceiling for --concurrency. Each in-flight probe holds a socket, so the
+# real limit is the process's file-descriptor allowance (1024 on most Linux
+# defaults); helix.py warns when the requested value gets near it.
+MAX_CONCURRENCY = 1000
+
+
+def _dynamic_concurrency(n: int, override: Optional[int] = None) -> int:
+    """Probes in flight at once: scaled to the scan size, or the analyst's
+    --concurrency value clamped to [1, MAX_CONCURRENCY]."""
+    if override:
+        return max(1, min(int(override), MAX_CONCURRENCY))
+    if n <= 50:  return 20
+    if n <= 200: return 40
+    return 60
+
+def _extract_og_tag(html: str, prop: str) -> Optional[str]:
+    for pat in [
+        rf'<meta[^>]+(?:property|name)=["\']og:{re.escape(prop)}["\'][^>]+content=["\']([^"\']+)["\']',
+        rf'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']og:{re.escape(prop)}["\']',
+    ]:
+        m = re.search(pat, html, re.IGNORECASE)
+        # Sites escape the attribute: Instagram sends "Marco Migozzi (&#064;torvalds) &#x2022; Instagram"
+        if m: return _unescape(m.group(1)).strip()
+    return None
+
+# Markup namespaces, CDNs and trackers that appear in page source but are
+# never a link the account holder posted.
+_BIO_NOISE = (
+    "ogp.me", "opengraphprotocol.org", "schema.org", "w3.org", "purl.org",
+    "xmlns.com", "gmpg.org", "fonts.googleapis.com", "fonts.gstatic.com",
+    "gstatic.com", "googletagmanager.com", "google-analytics.com",
+    "githubassets.com", "gitlab-static.net", "cloudflareinsights.com",
+    "cdnjs.cloudflare.com", "jsdelivr.net", "unpkg.com", "gravatar.com/avatar",
+    # The platform's own media CDNs: avatars and banners, not links the user posted
+    "twimg.com", "fbcdn.net", "cdninstagram.com", "tiktokcdn.com", "redditmedia.com",
+    "redd.it", "ytimg.com", "ggpht.com", "googleusercontent.com", "licdn.com",
+    "githubusercontent.com", "akamaihd.net", "cloudfront.net",
+    # Platforms' official onion mirrors, present on every one of their pages
+    "twitter3e4tixl4xyajtrzo62zg5vztmjuricljdp2c5kshju4avyoid.onion",
+    "facebookwkhpilnemxj7asaniu7vnjjbiltxjqhye3mhbshg7kx5tfyd.onion",
+)
+_MEDIA_EXT = re.compile(r"\.(?:jpe?g|png|gif|webp|svg|ico|bmp|avif|mp4|webm|css|js|woff2?)(?:[?#].*)?$", re.I)
+
+
+_SHORTENER_ROOT = re.compile(r"^https?://(?:t\.co|bit\.ly|lnkd\.in|goo\.gl|ow\.ly|buff\.ly)/?$", re.I)
+
+
+def _is_bio_noise(value: str) -> bool:
+    v = value.lower()
+    return (any(n in v for n in _BIO_NOISE) or bool(_MEDIA_EXT.search(v))
+            or bool(_SHORTENER_ROOT.match(v)))      # "https://t.co" in X's page chrome
+
+
+def _site_of(url: str) -> str:
+    host = (urlparse(url if "://" in url else "https://" + url).hostname or "").lower()
+    parts = host.split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else host
+
+
+def _drop_self_links(links: dict, profile_url: str, platform: str) -> dict:
+    """A profile page links to its own site everywhere (canonical URL, share
+    buttons, the platform's own handle). Those are not links the user posted."""
+    own = _site_of(profile_url)
+    plat = re.sub(r"[^a-z0-9]", "", (platform or "").lower())
+    out = {}
+    for key, value in links.items():
+        if re.sub(r"[^a-z0-9]", "", key.lower()) == plat:
+            continue                              # "devto" handle on Dev.to itself
+        if "://" in value or "." in value.split("/")[0]:
+            if own and _site_of(value) == own:
+                continue                          # dev.to/jack on dev.to, linktr.ee/jack on Linktree
+        out[key] = value
+    return out
+
+
+# Site paths that the handle patterns can capture but that are never a user:
+# youtube.com/channel/..., twitter.com/intent/..., instagram.com/p/..., github.com/features ...
+_RESERVED_PATHS = {
+    "channel", "watch", "embed", "results", "feed", "playlist", "shorts", "live", "c", "user",
+    "intent", "share", "home", "i", "search", "hashtag", "explore", "p", "reel", "reels",
+    "stories", "accounts", "about", "login", "signup", "join", "settings", "privacy", "terms",
+    "help", "features", "pricing", "sponsors", "orgs", "topics", "trending", "marketplace",
+    "enterprise", "security", "notifications", "new", "site", "tos", "legal", "jobs",
+    "company", "school", "pub", "in", "tag", "tags", "privacy-policy", "en", "static",
+}
+
+
+def _extract_bio_links(html: str, patterns: dict) -> dict:
+    out = {}
+    for key, pat in patterns.items():
+        for m in re.finditer(pat, html, re.IGNORECASE):
+            handle = m.group(1).rstrip("/").strip()
+            if key != "website" and handle.lower() in _RESERVED_PATHS:
+                continue
+            if handle and not _is_bio_noise(handle):
+                out[key] = handle
+                break
+    return out
+
+
+async def check_platform(session, name: str, platform: dict,
+                         username: str, semaphore: asyncio.Semaphore,
+                         fast: bool = False, capture: bool = False) -> dict:
+    """
+    One username on one platform. With capture=True a hit also carries
+    `_capture`: the raw response, headers and UTC time (see helix_osint.capture).
+    """
+    display_url = platform["url"].replace("{username}", username)
+    # check_url: separate probe URL (API endpoint): falls back to display_url
+    probe_url   = platform.get("check_url", platform["url"]).replace("{username}", username)
+
+    result = {
+        "platform": name, "url": display_url, "category": platform["category"],
+        "color": platform["color"], "found": False, "error": None,
+        "confidence": "low", "bio_links": {}, "target_type": "username",
+        "source": platform.get("source", "builtin"), "status_code": None, "og_title": "",
+        "detection_method": platform.get("method", ""),
+    }
+
+    # Skip WAF-only platforms when curl_cffi unavailable
+    if platform.get("requires_tls") and not HAS_CURL_CFFI:
+        result["error"] = "requires curl_cffi (pip install curl-cffi)"
+        return result
+
+    async with semaphore:
+        await asyncio.sleep(0.03 + (hash(name) % 15) * 0.01)
+
+        retries = 0 if fast else MAX_RETRIES
+        timeout = FAST_TIMEOUT if fast else TIMEOUT
+        for attempt in range(retries + 1):
+            try:
+                if HAS_CURL_CFFI and platform.get("tls_impersonate"):
+                    async with CurlSession(impersonate="chrome120") as curl:
+                        r   = await curl.get(probe_url, headers=_headers(platform), timeout=timeout.total,
+                                             allow_redirects=True, **netconfig.curl_kwargs())
+                        await _apply(result, platform, username, r.status_code, r.text, str(r.url), probe_url)
+                        if capture and result["found"]:
+                            result["_capture"] = _snap(r.status_code, probe_url, str(r.url),
+                                                       r.headers, r.content)
+                else:
+                    # Increase read_bufsize to handle large headers (fixes Twitter 8190-byte error)
+                    async with session.get(
+                        probe_url, headers=_headers(platform), timeout=timeout,
+                        allow_redirects=True, ssl=True,
+                        read_bufsize=2**16, **netconfig.request_kwargs(),
+                    ) as r:
+                        raw_bytes = await netconfig.read_body(r, _MAX_BODY_BYTES)
+                        text = raw_bytes.decode("utf-8", errors="ignore")
+                        await _apply(result, platform, username, r.status, text, str(r.url), probe_url)
+                        wait = _retry_after(r.headers)
+                        if wait is not None:
+                            result["_retry_after"] = wait
+                        if capture and result["found"]:
+                            result["_capture"] = _snap(r.status, probe_url, str(r.url),
+                                                       r.headers, raw_bytes)
+                result["status_code"] = result.get("status_code")
+                break
+
+            except asyncio.TimeoutError:
+                result["error"] = "timeout"
+                if attempt < retries: await asyncio.sleep(1.5 * (attempt + 1))
+            except aiohttp.ClientConnectorError as e:
+                result["error"] = _connect_error(e); break
+            except aiohttp.ClientError as e:
+                result["error"] = str(e)[:80]; break
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                result["error"] = f"unexpected: {str(e)[:60]}"; break
+
+    return result
+
+
+DNS_ERROR = "connection_error: host name does not resolve"
+DNS_TEMPORARY = "connection_error: name lookup failed"
+CERT_ERROR = "connection_error: invalid HTTPS certificate"
+
+
+def _connect_error(e: Exception) -> str:
+    """Why a connection failed, as far as it can be told. A host name that
+    does not resolve is a dead site, not a busy one, and a certificate error
+    will not go away on a second attempt, so both are named."""
+    if isinstance(e, getattr(aiohttp, "ClientConnectorCertificateError", ())):
+        return CERT_ERROR
+    os_error = getattr(e, "os_error", None)
+    if isinstance(os_error, socket.gaierror):
+        temporary = os_error.errno == getattr(socket, "EAI_AGAIN", -3)
+        return DNS_TEMPORARY if temporary else DNS_ERROR
+    return "connection_error"
+
+
+def _retry_after(headers) -> Optional[float]:
+    """Seconds a rate-limited site asked for (Retry-After), when it said."""
+    try:
+        value = headers.get("Retry-After")
+        return max(0.0, float(value)) if value is not None else None
+    except (TypeError, ValueError, AttributeError):
+        return None                    # an HTTP date, or no usable header
+
+
+def _snap(status, requested_url, final_url, headers, body) -> dict:
+    from helix_osint.capture import snapshot
+    return snapshot(status, requested_url, final_url, headers, body or b"", _MAX_BODY_BYTES)
+
+
+def names_user(text: str, username: str) -> bool:
+    """The page names this exact user, not just a longer name containing it
+    ("Cjacker" or "jackie" on a search page is not "jack")."""
+    if not text or not username:
+        return False
+    pat = r"(?<![A-Za-z0-9])" + re.escape(username) + r"(?![A-Za-z0-9])"
+    return re.search(pat, text, re.I) is not None
+
+
+async def _apply(result: dict, platform: dict, username: str,
+                 status: int, text: str, final_url: str, probe_url: str = ""):
+    result["final_url"] = final_url
+    result["probe_url"] = probe_url or result.get("url", "")
+
+    # WAF detection: catches Cloudflare/bot-check 200s before any method logic
+    if text and _is_waf_page(text):
+        result["found"]  = False
+        result["error"]  = "waf_blocked: bot-check page detected"
+        result["confidence"] = "low"
+        return
+
+    method = platform["method"]
+    result["status_code"] = status
+
+    if method == "status_code":
+        result["found"] = status in platform.get("found", [200])
+        # A status code alone cannot tell a profile from a catch-all page that
+        # answers 200 for any name (forum homepages, sign-in redirects). A real
+        # profile page names its user; VK-style login walls opt out.
+        if (result["found"] and platform.get("name_in_page", True)
+                and not names_user(text, username)):
+            result["found"] = False
+        if result["found"]: result["confidence"] = "medium"
+        # For suspicious WMN status_code-only entries, also read body
+        # so the verifier's soft-404 layer can catch false positives
+        if result["found"] and platform.get("wmn_soft404_risk") and text:
+            from helix_osint.verifier import _has_soft_404_content
+            if _has_soft_404_content(text):
+                result["found"] = False
+                result["error"] = "soft404_body: page body indicates user not found"
+
+    elif method == "text_not_present":
+        nfs = [t for t in (platform.get("not_found_texts")
+                           or [platform.get("not_found_text", "")]) if t]
+        # Absence of the not-found text alone is weak: a rate-limit page, an
+        # error page or changed wording lacks it too. A real profile page
+        # names its user, so require that as well.
+        result["found"] = ((status == 200) and not any(t in text for t in nfs)
+                           and names_user(text, username))
+        if result["found"]: result["confidence"] = "medium"
+
+    elif method == "text_present":
+        # Any one of the found texts will do ({username} is filled in). A
+        # text that is the same on every profile ("js-user-profile-actions")
+        # says a profile was shown, not whose: name_in_page asks for the name.
+        fts = [t.replace("{username}", username).lower()
+               for t in (platform.get("found_texts") or [platform.get("found_text", "")]) if t]
+        low = text.lower()
+        result["found"] = (status == 200) and any(ft in low for ft in fts)
+        if result["found"] and platform.get("name_in_page") and not names_user(text, username):
+            result["found"] = False
+        if result["found"]: result["confidence"] = "medium"
+
+    elif method == "response_url":
+        err_url = platform.get("error_url", "")
+        result["found"] = (status == 200) and (err_url not in final_url)
+        if result["found"]: result["confidence"] = "medium"
+
+    elif method == "og_meta":
+        og_title = _extract_og_tag(text, "title") or ""
+        og_desc  = _extract_og_tag(text, "description") or ""
+        nf_list  = platform.get("og_not_found", [])
+        f_list   = platform.get("og_found", [])
+
+        if status != 200:
+            result["found"] = False
+        elif nf_list:
+            hit = any(s.lower() in og_title.lower() or s.lower() in og_desc.lower()
+                      for s in nf_list)
+            result["found"] = not hit and bool(og_title)
+        elif f_list:
+            # Replace {username} in og_found patterns
+            result["found"] = any(
+                s.replace("{username}", username).lower() in og_title.lower()
+                for s in f_list
+            )
+        else:
+            result["found"] = status == 200
+
+        if result["found"]:
+            result["confidence"] = "high"
+            if og_title: result["og_title"] = og_title
+
+    # Extract avatar URL from og:image for pHash
+    if result["found"] and text:
+        og_img = _extract_og_tag(text, "image")
+        if og_img and og_img.startswith("http"):
+            result["avatar_url"] = og_img
+
+    # Store condensed page text for verifier content-based checks (6000 chars max)
+    if text:
+        result["_page_text"] = text[:6000]
+
+    # Bio extraction on confirmed profiles
+    if result["found"] and platform.get("bio_extract") and text:
+        bio_pats = platform.get("bio_patterns", {})
+        if bio_pats:
+            result["bio_links"] = _drop_self_links(
+                _extract_bio_links(text, bio_pats), result.get("url", ""), result["platform"])
+
+
+CONTROL_ERROR = "unverifiable: platform also reports a random nonexistent username as found"
+CONTROL_INCONCLUSIVE = "unverifiable: no clear 'not found' for a random username (blocked, rate-limited or erroring)"
+RECHECK_ERROR = "unverifiable: hit did not reproduce on re-check"
+CONTROL_UNCONFIRMED = ("unconfirmed: a made-up name the same length as this one was also found "
+                       "(the site may accept any short name, or that name is taken)")
+CONTROL_RETRY_DELAY = 3.0
+
+# For the random username, these answers say nothing about whether the site
+# can tell names apart: rate limits, challenges, gateway and edge errors.
+# Every other clear status is the site's answer for an unknown name, usually
+# 404, but some sites answer 400, 403, 410 or even 500 ("Interner
+# Serverfehler" for unknown users), and that still differs from a profile.
+_TRANSIENT_STATUSES = {202, 408, 425, 429, 502, 503, 504, 999} | set(range(520, 531))
+_CONTENT_METHODS = ("text_not_present", "text_present", "og_meta", "response_url")
+
+
+def definitive_negative(control: dict, platform: dict) -> bool:
+    """True when a check got a genuine "no such user" answer."""
+    if control.get("found") or control.get("error"):
+        return False
+    status = control.get("status_code")
+    if status is None or status in _TRANSIENT_STATUSES:
+        return False
+    # A 200 is a real negative only where the method read not-found evidence
+    # from the page content (not-found text present, profile marker absent).
+    return status != 200 or platform.get("method") in _CONTENT_METHODS
+
+
+CONTROL_MIN_RANDOM = 12
+
+# Made-up names checked against every hit: two shaped like the name (at least
+# CONTROL_MIN_RANDOM random characters), then the rest, which for a name
+# shorter than those two are of exactly its length. --controls raises it for
+# strict use.
+DEFAULT_CONTROLS = 3
+
+
+def control_username(shape: str = "", keep_leading_digits: bool = False) -> str:
+    """
+    A username nobody has, in the same shape as `shape`: the same punctuation
+    in the same places (a leading dot, an underscore, a hyphen), every run of
+    letters and digits replaced by random ones, and at least 12 random
+    characters in all, so it cannot collide with a real account.
+
+    The shape matters: sites treat some names specially. dev.to answered a
+    leading-dot path like a profile while plain random names got a clean 404,
+    so ".name" passed a control that never had a dot in it.
+
+    With keep_leading_digits, a username that starts with digits keeps them.
+    Some sites read only the leading number as a member id: forum.quik.ru
+    served member #4's profile for "4tj4jneu4byr", while controls starting
+    with other digits got a clean 404, so the made-up name passed as found.
+    """
+    if keep_leading_digits:
+        m = re.match(r"\d+", shape or "")
+        if m:
+            return m.group(0) + control_username(shape[m.end():])
+    rng = random.SystemRandom()
+    letters, alnum = "abcdefghijklmnopqrstuvwxyz", "abcdefghijklmnopqrstuvwxyz0123456789"
+    parts = re.findall(r"[A-Za-z0-9]+|[^A-Za-z0-9]+", shape or "")
+    runs = [i for i, p in enumerate(parts) if p[0].isalnum()]
+    if not runs:                                      # no shape, or punctuation only
+        parts.append("x")
+        runs = [len(parts) - 1]
+    lengths = {i: len(parts[i]) for i in runs}
+    longest = max(runs, key=lambda i: lengths[i])
+    lengths[longest] += max(0, CONTROL_MIN_RANDOM - sum(lengths.values()))
+    out = []
+    for i, p in enumerate(parts):
+        if i not in lengths:
+            out.append(p)
+            continue
+        first = rng.choice(letters if (p[0].isalpha() or not shape) else "0123456789")
+        out.append(first + "".join(rng.choice(alnum) for _ in range(lengths[i] - 1)))
+    return "".join(out)
+
+
+def same_length_control(shape: str) -> str:
+    """
+    A made-up name exactly as long as `shape`, same punctuation in the same
+    places, each run of letters and digits replaced by random ones.
+
+    The usual controls are padded to CONTROL_MIN_RANDOM characters so they
+    cannot collide with a real account, but that lets a site that accepts any
+    short name and refuses longer ones (400 "invalid", or a 404 from a route
+    that only matches short names) answer every control with a clean "not
+    found" while "finding" the short name searched for. A control of the same
+    length is answered by the same rule. For a short name it can be a real
+    account, so a hit it contradicts is reported as unconfirmed, not dropped.
+    """
+    rng = random.SystemRandom()
+    letters, alnum = "abcdefghijklmnopqrstuvwxyz", "abcdefghijklmnopqrstuvwxyz0123456789"
+    out = []
+    for p in re.findall(r"[A-Za-z0-9]+|[^A-Za-z0-9]+", shape or "x"):
+        if not p[0].isalnum():
+            out.append(p)
+            continue
+        first = rng.choice(letters if p[0].isalpha() else "0123456789")
+        out.append(first + "".join(rng.choice(alnum) for _ in range(len(p) - 1)))
+    return "".join(out)
+
+
+def _extra_controls(username: str, first: str, controls: int) -> tuple:
+    """(names, same_length): the controls beyond the first two."""
+    same_length = len(first) != len(username)
+    n = max(controls - 2, 1 if same_length else 0)
+    make = same_length_control if same_length else control_username
+    names, taken = [], {username.lower(), first.lower()}
+    for _ in range(n):
+        c = make(username)
+        for _retry in range(20):
+            if c.lower() not in taken:
+                break
+            c = make(username)
+        else:
+            continue            # a one- or two-character name has few others
+        taken.add(c.lower())
+        names.append(c)
+    return names, same_length
+
+
+async def _control_probe(session, results: list, plat_map: dict,
+                         semaphore: asyncio.Semaphore, username: str,
+                         controls: int = DEFAULT_CONTROLS) -> list:
+    """
+    Re-check every hit with a username that cannot exist. A platform that
+    "finds" it too returns the same answer for any name (login walls, catch-all
+    pages, changed markup), so its hit is evidence of nothing and is discarded.
+    Returns the names of the discarded platforms.
+    """
+    hits = [r for r in results if r.get("found")]
+    if not hits:
+        return []
+    ctrl = control_username(username)
+    while ctrl.lower() == username.lower():
+        ctrl = control_username(username)
+
+    # The second control keeps any leading digits, so a site that only reads
+    # the leading number (a member id) "finds" it too and is caught.
+    ctrl2 = control_username(username, keep_leading_digits=True)
+    while ctrl2.lower() in (username.lower(), ctrl.lower()):
+        ctrl2 = control_username(username, keep_leading_digits=True)
+    extras, same_length = _extra_controls(username, ctrl, controls)
+
+    async def settled(pdef, name, platform):
+        """One check, retried once if the answer was transient (429, timeout...)."""
+        r = await check_platform(session, platform, pdef, name, semaphore)
+        if not r.get("found") and not definitive_negative(r, pdef):
+            await asyncio.sleep(CONTROL_RETRY_DELAY)
+            r = await check_platform(session, platform, pdef, name, semaphore)
+        return r
+
+    async def verify_with(pdef, name):
+        """(reason, blocked): the whole probe read by one rule. `blocked` says
+        the rule got no clear answer, as opposed to a wrong one."""
+        # Hit and control are fetched together so both answers come from the
+        # same moment: a site that served the scan a transient 200 (overload,
+        # error page) and a clean 404 a minute later must not "confirm" it.
+        control, again = await asyncio.gather(settled(pdef, ctrl, name),
+                                              settled(pdef, username, name))
+        if control.get("found"):
+            return CONTROL_ERROR, False
+        if not definitive_negative(control, pdef):
+            return CONTROL_INCONCLUSIVE, True
+        if not again.get("found"):
+            # A hit that now gets a refusal or an error was blocked, which is
+            # not the same as the site saying the account is gone.
+            return RECHECK_ERROR, bool(_no_answer(again))
+        # A second random name must get the same "no such user" answer: a
+        # one-off 403/500 under load is not the site's answer for unknown names.
+        control2 = await settled(pdef, ctrl2, name)
+        if control2.get("found"):
+            return CONTROL_ERROR, False
+        if not definitive_negative(control2, pdef):
+            return CONTROL_INCONCLUSIVE, True
+        if control2.get("status_code") != control.get("status_code"):
+            return CONTROL_INCONCLUSIVE, False
+        for extra in extras:
+            r = await settled(pdef, extra, name)
+            if r.get("found"):
+                return (CONTROL_UNCONFIRMED if same_length else CONTROL_ERROR), False
+            if not definitive_negative(r, pdef):
+                return CONTROL_INCONCLUSIVE, True
+        # And the hit must hold a third time. A site that answers unknown names
+        # at random now has to land "found" three times and "not found" twice
+        # in a row to slip through.
+        last = await settled(pdef, username, name)
+        if not last.get("found"):
+            return RECHECK_ERROR, bool(_no_answer(last))
+        return None, False
+
+    async def verify(hit):
+        name = hit["platform"]
+        pdef = plat_map[name]
+        reason, blocked = await verify_with(pdef, name)
+        if not blocked:
+            return reason
+        # The rule was blocked part of the way (rate limit, bot check). Where
+        # the site can be asked another way, the whole probe is run again by
+        # that rule alone: the hit twice more and every made-up name.
+        for other in fallback_defs(pdef):
+            again, again_blocked = await verify_with(other, name)
+            if again is None:
+                hit["verified_by"] = "fallback"
+                return None
+            if not again_blocked:
+                return again
+        return reason
+
+    reasons = await asyncio.gather(*(verify(h) for h in hits))
+    discarded = []
+    for hit, reason in zip(hits, reasons):
+        if reason == CONTROL_UNCONFIRMED:
+            hit["found"] = False
+            hit["error"] = reason
+            hit["unconfirmed"] = True
+        elif reason:
+            hit["found"] = False
+            hit["error"] = reason
+            hit["control_failed"] = True
+            discarded.append(hit["platform"])
+    return discarded
+
+
+# The fast sweep makes one short attempt per site. With many probes in flight
+# a slow link makes healthy sites miss that window, so timed-out sites get one
+# more attempt at this calmer concurrency (the control probe runs at it too).
+CALM_CONCURRENCY = 60
+
+# At the calm limit most timeouts are dead hosts, and retrying them costs more
+# than it finds. Retry only when the sweep ran hotter than the calm limit or
+# when enough sites timed out that the link was clearly overloaded.
+RETRY_TIMEOUT_SHARE = 0.05
+
+
+def should_retry_timeouts(timed_out: int, total: int, limit: int, forced=None) -> bool:
+    if not timed_out:
+        return False
+    if forced is not None:
+        return bool(forced)
+    return limit > CALM_CONCURRENCY or timed_out > total * RETRY_TIMEOUT_SHARE
+
+
+async def _retry_timeouts(session, results: list, plat_map: dict, username: str,
+                          concurrency: int, capture: bool = False) -> int:
+    """Re-check every site whose first attempt timed out. Returns how many."""
+    idx = [i for i, r in enumerate(results) if r.get("error") == "timeout"]
+    if not idx:
+        return 0
+    sem = asyncio.Semaphore(concurrency)
+    again = await asyncio.gather(*(
+        check_platform(session, results[i]["platform"], plat_map[results[i]["platform"]],
+                       username, sem, fast=True, **({"capture": True} if capture else {}))
+        for i in idx))
+    for i, r in zip(idx, again):
+        r["retried"] = True
+        results[i] = r
+    return len(idx)
+
+
+# Second attempt
+
+# Seconds to wait before asking a site again, by what stood in the way.
+RECOVERY_WAIT = {"rate": 6.0, "server": 3.0}
+MAX_RETRY_AFTER = 20.0
+
+
+def unanswered_kind(r: dict) -> str:
+    """
+    '' when the result is a clear answer (the counting rule in helix_osint.evidence),
+    else what stood in the way: timeout, dns, certificate, connect, botcheck,
+    rate, refused, server, or other.
+    """
+    if not _no_answer(r):
+        return ""
+    error = str(r.get("error") or "")
+    if error:
+        if error == "timeout":
+            return "timeout"
+        if error == DNS_ERROR:
+            return "dns"
+        if error == CERT_ERROR:
+            return "certificate"
+        if error.startswith(("connection_error", "Server disconnected", "Cannot connect")):
+            return "connect"
+        if error.startswith("waf_blocked"):
+            return "botcheck"
+        return "other"
+    status = r.get("status_code")
+    if status == 429:
+        return "rate"
+    if status in (401, 403, 407, 451, 999):
+        return "refused"
+    return "server"
+
+
+# Not asked a second time: a host name that does not exist and a broken
+# certificate stay that way, timeouts have their own retry rule above, and
+# the last two are verdicts, not failures.
+_NO_SECOND_ATTEMPT = ("dns", "certificate", "timeout")
+_FINAL_ERRORS = ("requires curl_cffi", "soft404_body")
+
+
+async def _recover(session, results: list, plat_map: dict, username: str,
+                   concurrency: int, capture: bool = False, recover_cb=None) -> dict:
+    """
+    One more attempt for every site that gave no clear answer, in this order:
+
+      1. another way to ask the same site, where its definition lists one
+         (`fallbacks`: WebFinger on a fediverse server whose API is limited);
+      2. the same request again, after the pause a rate limit or server
+         error calls for;
+      3. the same request with a browser's TLS fingerprint, when curl_cffi
+         is installed and the site answered with a bot check or a refusal.
+
+    A result is replaced only by a clear answer. Hits found here go through
+    the control probe like any other, read by the rule that found them: the
+    returned map gives that rule for every site it changed.
+    """
+    kw = {"capture": True} if capture else {}
+    todo = []
+    for i, r in enumerate(results):
+        kind = unanswered_kind(r)
+        if not kind or kind in _NO_SECOND_ATTEMPT:
+            continue
+        if str(r.get("error") or "").startswith(_FINAL_ERRORS):
+            continue
+        todo.append((i, kind))
+    changed = {}
+    if not todo:
+        return changed
+    if recover_cb:
+        recover_cb(len(todo))
+    sem = asyncio.Semaphore(concurrency)
+
+    async def second_attempt(i, kind):
+        first = results[i]
+        name = first["platform"]
+        pdef = plat_map[name]
+        for other in fallback_defs(pdef):
+            r = await check_platform(session, name, other, username, sem, fast=True, **kw)
+            if not unanswered_kind(r):
+                return r, "fallback", other
+        wait = RECOVERY_WAIT.get(kind, 0.0)
+        if kind == "rate" and first.get("_retry_after") is not None:
+            wait = first["_retry_after"]
+        if wait:
+            await asyncio.sleep(min(wait, MAX_RETRY_AFTER))
+        r = await check_platform(session, name, pdef, username, sem, fast=True, **kw)
+        if not unanswered_kind(r):
+            return r, "retry", None
+        if (HAS_CURL_CFFI and not pdef.get("tls_impersonate")
+                and unanswered_kind(r) in ("botcheck", "refused")):
+            as_browser = {**pdef, "tls_impersonate": True}
+            r = await check_platform(session, name, as_browser, username, sem, fast=True, **kw)
+            if not unanswered_kind(r):
+                return r, "tls", as_browser
+        return None, "", None
+
+    outcomes = await asyncio.gather(*(second_attempt(i, kind) for i, kind in todo))
+    for (i, _kind), (r, how, rule) in zip(todo, outcomes):
+        if r is None:
+            continue
+        r["recovered"] = how
+        results[i] = r
+        if rule is not None:
+            changed[r["platform"]] = rule
+    return changed
+
+
+async def check_username(username: str, platforms: dict = None, progress_cb=None,
+                         control: bool = True, concurrency: Optional[int] = None,
+                         retry_cb=None, retry_timeouts: Optional[bool] = None,
+                         capture: bool = False, controls: int = DEFAULT_CONTROLS,
+                         recover: bool = True, recover_cb=None) -> list:
+    """
+    Check one username on every platform. Large maps run a fast single-attempt
+    sweep, then (see should_retry_timeouts; retry_timeouts=True/False forces
+    it) retry the sites that timed out, calling retry_cb(count) first. Sites
+    that still gave no clear answer get a second attempt (see _recover;
+    recover=False skips it, recover_cb(count) is called first), then the
+    control probe verifies every hit.
+    """
+    plat_map  = platforms or PLATFORMS
+    n         = len(plat_map)
+    limit     = _dynamic_concurrency(n, concurrency)
+    calm      = min(limit, CALM_CONCURRENCY)
+    fast      = n > FAST_SCAN_THRESHOLD
+    semaphore = asyncio.Semaphore(limit)
+    results   = []
+    done      = 0
+
+    connector = netconfig.build_connector(limit=limit, force_close=True)
+    async with netconfig.new_session(connector=connector) as session:
+        tasks = [
+            check_platform(session, name, plat, username, semaphore, fast=fast,
+                           **({"capture": True} if capture else {}))
+            for name, plat in plat_map.items()
+        ]
+        for coro in asyncio.as_completed(tasks):
+            result = await coro
+            results.append(result)
+            done += 1
+            if progress_cb: progress_cb(done, n)
+        if fast:
+            timed_out = sum(1 for r in results if r.get("error") == "timeout")
+            if should_retry_timeouts(timed_out, n, limit, retry_timeouts):
+                if retry_cb:
+                    retry_cb(timed_out)
+                await _retry_timeouts(session, results, plat_map, username, calm, capture)
+        if recover:
+            changed = await _recover(session, results, plat_map, username, calm,
+                                     capture, recover_cb)
+            if changed:
+                plat_map = {**plat_map, **changed}
+        if control:
+            await _control_probe(session, results, plat_map,
+                                 asyncio.Semaphore(calm), username, controls)
+    for r in results:
+        r.pop("_retry_after", None)
+    return results
+
+
+async def check_email(email: str, progress_cb=None) -> list:
+    normalized  = email.strip().lower()
+    email_hash  = hashlib.sha256(normalized.encode()).hexdigest()  # #4 SHA256 not MD5
+    results     = []
+
+    checks = [{
+        "platform": "Gravatar", "category": "other", "color": "#1E8CBE",
+        "probe":    f"https://www.gravatar.com/avatar/{email_hash}?d=404",
+        "display":  f"https://en.gravatar.com/{email_hash}",
+    }]
+
+    connector = netconfig.build_connector(limit=10, force_close=True)
+    async with netconfig.new_session(connector=connector) as session:
+        for i, chk in enumerate(checks):
+            r = {
+                "platform": chk["platform"], "url": chk["display"],
+                "category": chk["category"], "color": chk["color"],
+                "found": False, "error": None, "confidence": "high",
+                "bio_links": {}, "target_type": "email", "source": "builtin",
+            }
+            try:
+                async with session.get(chk["probe"], headers=_headers(),
+                                       timeout=TIMEOUT, ssl=True) as resp:
+                    # d=404: 200 = an avatar exists for this address, 404 = none.
+                    # Anything else (429, 5xx) says nothing either way.
+                    r["found"] = resp.status == 200
+                    if resp.status not in (200, 404):
+                        r["error"] = f"not checked: HTTP {resp.status}"
+            except Exception as e:
+                r["error"] = f"not checked: {netconfig.redact(str(e))[:50] or type(e).__name__}"
+            results.append(r)
+            if progress_cb: progress_cb(i + 1, len(checks))
+    return results
+
+
+def validate_username(u: str):
+    if not u: return False, "Username cannot be empty"
+    if len(u) > 50: return False, "Username too long (max 50)"
+    if not re.match(r'^[a-zA-Z0-9._\-]+$', u):
+        return False, "Invalid characters (allowed: a-z 0-9 . _ -)"
+    return True, ""
+
+def validate_email(e: str):
+    if re.match(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$', e):
+        return True, ""
+    return False, "Invalid email format"

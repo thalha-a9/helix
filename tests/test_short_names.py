@@ -20,9 +20,9 @@ import threading
 import pytest
 
 from bench import benchmark
-from osint import evidence
-from osint.adapters import maigret_engine as me
-from osint.checker import (CONTROL_UNCONFIRMED, DEFAULT_CONTROLS, _extra_controls,
+from helix_osint import evidence
+from helix_osint.adapters import maigret_engine as me
+from helix_osint.checker import (CONTROL_UNCONFIRMED, DEFAULT_CONTROLS, _extra_controls,
                            check_username, control_username, same_length_control)
 
 LIMIT = 11
@@ -70,7 +70,7 @@ def _plats(base, kinds):
 
 @pytest.fixture(autouse=True)
 def no_wait(monkeypatch):
-    from osint import checker
+    from helix_osint import checker
     monkeypatch.setattr(checker, "CONTROL_RETRY_DELAY", 0)
 
 
@@ -134,7 +134,7 @@ async def test_maigret_engine_leads_on_short_catch_alls_are_unconfirmed(site):
             "_page_text": "<html><h1>@jane</h1></html>"}
     ctrls = (control_username("jane"), control_username("jane", keep_leading_digits=True),
              same_length_control("jane"))
-    from osint import netconfig
+    from helix_osint import netconfig
     async with netconfig.new_session() as session:
         await me._control_check(session, lead, "jane", ctrls, asyncio.Semaphore(2))
     assert not lead["found"] and lead.get("unconfirmed")
@@ -150,7 +150,7 @@ def test_benchmark_has_short_catch_alls_and_reports_none():
 
 def test_unconfirmed_sites_are_listed_in_the_json_report(tmp_path):
     import json
-    from osint.report import save_json
+    from helix_osint.report import save_json
     results = [{"platform": "A", "found": True, "url": "u"},
                {"platform": "B", "found": False, "error": CONTROL_UNCONFIRMED, "unconfirmed": True},
                {"platform": "C", "found": False}]

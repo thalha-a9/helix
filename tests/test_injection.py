@@ -10,9 +10,9 @@ no dialog fired with every node and link clicked.)
 import copy
 import re
 
-from osint import capture
-from osint.graph import generate_graph
-from osint.pdf_report import _build_html
+from helix_osint import capture
+from helix_osint.graph import generate_graph
+from helix_osint.pdf_report import _build_html
 from test_relationships import DARK, EDGE, VERDICT
 
 X = '"><script>alert("x1")</script><img src=x onerror=alert("x2")><svg onload=alert("x3")>'

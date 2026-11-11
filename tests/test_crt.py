@@ -7,7 +7,7 @@ import threading
 
 import pytest
 
-from osint.modules import crt
+from helix_osint.modules import crt
 
 # Names from the live crt.sh answer for "krisnova.%" (Oct 2026)
 LIVE_NAMES = ["krisnova.co.uk", "*.krisnova.com", "krisnova.com.mx", "krisnova.edumer.org",

@@ -12,7 +12,7 @@
 ### Decode the digital DNA of any identity
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-4.0.0-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
+[![Version](https://img.shields.io/badge/Version-4.1.0-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
 [![License](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)](LICENSE)
 [![Platforms](https://img.shields.io/badge/Platforms-56%20builtin%20%7C%208%2C305%20with%20--all-a78bfa?style=flat-square)](https://github.com/thalha-a9/helix)
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-reproducible%20%7C%200%20false%20positives-00ff88?style=flat-square)](bench/README.md)
@@ -343,9 +343,11 @@ no usable answer, Helix tries the provider's next model, and
 
 ```
 helix/
-|-- helix.py                         # CLI entry point + orchestrator
+|-- helix.py                         # Starts the CLI from a source checkout (not installed)
 |-- pyproject.toml                   # pip installable (helix-osint)
-|-- osint/
+|-- helix_osint/                     # The one package that is installed
+|   |-- cli.py                       # CLI entry point + orchestrator (helix-osint, python -m helix_osint)
+|   |-- api.py                       # The scan as a library: helix_osint.api.scan
 |   |-- checker.py                   # Async engine (aiohttp + optional curl_cffi)
 |   |-- platforms.py                 # 56 platform definitions with OG/API detection
 |   |-- verifier.py                  # Local heuristic false-positive engine
@@ -542,7 +544,7 @@ Security problems go through [SECURITY.md](SECURITY.md), privately.
 
 ## Use it from other tools
 
-- **Python:** `from osint.api import scan_sync; report = scan_sync("johndoe", sources="all")` runs the same scan as the command line and returns one dictionary.
+- **Python:** `from helix_osint.api import scan_sync; report = scan_sync("johndoe", sources="all")` runs the same scan as the command line and returns one dictionary.
 - **Maltego and SpiderFoot:** a local transform and a module in [`integrations/`](integrations/README.md). Both are tested against the formats the two tools document. Neither has yet been run inside Maltego or SpiderFoot itself.
 
 ---

@@ -1,4 +1,4 @@
-"""Rebuild osint/fediverse_servers.py: the fediverse servers --fediverse checks.
+"""Rebuild helix_osint/fediverse_servers.py: the fediverse servers --fediverse checks.
 
     python tools/update_fediverse.py            # about 10 minutes
     python tools/update_fediverse.py --pages 50 # a quicker, smaller list
@@ -27,7 +27,7 @@ import urllib.request
 import aiohttp
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "osint", "fediverse_servers.py")
+OUT = os.path.join(ROOT, "helix_osint", "fediverse_servers.py")
 UA = {"User-Agent": "helix-osint fediverse list (github.com/thalha-a9/helix)", "Accept": "application/json"}
 TIMEOUT = aiohttp.ClientTimeout(total=15, connect=8)
 
@@ -66,7 +66,7 @@ async def _get(s, url, method="GET", **kw):
 
 async def _known_user(s, d, sw):
     sys.path.insert(0, ROOT)
-    from osint.adapters.fediverse_adapter import known_account
+    from helix_osint.adapters.fediverse_adapter import known_account
     return await known_account(s, d, sw)
 
 

@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from osint.modules import wayback
+from helix_osint.modules import wayback
 
 
 def test_parse_cdx_first_last_and_months():

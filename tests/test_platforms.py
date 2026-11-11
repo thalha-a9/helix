@@ -10,7 +10,7 @@ import re
 
 import pytest
 
-from osint.platforms import PLATFORMS, CATEGORY_META
+from helix_osint.platforms import PLATFORMS, CATEGORY_META
 
 VALID_METHODS = {"og_meta", "text_not_present", "text_present", "status_code", "api_json"}
 HEX_COLOR = re.compile(r'^#[0-9a-fA-F]{3,8}$')

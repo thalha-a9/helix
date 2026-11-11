@@ -11,7 +11,7 @@ import threading
 
 import pytest
 
-from osint.modules import paste
+from helix_osint.modules import paste
 
 
 class Handler(http.server.BaseHTTPRequestHandler):

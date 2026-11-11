@@ -16,9 +16,9 @@ import threading
 
 import pytest
 
-import helix
-import osint.checker as ck
-from osint import watch
+from helix_osint import cli as helix
+import helix_osint.checker as ck
+from helix_osint import watch
 
 T1, T2, T3 = "2026-11-10T04:00:00+00:00", "2026-11-11T04:00:00+00:00", "2026-11-12T04:00:00+00:00"
 

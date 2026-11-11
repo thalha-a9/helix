@@ -7,7 +7,7 @@ import threading
 
 import pytest
 
-from osint import netconfig, phash
+from helix_osint import netconfig, phash
 
 
 @pytest.mark.parametrize("url", [

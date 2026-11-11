@@ -1,7 +1,7 @@
 import base64
 import re
 
-from osint.graph import generate_graph
+from helix_osint.graph import generate_graph
 
 
 def _render(tmp_path):
@@ -35,7 +35,7 @@ def test_d3_is_pinned_to_an_exact_version(tmp_path):
 
 def test_pinned_digest_matches_d3_7_8_5():
     """The digest of d3@7.8.5/dist/d3.min.js from the npm registry tarball."""
-    import osint.graph as g
+    import helix_osint.graph as g
     src = open(g.__file__, encoding="utf-8").read()
     assert "sha512-M7nHCiNUOwFt6Us3r8alutZLm9qMt4s9951uo8jqO4UwJ1hziseL6O3ndFyigx6+LREfZqnhHxYjKRJ8ZQ69DQ==" in src
     assert "d3@7.8.5" in src
@@ -45,7 +45,7 @@ def test_profile_text_cannot_close_the_graph_script(tmp_path):
     """og:title comes from the scanned page, it must not break out of <script>."""
     import json as _json
     import os as _os
-    from osint.graph import generate_graph as _gen
+    from helix_osint.graph import generate_graph as _gen
     evil = "</script><script>alert(1)</script> & <!--"
     r = [{"platform": "X", "url": "https://x.com/a", "category": "social", "color": "#fff",
           "found": True, "og_title": evil}]
@@ -60,7 +60,7 @@ def test_profile_text_cannot_close_the_graph_script(tmp_path):
 def test_graph_fits_large_layouts_to_the_window(tmp_path):
     """Live: an 83-node graph settled wider than the window (nodes off-screen)."""
     import os as _os
-    from osint.graph import generate_graph as _gen
+    from helix_osint.graph import generate_graph as _gen
     out = _os.path.join(tmp_path, "g.html")
     _gen("a", [], out)
     page = open(out).read()
@@ -69,7 +69,7 @@ def test_graph_fits_large_layouts_to_the_window(tmp_path):
 
 
 def test_username_and_email_are_escaped_in_the_graph_page(tmp_path):
-    from osint.graph import generate_graph
+    from helix_osint.graph import generate_graph
     out = tmp_path / "g.html"
     generate_graph(username="<b>x</b>", results=[], output_path=str(out), email="<i>@y.z")
     page = out.read_text()

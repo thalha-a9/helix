@@ -1,7 +1,7 @@
 # Releasing Helix
 
 A release is one tag. Pushing `vX.Y.Z` runs `.github/workflows/release.yml`:
-it checks the tag matches `osint/__init__.py`, builds, tests the built
+it checks the tag matches `helix_osint/__init__.py`, builds, tests the built
 package, publishes to PyPI and creates the GitHub release with the
 changelog section as notes.
 
@@ -20,7 +20,7 @@ changelog section as notes.
 
 ## Each release
 
-1. Set the version in `osint/__init__.py` and add a `## vX.Y.Z (date)`
+1. Set the version in `helix_osint/__init__.py` and add a `## vX.Y.Z (date)`
    section at the top of `CHANGELOG.md` (a test fails if it is missing).
 2. Merge to `main` with CI green.
 3. Start the release, either way:

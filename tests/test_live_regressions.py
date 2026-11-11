@@ -6,9 +6,9 @@ evidence counts.
 
 import pytest
 
-from osint import checker
-from osint.platforms import PLATFORMS
-from osint.verifier import run_local_verifier
+from helix_osint import checker
+from helix_osint.platforms import PLATFORMS
+from helix_osint.verifier import run_local_verifier
 
 
 def _r(platform):

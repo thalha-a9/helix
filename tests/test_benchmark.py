@@ -4,9 +4,9 @@ import asyncio
 
 import pytest
 
-import helix
+from helix_osint import cli as helix
 from bench import benchmark, mockweb
-from osint import checker
+from helix_osint import checker
 
 
 def test_manifest_is_reproducible_and_respects_fractions():

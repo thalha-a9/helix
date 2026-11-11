@@ -13,8 +13,8 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
-COPY pyproject.toml README.md LICENSE MANIFEST.in helix.py ./
-COPY osint ./osint
+COPY pyproject.toml README.md LICENSE MANIFEST.in ./
+COPY helix_osint ./helix_osint
 RUN pip install --no-cache-dir ".[full]" \
  && cd / && rm -rf /src
 

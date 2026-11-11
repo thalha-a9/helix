@@ -9,9 +9,9 @@ import json
 
 import pytest
 
-import helix
-from osint import leftout
-from osint.leftout import is_left_out, token
+from helix_osint import cli as helix
+from helix_osint import leftout
+from helix_osint.leftout import is_left_out, token
 
 
 def test_a_token_is_stable_and_hides_the_name():
@@ -91,13 +91,13 @@ async def test_a_left_out_name_is_refused_before_any_request(listed, capsys, kw,
 
 @pytest.mark.asyncio
 async def test_pivot_does_not_follow_a_left_out_alias(listed, monkeypatch):
-    from osint import pivot
+    from helix_osint import pivot
     scanned = []
 
     async def fake_check(username, platforms=None, concurrency=None):
         scanned.append(username)
         return []
-    import osint.checker as ck
+    import helix_osint.checker as ck
     monkeypatch.setattr(ck, "check_username", fake_check)
     initial = [{"platform": "GitHub", "found": True,
                 "bio_links": {"twitter": "janeroe", "instagram": "otherhandle"}}]
