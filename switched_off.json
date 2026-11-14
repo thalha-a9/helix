@@ -1,0 +1,3432 @@
+{
+ "rule": "dead or broken on 3 checks in a row; back on at the first check that finds it working",
+ "schema": "helix.switched-off.v1",
+ "sites": {
+  "0-3.ru/members/?username={username}": {
+   "name": "0-3.RU",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "11x2.com/user/home/{username}": {
+   "name": "11x2",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "2el5.ucoz.ua/index/8-0-{username}": {
+   "name": "2el5.ucoz.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "3dmir.ru/{username}": {
+   "name": "3DMir.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "3rabnaar.com/members/?username={username}": {
+   "name": "3rabnaar.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "4unt1ngt0n.social/@{username}": {
+   "name": "4unt1ngt0n.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "50cc.com.ua/index/8-0-{username}": {
+   "name": "50cc.com.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "650f.bike/members/?username={username}": {
+   "name": "650f.bike",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "7x.net.ua/index/8-0-{username}": {
+   "name": "7x.net.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "8tracks.com/{username}": {
+   "name": "8tracks.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 530)"
+  },
+  "akkoma.0pt.dpdns.org/@{username}": {
+   "name": "akkoma.0pt.dpdns.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "aktualno.lv/index/8-0-{username}": {
+   "name": "aktualno.lv",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "albailassan.com/members/?username={username}": {
+   "name": "albailassan.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "alimero.ru/profile/{username}": {
+   "name": "alimero.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "allmobile.vo.uz/index/8-0-{username}": {
+   "name": "allmobile.vo.uz",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "allthelyrics.com/forum/member.php?username={username}": {
+   "name": "AllTheLyrics",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "alsh3er.com/vb/members/?username={username}": {
+   "name": "alsh3er.com/vb",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "alverde.net/forum/members/?username={username}": {
+   "name": "alverde.net/forum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "amalgama-forum.com/member.php?username={username}": {
+   "name": "amalgama-forum.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "android-gameworld.ru/index/8-0-{username}": {
+   "name": "android-gameworld.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "answerszuvs3gg2l64e6hmnryudl5zgrmwm3vh65hzszdghblddvfiqd.onion/user/{username}": {
+   "name": "HiddenAnswers",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "api.edns.domains/domain/lookup/{username}.iotex": {
+   "name": "edns.domains/iotex",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "apps.runescape.com/runemetrics/app/overview/player/{username}": {
+   "name": "RuneScape",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "apps.runescape.com/runemetrics/profile/profile?user={username}": {
+   "name": "Runescape",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "arcade-zockerbande.de/memberlist.php?mode=viewprofile&un={username}": {
+   "name": "arcade-zockerbande.de",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "finds made-up names"
+  },
+  "archlinux.org.ru/forum/users/{username}": {
+   "name": "Archlinux",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "are.kamrbb.ru/?x=find&f={username}#top": {
+   "name": "AreKamrbb",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "arkcast.mycreationhaven.com/a/{username}": {
+   "name": "arkcast.mycreationhaven.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "artinginmaldives.com/members/?username={username}": {
+   "name": "artinginmaldives.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "artistsnclients.com/people/{username}": {
+   "name": "Artistsnclients",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 525)"
+  },
+  "artmilitaire.ru/index/8-0-{username}": {
+   "name": "artmilitaire.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "artofsm.art/u/{username}/summary": {
+   "name": "artofsm.art",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "asciinema.org/~{username}": {
+   "name": "asciinema",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "ask.ocsinventory-ng.org/user/{username}": {
+   "name": "ask.ocsinventory-ng.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "ask.veye.cc/user/{username}": {
+   "name": "ask.veye.cc",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "asquero.com/user/dashboard/{username}": {
+   "name": "asquero.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "astropal.co.uk/u/{username}/summary": {
+   "name": "astropal.co.uk",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "ativosdigitais.com/social/user/{username}": {
+   "name": "ativosdigitais.com/social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "audiforum.nu/members/?username={username}": {
+   "name": "audiforum.nu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "auth.geeksforgeeks.org/user/{username}": {
+   "name": "GeeksforGeeks",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "automania.ru/author/{username}": {
+   "name": "Automania",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "avtomarket.ru/u/{username}": {
+   "name": "Avtomarket",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "babyboom.pl/forum/members/?username={username}": {
+   "name": "babyboom.pl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "backgammonforums.com/u/{username}/summary": {
+   "name": "backgammonforums.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "bar-it.fr/u/{username}/summary": {
+   "name": "bar-it.fr",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "barnacl.es/u/{username}": {
+   "name": "Barnacl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "batsidan.com/forum/members/?username={username}": {
+   "name": "batsidan.com/forum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "bbs.csur.fun/u/{username}": {
+   "name": "bbs.csur.fun",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "bbw.wiki/user:{username}": {
+   "name": "bbw.wiki",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "bestclips.ws/index/8-0-{username}": {
+   "name": "bestclips.ws",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "big-game.ucoz.ru/index/8-0-{username}": {
+   "name": "big-game.ucoz.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "bisq.wiki/user:{username}": {
+   "name": "bisq.wiki",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "bjapi.afreecatv.com/api/{username}/station": {
+   "name": "AfreecaTV",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 515)"
+  },
+  "blackbirdownersclub.eu/phpbb3/memberlist.php?mode=viewprofile&un={username}": {
+   "name": "www.blackbirdownersclub.eu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "blog.csdn.net/{username}": {
+   "name": "CSDN",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "server error (HTTP 521)"
+  },
+  "board.b1gmail.com/members/?username={username}": {
+   "name": "board.b1gmail.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "boards.insidethestar.com/u/{username}/summary": {
+   "name": "boards.insidethestar.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "bocaudua.vn/members/?username={username}": {
+   "name": "bocaudua.vn",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "bodyspace.bodybuilding.com/{username}": {
+   "name": "BodyBuilding",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "boominfo.org/members/?username={username}": {
+   "name": "boominfo.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "boryspil.in.ua/forum/memberlist.php?mode=viewprofile&un={username}": {
+   "name": "boryspil.in.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "brainport.social/@{username}": {
+   "name": "brainport.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "brandschutz-wiki.de/index.php?title=user:{username}": {
+   "name": "brandschutz-wiki.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "breachsta.rs/profile/{username}": {
+   "name": "BreachSta.rs Forum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "bv.umbrellix.org/@{username}": {
+   "name": "bv.umbrellix.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "byzantinenexus.io/@{username}": {
+   "name": "byzantinenexus.io",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "campfire.milospark.tr/u/{username}/summary": {
+   "name": "campfire.milospark.tr",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 521)"
+  },
+  "canadahun.com/members/?username={username}": {
+   "name": "canadahun.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "capa9.net/members/?username={username}": {
+   "name": "capa9.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "capitalcity.combats.com/inf.pl?{username}": {
+   "name": "CapitalcityCombats",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "caravanvn.com/members/?username={username}": {
+   "name": "caravanvn.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "carpfishing.ru:443/forum/members/?username={username}": {
+   "name": "carpfishing.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "catharsis.cafe/@{username}": {
+   "name": "catharsis.cafe",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "catswords.social/@{username}": {
+   "name": "catswords.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "cbergit.com/members/?username={username}": {
+   "name": "cbergit.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "chemport.ru/forum/memberlist.php?username={username}": {
+   "name": "Chemport",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "cheshirecatsclan.eu/forum/memberlist.php?mode=viewprofile&un={username}": {
+   "name": "cheshirecatsclan.eu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "chess-russia.ru/profile.php?mode=viewprofile&u={username}": {
+   "name": "Chess-russia",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "chiase.org/members/?username={username}": {
+   "name": "chiase.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "chiphell.com/home.php?mod=space&username={username}": {
+   "name": "Chiphell",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 567)"
+  },
+  "chodilinh.com/members/?username={username}": {
+   "name": "chodilinh.com",
+   "since": "2026-11-13T11:24:44+00:00",
+   "why": "finds made-up names"
+  },
+  "click49.net/members/?username={username}": {
+   "name": "click49.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "clubskoda.ro/members/?username={username}": {
+   "name": "clubskoda.ro",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "code.hoteas.com/{username}": {
+   "name": "code.hoteas.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "codeseller.ru/author/{username}": {
+   "name": "codeseller.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "codolio.com/profile/{username}": {
+   "name": "Codolio",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "cohones.pl/members/?username={username}": {
+   "name": "cohones.pl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "cointalk.com/members/?username={username}": {
+   "name": "cointalk.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "community.appdrag.com/user/{username}": {
+   "name": "community.appdrag.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "community.avianarp.ru/members/?username={username}": {
+   "name": "community.avianarp.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "community.clearlinux.org/u/{username}/summary": {
+   "name": "community.clearlinux.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "community.darkscribes.com/user/{username}": {
+   "name": "community.darkscribes.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "community.eintracht.de/fans/{username}": {
+   "name": "Eintracht Frankfurt Forum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "community.espboy.com/u/{username}": {
+   "name": "community.espboy.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "community.forestadmin.com/u/{username}": {
+   "name": "community.forestadmin.com",
+   "since": "2026-11-11T11:24:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "community.justlanded.com/en/profile/{username}": {
+   "name": "Justlanded",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "community.mydevices.com/u/{username}": {
+   "name": "community.mydevices.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "community.screwfix.com/members/?username={username}": {
+   "name": "Screwfix",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "community.sphero.com/u/{username}/summary": {
+   "name": "community.sphero.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "community.ycloud.y.org/u/{username}/summary": {
+   "name": "community.ycloud.y.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "compcar.ru/member.php?username={username}": {
+   "name": "compcar.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "congdongai.vn/members/?username={username}": {
+   "name": "congdongai.vn",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "coptr.digipres.org/user:{username}": {
+   "name": "coptr.digipres.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "cqham.ru/forum/member.php?username={username}": {
+   "name": "Cqham",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "creationwiki.org/user:{username}": {
+   "name": "creationwiki.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "creature.social/@{username}": {
+   "name": "creature.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "creonline.discoursehosting.net/u/{username}": {
+   "name": "creonline.discoursehosting.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "crown6.org/index/8-0-{username}": {
+   "name": "crown6.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "cssbattle.dev/player/{username}": {
+   "name": "CSSBattle",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "cultofshiv.wtf/@{username}": {
+   "name": "cultofshiv.wtf",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "danketoan.com/members/?username={username}": {
+   "name": "danketoan.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "dcpg.ru/users/{username}": {
+   "name": "Dcpg",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "ddr-luftfahrt.de/forum/memberlist.php?mode=viewprofile&un={username}": {
+   "name": "www.ddr-luftfahrt.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "de.spongepedia.org/index.php/user:{username}": {
+   "name": "de.spongepedia.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "deacon.social/@{username}": {
+   "name": "deacon.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "debat.alt.dk/u/{username}/summary": {
+   "name": "debat.alt.dk",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "decredit.com.ua/members/?username={username}": {
+   "name": "decredit.com.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "deepcomputing.discourse.group/u/{username}": {
+   "name": "deepcomputing.discourse.group",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "deeptor.ws/members/?username={username}": {
+   "name": "deeptor.ws",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "dembuon.vn/members/?username={username}": {
+   "name": "dembuon.vn",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "demon-art.ru/index/8-0-{username}": {
+   "name": "demon-art.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "demonscity.combats.com/inf.pl?{username}": {
+   "name": "Demonscity",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "desu.me/members/?username={username}": {
+   "name": "Desu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "detstrana.ru/user/{username}": {
+   "name": "Detstrana",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "dev.motube.online/a/{username}": {
+   "name": "dev.motube.online",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "devblogs.io/u/{username}": {
+   "name": "devblogs.io",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "devtribe.ru/user/{username}": {
+   "name": "Devtribe",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 526)"
+  },
+  "diendan.isempai.com/members/?username={username}": {
+   "name": "diendan.isempai.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "diggyforum.ru/members/?username={username}": {
+   "name": "diggyforum.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "digilabor.ut.ee/index.php/user:{username}": {
+   "name": "digilabor.ut.ee",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "dimitrov.ucoz.ua/index/8-0-{username}": {
+   "name": "dimitrov.ucoz.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "discord.vreecoaster.de/members/?username={username}": {
+   "name": "discord.vreecoaster.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "discourse.saylor.org/u/{username}/summary": {
+   "name": "discourse.saylor.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "discourse.snowplowanalytics.com/u/{username}": {
+   "name": "discourse.snowplowanalytics.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "discourse.taiao.ai/u/{username}/summary": {
+   "name": "discourse.taiao.ai",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "discuss.bbchallenge.org/u/{username}": {
+   "name": "discuss.bbchallenge.org",
+   "since": "2026-11-11T11:24:51+00:00",
+   "why": "connection failed"
+  },
+  "discuss.bootstrapped.fm/u/{username}/summary": {
+   "name": "discuss.bootstrapped.fm",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "discuss.codecademy.com/u/{username}/summary": {
+   "name": "discuss.codecademy.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "discuss.foodomaa.com/u/{username}": {
+   "name": "discuss.foodomaa.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "discuss.hotwired.dev/u/{username}": {
+   "name": "discuss.hotwired.dev",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "discuss.studiofow.com/u/{username}/summary": {
+   "name": "discuss.studiofow.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "discussions.tetrax.software/u/{username}/summary": {
+   "name": "discussions.tetrax.software",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "dntrustmucd4mwec.onion/u/{username}": {
+   "name": "DarkNet Trust",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "doccarb.ucoz.ru/index/8-0-{username}": {
+   "name": "doccarb.ucoz.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "docraft.cn/members/?username={username}": {
+   "name": "docraft.cn",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "dodge-tech.com.ar/members/?username={username}": {
+   "name": "dodge-tech.com.ar",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "dogster.ru/users/{username}": {
+   "name": "Dogster",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "dreamin.online/@{username}": {
+   "name": "dreamin.online",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "dreddmc.ru/index/8-0-{username}": {
+   "name": "dreddmc.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "dtp-discourse.jp/u/{username}/summary": {
+   "name": "dtp-discourse.jp",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "dumpor.com/v/{username}": {
+   "name": "Dumpor",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "earpnation.social/@{username}": {
+   "name": "earpnation.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "ebay.com/usr/{username}": {
+   "name": "Ebay",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "elbilsforum.se/members/?username={username}": {
+   "name": "elbilsforum.se",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "elektron.ucoz.ua/index/8-0-{username}": {
+   "name": "elektron.ucoz.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "en.wiki.aktivix.org/wiki/user:{username}": {
+   "name": "en.wiki.aktivix.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "energeticambiente.it/members/?username={username}": {
+   "name": "energeticambiente.it",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "ennstalwiki.at/wiki/index.php/user:{username}": {
+   "name": "ennstalwiki.at",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "enot-poloskun.ru/member.php?username={username}": {
+   "name": "Enot-poloskun",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "espero-club.ru/index/8-0-{username}": {
+   "name": "espero-club.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "evoclub.in.ua/forum/memberlist.php?mode=viewprofile&un={username}": {
+   "name": "evoclub.in.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "exploretalent.com/{username}": {
+   "name": "exploretalent.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "f.reun.de/@{username}": {
+   "name": "f.reun.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "f1-forum.fi/members/?username={username}": {
+   "name": "f1-forum.fi",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "f3.cool/{username}": {
+   "name": "F3.cool",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "facebook.com/{username}": {
+   "name": "Facebook",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "finds made-up names"
+  },
+  "fairdataforum.org/u/{username}/summary": {
+   "name": "fairdataforum.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "fansubdb.com/wiki/user:{username}": {
+   "name": "fansubdb.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "fcrubin.ru/forum/member.php?username={username}": {
+   "name": "FCRubin",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "feddit.bg/u/{username}": {
+   "name": "feddit.bg",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "fedi.yesmap.net/@{username}": {
+   "name": "fedi.yesmap.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "fffsquad.com/members/?username={username}": {
+   "name": "fffsquad.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "fileformats.archiveteam.org/wiki/user:{username}": {
+   "name": "fileformats.archiveteam.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "findout.channel.org/@{username}": {
+   "name": "findout.channel.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "flutterforum.org/u/{username}": {
+   "name": "flutterforum.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "followus.com/{username}": {
+   "name": "followus.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "fonttalk.com/u/{username}/summary": {
+   "name": "fonttalk.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "for-bit.com/members/?username={username}": {
+   "name": "for-bit.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forge.iw4x.io/{username}": {
+   "name": "forge.iw4x.io",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forgejo.thomasboom.com/{username}": {
+   "name": "forgejo.thomasboom.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "foro.autoescala.net/members/?username={username}": {
+   "name": "foro.autoescala.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "foro.biwenger.com/members/?username={username}": {
+   "name": "foro.biwenger.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "foroact.com/members/?username={username}": {
+   "name": "foroact.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forobeta.com/members/?username={username}": {
+   "name": "forobeta.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "foroderelojes.es/members/?username={username}": {
+   "name": "foroderelojes.es",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "foroelectricidad.net/members/?username={username}": {
+   "name": "foroelectricidad.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "foromotos.net/members/?username={username}": {
+   "name": "foromotos.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "foropuros.com/members/?username={username}": {
+   "name": "foropuros.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "foros.manerasdevivir.com/u/{username}/summary": {
+   "name": "foros.manerasdevivir.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forosdeia.com/members/?username={username}": {
+   "name": "forosdeia.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum-bet.com/members/?username={username}": {
+   "name": "forum-bet.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum-mechanika.pl/members/?username={username}": {
+   "name": "forum-mechanika.pl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum-ukraina.net/members/?username={username}": {
+   "name": "forum-ukraina.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum-volgograd.ru/members/?username={username}": {
+   "name": "Volgograd Forum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forum.4r3.net/members/?username={username}": {
+   "name": "forum.4r3.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.antichat.ru/members/?username={username}": {
+   "name": "Antichat",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forum.astralinux.ru/members/?username={username}": {
+   "name": "Astralinux",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forum.authing.com/u/{username}/summary": {
+   "name": "forum.authing.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.awog.at/user/{username}": {
+   "name": "forum.awog.at",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "forum.babyaud.io/u/{username}": {
+   "name": "forum.babyaud.io",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forum.benchmark.rs/members/?username={username}": {
+   "name": "forum.benchmark.rs",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.beobuild.rs/members/?username={username}": {
+   "name": "forum.beobuild.rs",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.biotechvana.com/u/{username}": {
+   "name": "forum.biotechvana.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.bmrp.rs/members/?username={username}": {
+   "name": "forum.bmrp.rs",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.bratsk.org/member.php?username={username}": {
+   "name": "Bratsk Forum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "forum.console-tribe.com/members/?username={username}": {
+   "name": "forum.console-tribe.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.cz.forgeofempires.com/members/?username={username}": {
+   "name": "forum.cz.forgeofempires.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.decred.org/members/?username={username}": {
+   "name": "forum.decred.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.denizenscript.com/members/?username={username}": {
+   "name": "forum.denizenscript.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "forum.divokekmeny.cz/members/?username={username}": {
+   "name": "forum.divokekmeny.cz",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.djangoproject.co/u/{username}/summary": {
+   "name": "Djangoproject.co",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forum.dmec.vn/members/?username={username}": {
+   "name": "forum.dmec.vn",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.eco.com/u/{username}/summary": {
+   "name": "forum.eco.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forum.elektrolab.eu/members/?username={username}": {
+   "name": "forum.elektrolab.eu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.elkaisar.com/members/?username={username}": {
+   "name": "forum.elkaisar.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.evaveda.com/memberlist.php?username={username}": {
+   "name": "ForumEvaveda",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "forum.eyvalon.de/u/{username}": {
+   "name": "forum.eyvalon.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "forum.gong.bg/memberlist.php?username={username}": {
+   "name": "forum.gong.bg",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.greenday.fm/u/{username}": {
+   "name": "forum.greenday.fm",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "forum.iinkor.com/members/?username={username}": {
+   "name": "forum.iinkor.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.indiedev.lt/u/{username}/summary": {
+   "name": "forum.indiedev.lt",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "forum.informaticagames.com/members/?username={username}": {
+   "name": "forum.informaticagames.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.jambox.ru/members/?username={username}": {
+   "name": "Forum.jambox.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.jscourse.com/u/{username}/summary": {
+   "name": "forum.jscourse.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "forum.kristallov.net/member.php?username={username}": {
+   "name": "KristallovNet",
+   "since": "2026-11-11T11:24:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "forum.kubiparts.cz/u/{username}": {
+   "name": "forum.kubiparts.cz",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "forum.kursknet.ru/memberlist.php?username={username}": {
+   "name": "kursknet",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "forum.laraider.com/memberlist.php?mode=viewprofile&un={username}": {
+   "name": "forum.laraider.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.logos.co/u/{username}/summary": {
+   "name": "forum.logos.co",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "forum.lvivport.com/members/?username={username}": {
+   "name": "forum.lvivport.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.meter.io/u/{username}/summary": {
+   "name": "forum.meter.io",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "forum.misa.vn/members/?username={username}": {
+   "name": "forum.misa.vn",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "forum.mmcs.sfedu.ru/u/{username}": {
+   "name": "forum.mmcs.sfedu.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "forum.mockaroo.com/u/{username}/summary": {
+   "name": "forum.mockaroo.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.modnaya.org/members/{username}.html": {
+   "name": "modnaya",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forum.mohaddis.com/members/?username={username}": {
+   "name": "forum.mohaddis.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.motorguia.net/members/?username={username}": {
+   "name": "forum.motorguia.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.myjane.ru/profile.php?mode=viewprofile&u={username}": {
+   "name": "Myjane",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.neformat.com.ua/members/?username={username}": {
+   "name": "forum.neformat.com.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.nl.forgeofempires.com/members/?username={username}": {
+   "name": "forum.nl.forgeofempires.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.onerp.hu/members/?username={username}": {
+   "name": "forum.onerp.hu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.percussa.com/u/{username}/summary": {
+   "name": "forum.percussa.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.plancker.org/u/{username}/summary": {
+   "name": "forum.plancker.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.plemiona.pl/members/?username={username}": {
+   "name": "forum.plemiona.pl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.qim.dk/u/{username}/summary": {
+   "name": "forum.qim.dk",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "forum.radioenge.com.br/u/{username}/summary": {
+   "name": "forum.radioenge.com.br",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.rarib.ag/memberlist.php?username={username}": {
+   "name": "forum.rarib.ag",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forum.research.logos.co/u/{username}/summary": {
+   "name": "forum.research.logos.co",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "forum.rmnt.ru/members/?username={username}": {
+   "name": "forum.rmnt.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "forum.scuba-divers.ru/memberlist.php?username={username}": {
+   "name": "scuba",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forum.shanniiwrites.com/u/{username}/summary.json": {
+   "name": "ShaniiWrites",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forum.sk.forgeofempires.com/members/?username={username}": {
+   "name": "forum.sk.forgeofempires.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.sketchfab.com/u/{username}/summary": {
+   "name": "forum.sketchfab.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.swiftbook.ru/u/{username}/summary": {
+   "name": "swiftbook",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.swiftreporter.com/u/{username}/summary": {
+   "name": "forum.swiftreporter.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "forum.the-west.hu/members/?username={username}": {
+   "name": "forum.the-west.hu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.the-west.it/members/?username={username}": {
+   "name": "forum.the-west.it",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.the-west.nl/members/?username={username}": {
+   "name": "forum.the-west.nl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.tks.ru/member.php?username={username}": {
+   "name": "tks",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.velomania.ru/member.php?username={username}": {
+   "name": "Velomania",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.vinograd.info/member.php?username={username}": {
+   "name": "forum.vinograd.info",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "forum.vuurwerkcrew.nl/members/?username={username}": {
+   "name": "forum.vuurwerkcrew.nl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.westeroscraft.com/members/?username={username}": {
+   "name": "forum.westeroscraft.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 526)"
+  },
+  "forum.wotanks.com/member.php/?username={username}": {
+   "name": "WorlfOfTanksForum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "forum.xboxworld.nl/members/?username={username}": {
+   "name": "forum.xboxworld.nl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forum.yazbel.com/u/{username}/summary": {
+   "name": "Yazbel",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forum.yucts.com/members/?username={username}": {
+   "name": "forum.yucts.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forumbebas.com/u/{username}": {
+   "name": "forumbebas.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "forumfeminarum.nl/u/{username}/summary": {
+   "name": "forumfeminarum.nl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forumklassika.ru/member.php?username={username}": {
+   "name": "forumklassika.ru",
+   "since": "2026-11-14T10:49:45+00:00",
+   "why": "no reply in time"
+  },
+  "forumlojistik.com.tr/members/?username={username}": {
+   "name": "forumlojistik.com.tr",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "no reply in time"
+  },
+  "forums.dds6qkxpwdeubwucdiaord2xgbbeyds25rbsgr73tbfpqpt4a6vjwsyd.onion/u/{username}/summary": {
+   "name": "Whonix Forum Tor",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forums.grandstream.com/u/{username}/summary": {
+   "name": "forums.grandstream.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forums.jag-lovers.org/u/{username}/summary": {
+   "name": "forums.jag-lovers.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "forums.kingdomsofheckfire.com/members/?username={username}": {
+   "name": "forums.kingdomsofheckfire.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "forums.leialoft.com/u/{username}": {
+   "name": "forums.leialoft.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forums.liverpoolfc.com/members/?username={username}": {
+   "name": "LiverpoolFC",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forums.mozfr.org/memberlist.php?username={username}": {
+   "name": "forums.mozfr.org",
+   "since": "2026-11-14T10:49:45+00:00",
+   "why": "finds made-up names"
+  },
+  "forums.riftgame.com/members/{username}.html": {
+   "name": "Riftgame",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "forums.sumy.ua/members/?username={username}": {
+   "name": "forums.sumy.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "forums.theanimenetwork.com/u/{username}": {
+   "name": "forums.theanimenetwork.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "forumsi.org/member.php?username={username}": {
+   "name": "Forumsi",
+   "since": "2026-11-13T11:24:44+00:00",
+   "why": "finds made-up names"
+  },
+  "forumsmotri.club/user/{username}": {
+   "name": "ForumSmotri",
+   "since": "2026-11-11T11:24:51+00:00",
+   "why": "no reply in time"
+  },
+  "forumswimming.ru/index/8-0-{username}": {
+   "name": "SwimmingForum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "fpvua.org/members/?username={username}": {
+   "name": "fpvua.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "free-pass.ru/index/8-0-{username}": {
+   "name": "free-pass.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "freelancebay.com/freelancer/{username}": {
+   "name": "Freelancebay",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "freepo.st/freepost.cgi/user/public/{username}": {
+   "name": "Freepo",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "friend.yargl.com/profile/{username}": {
+   "name": "friend.yargl.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "friendfinder.com/profile/{username}": {
+   "name": "FriendFinder",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "friendica.gidikroon.eu/profile/{username}": {
+   "name": "friendica.gidikroon.eu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "friendica.waldstepperbu.de/profile/{username}": {
+   "name": "friendica.waldstepperbu.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "fuksiwiki.tko-aly.fi/user:{username}": {
+   "name": "fuksiwiki.tko-aly.fi",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "fullhub.ru/forum/members/?username={username}": {
+   "name": "Fullhub",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "futuresight.org/forums/users/{username}": {
+   "name": "futuresight.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "gamepvps.com/members/?username={username}": {
+   "name": "gamepvps.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "gamesubject.com/{username}": {
+   "name": "Gamesubject",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 521)"
+  },
+  "gazette.live/@{username}": {
+   "name": "gazette.live",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "gdbrowser.com/u/{username}": {
+   "name": "GDBrowser",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "gearheadwiki.com/wiki/user:{username}": {
+   "name": "gearheadwiki.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "geekdoing.com/members/?username={username}": {
+   "name": "Geekdoing",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "geowebforum.ch/u/{username}/summary": {
+   "name": "geowebforum.ch",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "giaicuunongdan.com/members/?username={username}": {
+   "name": "giaicuunongdan.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "gigagit.eu/{username}": {
+   "name": "gigagit.eu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "gigbucks.com/user/{username}": {
+   "name": "Gigbucks",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "git.aaronhosting.xyz/{username}": {
+   "name": "git.aaronhosting.xyz",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "git.adelielinux.org/{username}": {
+   "name": "git.adelielinux.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "git.alr-pkg.ru/{username}": {
+   "name": "git.alr-pkg.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "git.aquila-consortium.org/{username}": {
+   "name": "git.aquila-consortium.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "git.bitmycode.com/{username}": {
+   "name": "git.bitmycode.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "git.callial.com/{username}": {
+   "name": "git.callial.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "git.cheetah.cat/{username}": {
+   "name": "git.cheetah.cat",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "git.cherry-ai.com/{username}": {
+   "name": "git.cherry-ai.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "git.coldspire.com/{username}": {
+   "name": "git.coldspire.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "git.cooltux.net/{username}": {
+   "name": "git.cooltux.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "git.cromer.cl/{username}": {
+   "name": "git.cromer.cl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "git.csic.es/{username}": {
+   "name": "git.csic.es",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "git.euph.dev/{username}": {
+   "name": "git.euph.dev",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "git.fairkom.net/{username}": {
+   "name": "git.fairkom.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "git.fslab.de/{username}": {
+   "name": "git.fslab.de",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "no reply in time"
+  },
+  "git.fsmpi.rwth-aachen.de/{username}": {
+   "name": "git.fsmpi.rwth-aachen.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "git.halfakop.ru/{username}": {
+   "name": "git.halfakop.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "git.inotfail.com/{username}": {
+   "name": "git.inotfail.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "git.kantos.pl/{username}": {
+   "name": "git.kantos.pl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "git.konjactw.dev/{username}": {
+   "name": "git.konjactw.dev",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "git.kwila.cloud/{username}": {
+   "name": "git.kwila.cloud",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "git.linglouyi.pp.ua/{username}": {
+   "name": "git.linglouyi.pp.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "git.lo.sh/{username}": {
+   "name": "git.lo.sh",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "git.nwex.de/{username}": {
+   "name": "git.nwex.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "git.parlz.com/{username}": {
+   "name": "git.parlz.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "git.perrocarril.com/{username}": {
+   "name": "git.perrocarril.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "git.pic.ngo/{username}": {
+   "name": "git.pic.ngo",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "git.riquer.fr/{username}": {
+   "name": "git.riquer.fr",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "git.schneider-hosting.de/{username}": {
+   "name": "git.schneider-hosting.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "git.tcp.direct/{username}": {
+   "name": "git.tcp.direct",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "git.tomans.ru/{username}": {
+   "name": "git.tomans.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "git.trieoh.com/{username}": {
+   "name": "git.trieoh.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "git.wiseless.xyz/{username}": {
+   "name": "git.wiseless.xyz",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "gitea.aistudy666.com/{username}": {
+   "name": "gitea.aistudy666.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "gitea.amine-bouabdallaoui.fr/{username}": {
+   "name": "gitea.amine-bouabdallaoui.fr",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "gitea.bydata.com/{username}": {
+   "name": "gitea.bydata.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "gitea.engen.priv.no/{username}": {
+   "name": "gitea.engen.priv.no",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "gitea.kosmos.org/{username}": {
+   "name": "gitea.kosmos.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "gitea.ndda.fr/{username}": {
+   "name": "gitea.ndda.fr",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "gitea.redbearos.org/{username}": {
+   "name": "gitea.redbearos.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "gitea.thatqhu.top/{username}": {
+   "name": "gitea.thatqhu.top",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 530)"
+  },
+  "gitea.tosic.nu/{username}": {
+   "name": "gitea.tosic.nu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "gitea.unprism.ru/{username}": {
+   "name": "gitea.unprism.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "gitlab.abinit.org/{username}": {
+   "name": "gitlab.abinit.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "gitlab.computer.surgery/{username}": {
+   "name": "gitlab.computer.surgery",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "gitlab.cs.unh.edu/{username}": {
+   "name": "gitlab.cs.unh.edu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "gitlab.etsit.urjc.es/{username}": {
+   "name": "gitlab.etsit.urjc.es",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "gitlab.fatcat.tw/{username}": {
+   "name": "gitlab.fatcat.tw",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "gitlab.ilabt.imec.be/{username}": {
+   "name": "gitlab.ilabt.imec.be",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "gitlab.insrt.uk/{username}": {
+   "name": "gitlab.insrt.uk",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "gitlab.isae-supaero.fr/{username}": {
+   "name": "gitlab.isae-supaero.fr",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "gitlab.ispras.ru/{username}": {
+   "name": "gitlab.ispras.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "gitlab.mai.ru/{username}": {
+   "name": "gitlab.mai.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "gitlab.slu.cz/{username}": {
+   "name": "gitlab.slu.cz",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "gitlab.trevenque.es/{username}": {
+   "name": "gitlab.trevenque.es",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "gitlab.tudelft.nl/{username}": {
+   "name": "gitlab.tudelft.nl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "good-music.kiev.ua/index/8-0-{username}": {
+   "name": "Good-music",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "goroskop.ucoz.ua/index/8-0-{username}": {
+   "name": "goroskop.ucoz.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "grand-magic.ru/index/8-0-{username}": {
+   "name": "grand-magic.ru",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "host name does not resolve"
+  },
+  "grandprixforums.com/members/?username={username}": {
+   "name": "grandprixforums.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "graphicdesignforum.com/u/{username}/summary": {
+   "name": "graphicdesignforum.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "hackings.ru/index/8-0-{username}": {
+   "name": "hackings.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "haochimusic.com/members/?username={username}": {
+   "name": "haochimusic.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "hashnode.com/@{username}": {
+   "name": "Hashnode",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "hevc-club.ucoz.net/index/8-0-{username}": {
+   "name": "hevc-club.ucoz.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "hikvision.msk.ru/index/8-0-{username}": {
+   "name": "hikvision.msk.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "hilfe.uni-paderborn.de/user:{username}": {
+   "name": "hilfe.uni-paderborn.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "histomil.com/members/?username={username}": {
+   "name": "histomil.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "hiveblocks.com/@{username}": {
+   "name": "hiveblocks.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "hometheaterforum.com/community/members/?username={username}": {
+   "name": "Hometheaterforum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "hozpitality.com/{username}/profile": {
+   "name": "hozpitality",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "hubpages.com/@{username}": {
+   "name": "HubPages",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "hyprr.com/profile/{username}": {
+   "name": "hyprr.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 520)"
+  },
+  "hyundaitruckclub.kamrbb.ru/?x=find&f={username}&type=topics&nick=on#top": {
+   "name": "Hyundaitruckclub",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "ibf.lv/members/?username={username}": {
+   "name": "ibf.lv",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "indiedev.gg/members/?username={username}": {
+   "name": "indiedev.gg",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "induste.com/members/?username={username}": {
+   "name": "induste.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "infobeto.com/members/?username={username}": {
+   "name": "infobeto.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "inkbunny.net/{username}": {
+   "name": "Inkbunny",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "answers a made-up name differently each time"
+  },
+  "instaprofi.ru/profile/{username}": {
+   "name": "instaprofi.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "intoclassics.net/index/8-0-{username}": {
+   "name": "intoclassics.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "ipolska.pl/@{username}": {
+   "name": "Ipolska.pl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "issuehunt.io/u/{username}": {
+   "name": "IssueHunt",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "isuma.tv/members/{username}": {
+   "name": "isuma.tv",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 504)"
+  },
+  "itfy.org/members/?username={username}": {
+   "name": "Itfy",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "izobil.ru/index/8-0-{username}": {
+   "name": "izobil.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "kakata.vn/members/?username={username}": {
+   "name": "kakata.vn",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "kali.org.ru/profile/{username}": {
+   "name": "kali.org.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "kam-mamochka.ru/index/8-0-{username}": {
+   "name": "kam-mamochka.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "karab.in/u/{username}": {
+   "name": "Karab.in",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "kashanya.com/index/8-0-{username}": {
+   "name": "kashanya.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "kepler.duniter.org/u/{username}/summary": {
+   "name": "kepler.duniter.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "khatmenbuwat.org/members/?username={username}": {
+   "name": "khatmenbuwat.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "kiabongo.info/index/8-0-{username}": {
+   "name": "kiabongo.info",
+   "since": "2026-11-11T11:24:51+00:00",
+   "why": "no reply in time"
+  },
+  "kliki-doma.ru/index/8-0-{username}": {
+   "name": "kliki-doma.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "kotoba.wiki/u/{username}/summary": {
+   "name": "kotoba.wiki",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "kpyto.pp.net.ua/index/8-0-{username}": {
+   "name": "kpyto.pp.net.ua",
+   "since": "2026-11-11T11:24:51+00:00",
+   "why": "no reply in time"
+  },
+  "kuharka.ru/members/{username}": {
+   "name": "Kuharka",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "connection failed"
+  },
+  "kwai.com/@{username}": {
+   "name": "Kwai",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "lab.pentestit.ru/profile/{username}": {
+   "name": "labpentestit",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "ladies.zp.ua/memberlist.php?username={username}": {
+   "name": "Ladies",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "laequitacion.com/members/?username={username}": {
+   "name": "laequitacion.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "lavkachudec.ru/index/8-0-{username}": {
+   "name": "lavkachudec.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "leakix.net/u/{username}": {
+   "name": "LeakIX",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "lemfo-russia.ru/index/8-0-{username}": {
+   "name": "lemfo-russia.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "lemmy.1095.me/u/{username}": {
+   "name": "lemmy.1095.me",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "lemmy.almostadatacenter.social/u/{username}": {
+   "name": "lemmy.almostadatacenter.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "lemmy.devr.cc/u/{username}": {
+   "name": "lemmy.devr.cc",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "lemmy.mio19.uk/u/{username}": {
+   "name": "lemmy.mio19.uk",
+   "since": "2026-11-11T11:24:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "lemmy.mlaga97.space/u/{username}": {
+   "name": "lemmy.mlaga97.space",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "lemmy.myserv.one/u/{username}": {
+   "name": "lemmy.myserv.one",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "lemmy.zimage.com/u/{username}": {
+   "name": "lemmy.zimage.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "lemmynsfw.com/u/{username}": {
+   "name": "lemmynsfw.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "librepunk.club/@{username}": {
+   "name": "librepunk.club",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "life-dom2.su/user/{username}": {
+   "name": "Life-dom2",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "linkkle.com/{username}": {
+   "name": "Linkkle",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "linuxmint.com.ru/memberlist.php?username={username}": {
+   "name": "LinuxMint",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "answers a made-up name differently each time"
+  },
+  "linuxpip.org/author/{username}": {
+   "name": "linuxpip.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "liozno.info/index/8-0-{username}": {
+   "name": "liozno.info",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 530)"
+  },
+  "liveexpert.ru/e/{username}": {
+   "name": "Liveexpert",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "lkforum.ru/member.php?username={username}": {
+   "name": "Lkforum",
+   "since": "2026-11-14T10:49:45+00:00",
+   "why": "no reply in time"
+  },
+  "lockwiki.com/index.php/user:{username}": {
+   "name": "lockwiki.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "loghati.net/members/?username={username}": {
+   "name": "loghati.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "lokalhistoriewiki.no/wiki/user:{username}": {
+   "name": "lokalhistoriewiki.no",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "lostwaves.wiki/wiki/user:{username}": {
+   "name": "lostwaves.wiki",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "lt.harding.dev/u/{username}": {
+   "name": "lt.harding.dev",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "ma.diacrown.com/@{username}": {
+   "name": "ma.diacrown.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "macmini-forum.de/u/{username}/summary": {
+   "name": "macmini-forum.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "maga-chat.com/{username}": {
+   "name": "Maga-Chat",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "mage.town/@{username}": {
+   "name": "mage.town",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "mail.clbcaravan.com/members/?username={username}": {
+   "name": "mail.clbcaravan.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "mailpass.site/members/?username={username}": {
+   "name": "mailpass.site",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "majiangame.com/u/{username}/summary": {
+   "name": "majiangame.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "mander.xyz/u/{username}": {
+   "name": "mander.xyz",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "mapi.yummly.com/mapi/v19/user/{username}": {
+   "name": "Yummly",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "mapify.travel/{username}": {
+   "name": "Mapify.travel",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "maratang.life/@{username}": {
+   "name": "maratang.life",
+   "since": "2026-11-11T11:24:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "massageanywhere.com/profile/{username}": {
+   "name": "Massage Anywhere",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "mastodon.cpurecords.club/@{username}": {
+   "name": "mastodon.cpurecords.club",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "mcgathering.com/members/?username={username}": {
+   "name": "mcgathering.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "mediabuyai.com/u/{username}/summary": {
+   "name": "mediabuyai.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "medyczka.pl/user/{username}": {
+   "name": "Medyczka.pl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "megamodels.pl/{username}": {
+   "name": "Megamodels.pl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "melonmancy.cafe/u/{username}": {
+   "name": "melonmancy.cafe",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "metam.my/@{username}": {
+   "name": "metam.my",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "no reply in time"
+  },
+  "milanworld.net/members/?username={username}": {
+   "name": "milanworld.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "minecraftlist.com/players/{username}": {
+   "name": "Minecraftlist",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "miped.ru/user/{username}": {
+   "name": "Miped",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "mir-stalkera.ru/index/8-0-{username}": {
+   "name": "mir-stalkera.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "mir2007.ru/index/8-0-{username}": {
+   "name": "mir2007.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "misskey.04.si/@{username}": {
+   "name": "misskey.04.si",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "mistoodesa.ucoz.ua/index/8-0-{username}": {
+   "name": "mistoodesa.ucoz.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "mix-best.ucoz.ru/index/8-0-{username}": {
+   "name": "mix-best.ucoz.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "monitoringminecraft.ru/player/{username}": {
+   "name": "monitoringminecraft.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "mstdn.hokkaido.jp/@{username}": {
+   "name": "mstdn.hokkaido.jp",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "my-question.ru/user/{username}": {
+   "name": "My-question",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "myfootball-1.ucoz.ua/index/8-0-{username}": {
+   "name": "myfootball-1.ucoz.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "nanowiki.no/wiki/user:{username}": {
+   "name": "nanowiki.no",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "neogranka.com/forum/member.php?username={username}": {
+   "name": "neogranka.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "nevrotic.net/user/{username}": {
+   "name": "nevrotic.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "newf319.com/members/?username={username}": {
+   "name": "newf319.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "news.toretsk.online/index/8-0-{username}": {
+   "name": "news.toretsk.online",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "ninjakiwi.com/profile/{username}": {
+   "name": "Ninja Kiwi",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "nl.forum.grepolis.com/members/?username={username}": {
+   "name": "nl.forum.grepolis.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "nl.wikisage.org/wiki/user:{username}": {
+   "name": "nl.wikisage.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "nohandsseo.com/forum/memberlist.php?mode=viewprofile&un={username}": {
+   "name": "nohandsseo.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "nopnog.co.kr/@{username}": {
+   "name": "nopnog.co.kr",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "ntume.us/u/{username}/summary": {
+   "name": "ntume.us",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "nurdspace.nl/user:{username}": {
+   "name": "nurdspace.nl",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "connection failed"
+  },
+  "ocli.masto.host/@{username}": {
+   "name": "ocli.masto.host",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "offline.by/forum/memberlist.php?username={username}": {
+   "name": "Offline.by",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "oilcareer.ru/index/8-0-{username}": {
+   "name": "Oilcareer",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "omori.wiki/user:{username}": {
+   "name": "omori.wiki",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "opel-forum.nl/members/?username={username}": {
+   "name": "opel-forum.nl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "openmic.social/u/{username}": {
+   "name": "openmic.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "openriskcommons.org/u/{username}/summary": {
+   "name": "openriskcommons.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "orbys.net/{username}": {
+   "name": "Orbys",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "ortschroniken-mv.de/index.php/user:{username}": {
+   "name": "ortschroniken-mv.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "oshwlab.com/{username}": {
+   "name": "oshwlab.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "ourblworld.com/members/?username={username}": {
+   "name": "ourblworld.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "packagist.org/packages/{username}": {
+   "name": "Packagist",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "padrim.com.br/{username}": {
+   "name": "padrim.com.br",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 530)"
+  },
+  "palnet.io/@{username}": {
+   "name": "palnet",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "server error (HTTP 504)"
+  },
+  "palungjit.org/members/?username={username}": {
+   "name": "palungjit.org",
+   "since": "2026-11-14T10:49:45+00:00",
+   "why": "finds made-up names"
+  },
+  "pankreatitu.ucoz.net/index/8-0-{username}": {
+   "name": "pankreatitu.ucoz.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "parrotsec-cn.org/u/{username}/summary": {
+   "name": "parrotsec-cn.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 521)"
+  },
+  "paypal.com/paypalme/{username}": {
+   "name": "Paypal",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "pgpru.com/proekt/poljzovateli?profile={username}": {
+   "name": "Pgpru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "philosophy.cafe/u/{username}": {
+   "name": "philosophy.cafe",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "phyrexia.ru/@{username}": {
+   "name": "phyrexia.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "pigeon-vole.fr:443/forum/memberlist.php?mode=viewprofile&un={username}": {
+   "name": "pigeon-vole.fr/forum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "podsnezhniksad.ucoz.com/index/8-0-{username}": {
+   "name": "podsnezhniksad.ucoz.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "pokepedia.fr/user:{username}": {
+   "name": "pokepedia.fr",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "pol.social/@{username}": {
+   "name": "Pol.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "politforums.net/free/profile.php?showuser={username}": {
+   "name": "Politforums",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "politikforum.ru/member.php?username={username}": {
+   "name": "Politikforum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "postmortem.hellominecraft.fr/forum/memberlist.php?mode=viewprofile&un={username}": {
+   "name": "postmortem.hellominecraft.fr/forum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "pregame.com/members/{username}": {
+   "name": "Pregame",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "preprod.epsilon.social/@{username}": {
+   "name": "preprod.epsilon.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "prismatica.animerpgs.com/members/?username={username}": {
+   "name": "prismatica.animerpgs.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "privateinvestor2000.com/index/8-0-{username}": {
+   "name": "privateinvestor2000.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "privorot.club/members/?username={username}": {
+   "name": "privorot.club",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "professionali.ru/~{username}": {
+   "name": "Professionali",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "prog.co.il/members/?username={username}": {
+   "name": "prog.co.il",
+   "since": "2026-11-14T10:49:45+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "progresstalk.com/members/?username={username}": {
+   "name": "progresstalk.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "projectdiva.net/community/members/?username={username}": {
+   "name": "projectdiva.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "projectdiva.wiki/wiki/user:{username}": {
+   "name": "projectdiva.wiki",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "proshkolu.ru/user/{username}": {
+   "name": "Proshkolu",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "finds made-up names"
+  },
+  "pskovfaunaclub.ucoz.ru/index/8-0-{username}": {
+   "name": "pskovfaunaclub.ucoz.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "pubert.company/index/8-0-{username}": {
+   "name": "pubert.company",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "puru.do.am/index/8-0-{username}": {
+   "name": "puru.do.am",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "puzzle-place.com/wiki/user:{username}": {
+   "name": "puzzle-place.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "quantifyapi.avontus.com/u/{username}/summary": {
+   "name": "quantifyapi.avontus.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "questpost.ru/u/{username}": {
+   "name": "questpost.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "quitter.pl/profile/{username}": {
+   "name": "Quitter.pl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "radiann6631.xsns.jp/@{username}": {
+   "name": "radiann6631.xsns.jp",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "radiomed.ru/users/{username}": {
+   "name": "Radiomed",
+   "since": "2026-11-13T11:24:44+00:00",
+   "why": "finds made-up names"
+  },
+  "rapforce.net/index/8-0-{username}": {
+   "name": "Rapforce",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "rasskazovskie.ru/index/8-0-{username}": {
+   "name": "rasskazovskie.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "reincarnationforum.com/members/?username={username}": {
+   "name": "Reincarnationforum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "religions.wiki/index.php/user:{username}": {
+   "name": "religions.wiki",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "rewa-insights.com/u/{username}/summary": {
+   "name": "rewa-insights.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "riktigtkaffe.se/members/?username={username}": {
+   "name": "riktigtkaffe.se",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "rodobozhie.ru/index/8-0-{username}": {
+   "name": "rodobozhie.ru",
+   "since": "2026-11-11T11:24:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "royalcams.com/profile/{username}": {
+   "name": "RoyalCams",
+   "since": "2026-11-14T10:49:45+00:00",
+   "why": "finds made-up names"
+  },
+  "ru-sfera.org/members/?username={username}": {
+   "name": "Ru-sfera",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "ruby.dating/en/users/{username}": {
+   "name": "Ruby.dating",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "samp-rus.com/index/8-0-{username}": {
+   "name": "samp-rus.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "samsungmobile.pp.net.ua/index/8-0-{username}": {
+   "name": "samsungmobile.pp.net.ua",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "no reply in time"
+  },
+  "santeh-sinfo.ru/index/8-0-{username}": {
+   "name": "santeh-sinfo.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "saraacarter.com/author/{username}": {
+   "name": "Saracartershow",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "satsis.info/user/{username}": {
+   "name": "satsisRU",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "school-school.ru/user/{username}": {
+   "name": "School-school",
+   "since": "2026-11-11T11:24:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "scriptvip.ru/members/?username={username}": {
+   "name": "scriptvip.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "serenityos.social/@{username}": {
+   "name": "serenityos.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "seriewikin.serieframjandet.se/index.php/user:{username}": {
+   "name": "seriewikin.serieframjandet.se",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "no reply in time"
+  },
+  "shelf.im/{username}": {
+   "name": "Shelf",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "ships.ucoz.ru/index/8-0-{username}": {
+   "name": "ships.ucoz.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "shipsecure.cc/{username}": {
+   "name": "shipsecure.cc",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "shipsondesk.info/index/8-0-{username}": {
+   "name": "shipsondesk.info",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "sidvind.com/wiki/user:{username}": {
+   "name": "sidvind.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "skorozamuj.com/index/8-0-{username}": {
+   "name": "skorozamuj.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "skynetzone.net/members/?username={username}": {
+   "name": "skynetzone.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "skyrimforums.org/members/?username={username}": {
+   "name": "Skyrimforums",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "slant.co/users/{username}": {
+   "name": "Slant",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 526)"
+  },
+  "smart-phone.ucoz.ua/index/8-0-{username}": {
+   "name": "smart-phone.ucoz.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "smolhaj.social/@{username}": {
+   "name": "smolhaj.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "snsnsnya6h3ot563f3p566wuhfoklkg5f62hokdlaqzcaub3gf4xlxyd.onion/{username}": {
+   "name": "Stacker News Tor",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "social.3dots.lv/@{username}": {
+   "name": "social.3dots.lv",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "social.coletivos.org/@{username}": {
+   "name": "social.coletivos.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "social.khajiit.de/@{username}": {
+   "name": "social.khajiit.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "social.lol/@{username}": {
+   "name": "social.lol",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "social.netdynamics.eu/profile/{username}": {
+   "name": "social.netdynamics.eu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "social.phoenixradio1208.com/@{username}": {
+   "name": "social.phoenixradio1208.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "social.theokadas.com/@{username}": {
+   "name": "social.theokadas.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "social.xinghaizhandui.com/@{username}": {
+   "name": "social.xinghaizhandui.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "soundengine.cn/u/{username}/summary": {
+   "name": "soundengine.cn",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "southbayriders.com/forums/members/?username={username}": {
+   "name": "southbayriders.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "southparkz.net/index/8-0-{username}": {
+   "name": "southparkz.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "spaceserials.ru/index/8-0-{username}": {
+   "name": "spaceserials.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "sst.hiberworld.com/user/{username}": {
+   "name": "sst.hiberworld.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "starwarsrp.net/members/?username={username}": {
+   "name": "starwarsrp.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "starzen.space/u/{username}/summary": {
+   "name": "starzen.space",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "stellenangebote-forum.de/forum/users/{username}": {
+   "name": "stellenangebote-forum.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "stendustriforum.com/members/?username={username}": {
+   "name": "stendustriforum.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "student-telecom.ru/index/8-0-{username}": {
+   "name": "student-telecom.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "studygolang.com/user/{username}": {
+   "name": "StudyGolang",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "sustc.wiki/user:{username}": {
+   "name": "sustc.wiki",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "swedroid.se/forum/members/?username={username}": {
+   "name": "swedroid.se",
+   "since": "2026-11-14T10:49:45+00:00",
+   "why": "finds made-up names"
+  },
+  "sylphy.ru/user/{username}": {
+   "name": "sylphy.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "syringa.social/@{username}": {
+   "name": "syringa.social",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "szmer.info/u/{username}": {
+   "name": "szmer.info",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "talk.drugabuse.com/members/?username={username}": {
+   "name": "TalkDrugabuse",
+   "since": "2026-11-14T10:49:45+00:00",
+   "why": "server error (HTTP 530)"
+  },
+  "talk.pokitto.com/u/{username}/summary": {
+   "name": "talk.pokitto.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "tavr-obrazovanie.ru/index/8-0-{username}": {
+   "name": "tavr-obrazovanie.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "tbank.ru/invest/social/profile/{username}": {
+   "name": "Tinkoff Invest",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "techbiz.vn/members/?username={username}": {
+   "name": "techbiz.vn",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "techparle.com/u/{username}/summary": {
+   "name": "techparle.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "telcontarshope.co.uk/members/?username={username}": {
+   "name": "telcontarshope.co.uk",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "theweird.space/@{username}": {
+   "name": "theweird.space",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "thpedia.org/wiki/user:{username}": {
+   "name": "thpedia.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 530)"
+  },
+  "tigerfan.com/members/?username={username}": {
+   "name": "tigerfan.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "timxenhanh.autodaily.vn/members/?username={username}": {
+   "name": "timxenhanh.autodaily.vn",
+   "since": "2026-11-14T10:49:45+00:00",
+   "why": "no reply in time"
+  },
+  "tirol20.communalconsult.at/index.php?title=user:{username}": {
+   "name": "tirol20.communalconsult.at",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "tollab.sau.edu.jo/u/{username}/summary": {
+   "name": "tollab.sau.edu.jo",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "tonometerbot.com/@/{username}": {
+   "name": "Tonometerbot",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "toppsider.no/user:{username}": {
+   "name": "toppsider.no",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "toys22.ru/index/8-0-{username}": {
+   "name": "toys22.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "tr.forum.tribalwars2.com/members/?username={username}": {
+   "name": "tr.forum.tribalwars2.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "trailville.com/wiki/user:{username}": {
+   "name": "trailville.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "trakt.tv/users/{username}": {
+   "name": "trakt",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "trance.mk.ua/forum/member.php?username={username}": {
+   "name": "trance.mk.ua/forum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "tree-of-souls.net/members/?username={username}": {
+   "name": "tree-of-souls.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "tristatetuners.com/forum/member.php?username={username}": {
+   "name": "tristatetuners.com/forum",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "triviawhizz.com/members/{username}": {
+   "name": "triviawhizz.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "trovo.live/s/{username}": {
+   "name": "Trovo",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "tulpa.dev/{username}": {
+   "name": "tulpa.dev",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "tuna.voicemod.net/user/{username}": {
+   "name": "Tuna",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "turkrock.com/members/?username={username}": {
+   "name": "turkrock.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "tv-games.ru/forum/member.php?username={username}": {
+   "name": "Tv-games",
+   "since": "2026-11-13T11:24:44+00:00",
+   "why": "finds made-up names"
+  },
+  "twt.rs/@{username}": {
+   "name": "twt.rs",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "ucozzz.ru/index/8-0-{username}": {
+   "name": "ucozzz.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "ufive.ru/index/8-0-{username}": {
+   "name": "ufive.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "ufopedia.it/user:{username}.html": {
+   "name": "ufopedia.it",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "ukrelektrik.com/index/8-0-{username}": {
+   "name": "ukrelektrik.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "ultos.de/index.php?title=user:{username}": {
+   "name": "ultos.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "ultrasdiary.pl/u/{username}": {
+   "name": "ultrasdiary.pl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "unibot.net/members/?username={username}": {
+   "name": "unibot.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "urduweb.org/mehfil/members/?username={username}": {
+   "name": "urduweb.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "uroportal.com.ua/index/8-0-{username}": {
+   "name": "uroportal.com.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "uvelir.net/member.php?username={username}": {
+   "name": "Uvelir",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "vadimbondar.ucoz.ru/index/8-0-{username}": {
+   "name": "vadimbondar.ucoz.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "vamber.ru/author/{username}": {
+   "name": "Vamber",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "velozone.ucoz.ua/index/8-0-{username}": {
+   "name": "velozone.ucoz.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "vetasocial.k.vu/u/{username}": {
+   "name": "vetasocial.k.vu",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "videoforums.ru/member.php?username={username}": {
+   "name": "videoforums.ru",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "finds made-up names"
+  },
+  "vilinburg.net/index/8-0-{username}": {
+   "name": "vilinburg.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "virtualireland.ru/member.php?username={username}": {
+   "name": "VirtualIreland",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "virtualrift.ru/index/8-0-{username}": {
+   "name": "virtualrift.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "vivasan.mobi/index/8-0-{username}": {
+   "name": "vivasan.mobi",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "vizjer.pl/uzytkownik/{username}": {
+   "name": "Vizjer.pl",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "vl-dimir.ru/index/8-0-{username}": {
+   "name": "vl-dimir.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "vlmi.biz/members/?username={username}": {
+   "name": "Vlmi",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "volkswagen.lviv.ua/members/?username={username}": {
+   "name": "volkswagen.lviv.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "vozer.net/members/?username={username}": {
+   "name": "vozer.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "vrn-sms.ru/index/8-0-{username}": {
+   "name": "vrn-sms.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "vuna.no/a/{username}": {
+   "name": "vuna.no",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "waihui8.biz/members/?username={username}": {
+   "name": "waihui8.biz",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "wallz.gg/u/{username}": {
+   "name": "wallz.gg",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "waltons.nodebb.com/user/{username}": {
+   "name": "waltons.nodebb.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "watch.goodluckgabe.life/a/{username}": {
+   "name": "watch.goodluckgabe.life",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "weblogistics.vn/members/?username={username}": {
+   "name": "weblogistics.vn",
+   "since": "2026-11-14T10:49:45+00:00",
+   "why": "no reply in time"
+  },
+  "wellwiki.org/wiki/user:{username}": {
+   "name": "wellwiki.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "whackahack.com/foro/members/?username={username}": {
+   "name": "whackahack.com/foro",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "wiki.aapg.org/user:{username}": {
+   "name": "wiki.aapg.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "wiki.delphi-jedi.org/wiki/user:{username}": {
+   "name": "wiki.delphi-jedi.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "wiki.faltboot.org/wiki/index.php?title=user:{username}": {
+   "name": "wiki.faltboot.org",
+   "since": "2026-11-12T11:42:16+00:00",
+   "why": "no reply in time"
+  },
+  "wiki.freifunk-rheinland.net/wiki/user:{username}": {
+   "name": "wiki.freifunk-rheinland.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "wiki.fu-lab.ru/index.php/user:{username}": {
+   "name": "wiki.fu-lab.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "wiki.fusion.ciemat.es/wiki/user:{username}": {
+   "name": "wiki.fusion.ciemat.es",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "wiki.irkutsk.ru/index.php/user:{username}": {
+   "name": "wiki.irkutsk.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "wiki.maisons-paysannes.org/wiki/user:{username}": {
+   "name": "wiki.maisons-paysannes.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "wiki.mch2022.org/user:{username}": {
+   "name": "wiki.mch2022.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "wiki.nordugrid.org/wiki/user:{username}": {
+   "name": "wiki.nordugrid.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "wiki.openvz.org/user:{username}": {
+   "name": "wiki.openvz.org",
+   "since": "2026-11-11T11:24:51+00:00",
+   "why": "no reply in time"
+  },
+  "wiki.robojackets.org/user:{username}": {
+   "name": "wiki.robojackets.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 522)"
+  },
+  "wiki.rpgverse.ru/wiki/user:{username}": {
+   "name": "wiki.rpgverse.ru",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "wiki.samygo.tv/index.php?title=user:{username}": {
+   "name": "wiki.samygo.tv",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "wiki.tfes.org/user:{username}": {
+   "name": "wiki.tfes.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "wiki.themixingbowl.org/user:{username}": {
+   "name": "wiki.themixingbowl.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "wiki.travellerrpg.com/user:{username}": {
+   "name": "wiki.travellerrpg.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "wiki.urbandead.com/index.php/user:{username}": {
+   "name": "wiki.urbandead.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "wiki.vega-strike.org/user:{username}": {
+   "name": "wiki.vega-strike.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "wiki.vg/user:{username}": {
+   "name": "Wiki.vg",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "wiki.volleyball-bayern.de/index.php?title=user:{username}": {
+   "name": "wiki.volleyball-bayern.de",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "wiki.wolhynien.net/index.php?title=user:{username}": {
+   "name": "wiki.wolhynien.net",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "wiki.xiph.org/user:{username}": {
+   "name": "wiki.xiph.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "wikifantaeuropa.altervista.org/index.php?title=user:{username}": {
+   "name": "wikifantaeuropa.altervista.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "invalid HTTPS certificate"
+  },
+  "wikiwaves.org/index.php/user:{username}": {
+   "name": "wikiwaves.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "wikizilla.org/wiki/user:{username}": {
+   "name": "wikizilla.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "worldofplayers.ru/members/?username={username}": {
+   "name": "Worldofplayers",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  },
+  "writingforums.org/members/?username={username}": {
+   "name": "writingforums.org",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "wtliker.com/members/?username={username}": {
+   "name": "wtliker.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "ww2f.com/members/?username={username}": {
+   "name": "ww2f.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 503)"
+  },
+  "xn----7sbb0bfjrbhdi.xn--p1ai/index/8-0-{username}": {
+   "name": "xn----7sbb0bfjrbhdi.xn--p1ai",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "xn----7sbcctevcqafop1aviko5l.xn--p1ai/index/8-0-{username}": {
+   "name": "xn----7sbcctevcqafop1aviko5l.xn--p1ai",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "xn--80aepdb4ag.xn--p1ai/index/8-0-{username}": {
+   "name": "xn--80aepdb4ag.xn--p1ai",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "xn--lnforum-exa.se/members/?username={username}": {
+   "name": "xn--lnforum-exa.se",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "xosothantai.com/members/?username={username}": {
+   "name": "xosothantai.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "yazawaj.com/profile/{username}": {
+   "name": "Yazawaj",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "zdesvsyo.com/index/8-0-{username}": {
+   "name": "zdesvsyo.com",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "zix.vn/members/?username={username}": {
+   "name": "zix.vn",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "finds made-up names"
+  },
+  "zmey.ru/user/@{username}": {
+   "name": "Zmey",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "zoinks.one/@{username}": {
+   "name": "zoinks.one",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 502)"
+  },
+  "zp-mama.ucoz.ua/index/8-0-{username}": {
+   "name": "zp-mama.ucoz.ua",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "no reply in time"
+  },
+  "{username}.donatik.ua": {
+   "name": "Donatik",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "server error (HTTP 500)"
+  },
+  "{username}.empretienda.com.ar": {
+   "name": "Empretienda AR",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "{username}.noblogs.org": {
+   "name": "Noblogs",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "{username}.piccsy.com": {
+   "name": "Piccsy",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "host name does not resolve"
+  },
+  "{username}.tumblr.com": {
+   "name": "Tumblr",
+   "since": "2026-11-10T21:31:51+00:00",
+   "why": "connection failed"
+  }
+ },
+ "updated_utc": "2026-11-14T10:49:45+00:00"
+}
