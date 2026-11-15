@@ -46,7 +46,7 @@
         "guid": "helix-year",
         "status": "active",
         "name": "One year of Helix development",
-        "description": "Twelve months of part-time work on Helix, paid by milestone: 1. Publish the open accuracy test on real accounts with the owners' consent, comparing Helix, Sherlock, Maigret and Blackbird, with all data public. 2. Raise the share of sites that give a clear answer above 95% while keeping zero false positives on made-up names. 3. Ship Helix inside investigation tools people already use (Trace, Maltego, SpiderFoot), tested in each. 4. Native-speaker review of the Hindi, Spanish, Arabic, Portuguese and Russian translations. 5. Keep the daily site check, releases and packages (PyPI, Docker, BlackArch, AUR) running, and answer issues within a week. Progress is posted on the project's GitHub every quarter.",
+        "description": "One year of part-time work, paid by milestone: publish an open accuracy test on real accounts against Sherlock, Maigret and Blackbird; raise the share of sites that answer above 95% with zero false positives; ship Helix inside Trace, Maltego and SpiderFoot; get the translations checked by native speakers; keep the daily site check, releases and packages running. Progress posted on GitHub every quarter.",
         "amount": 300000,
         "currency": "INR",
         "frequency": "yearly",
