@@ -1,0 +1,67 @@
+{
+  "$schema": "https://fundingjson.org/schema/v1.1.0.json",
+  "version": "v1.0.0",
+  "entity": {
+    "type": "individual",
+    "role": "owner",
+    "name": "Thalha Ahmed",
+    "email": "sheikthalah035@gmail.com",
+    "description": "Developer from India who builds open source OSINT and security tools. I wrote and maintain Helix on my own: the engine, the site checks, the releases on PyPI, Docker, BlackArch and the AUR, and the daily public status page.",
+    "webpageUrl": {
+      "url": "https://github.com/thalha-a9"
+    }
+  },
+  "projects": [
+    {
+      "guid": "helix-osint",
+      "name": "Helix",
+      "description": "Helix checks a username across about 12,000 sites and re-checks every account it finds against made-up usernames before reporting it, so a site that says yes to any name cannot produce a false result. Every site is tested once a day against a real account and a made-up name, with the results on a public status page. Results are graded for how likely the accounts belong to one person and can be sealed with a fingerprint so anyone can verify later that nothing was edited. It also shows people their own footprint with a delete link for each account, and watches a username over time. Runs on the user's own machine: no account, no telemetry. Built for investigators, journalists and security researchers, and for ordinary people checking what is public about them.",
+      "webpageUrl": {
+        "url": "https://github.com/thalha-a9/helix"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/thalha-a9/helix"
+      },
+      "licenses": ["spdx:MIT"],
+      "tags": ["osint", "security", "privacy", "investigation", "journalism", "cli", "python", "fediverse"]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "bank",
+        "type": "bank",
+        "address": "",
+        "description": "Bank transfer to an Indian bank account. Email for details."
+      },
+      {
+        "guid": "github-sponsors",
+        "type": "payment-provider",
+        "address": "https://github.com/sponsors/thalha-a9",
+        "description": "One-time or monthly support through GitHub Sponsors."
+      }
+    ],
+    "plans": [
+      {
+        "guid": "helix-year",
+        "status": "active",
+        "name": "One year of Helix development",
+        "description": "Twelve months of part-time work on Helix, paid by milestone: 1. Publish the open accuracy test on real accounts with the owners' consent, comparing Helix, Sherlock, Maigret and Blackbird, with all data public. 2. Raise the share of sites that give a clear answer above 95% while keeping zero false positives on made-up names. 3. Ship Helix inside investigation tools people already use (Trace, Maltego, SpiderFoot), tested in each. 4. Native-speaker review of the Hindi, Spanish, Arabic, Portuguese and Russian translations. 5. Keep the daily site check, releases and packages (PyPI, Docker, BlackArch, AUR) running, and answer issues within a week. Progress is posted on the project's GitHub every quarter.",
+        "amount": 300000,
+        "currency": "INR",
+        "frequency": "yearly",
+        "channels": ["bank"]
+      },
+      {
+        "guid": "supporter",
+        "status": "active",
+        "name": "Support Helix",
+        "description": "Any amount, once or every month. It pays for my time keeping the site checks honest.",
+        "amount": 0,
+        "currency": "USD",
+        "frequency": "monthly",
+        "channels": ["github-sponsors"]
+      }
+    ]
+  }
+}
