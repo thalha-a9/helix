@@ -8,7 +8,8 @@
     "email": "sheikthalah035@gmail.com",
     "description": "Developer from India who builds open source OSINT and security tools. I wrote and maintain Helix on my own: the engine, the site checks, the releases on PyPI, Docker, BlackArch and the AUR, and the daily public status page.",
     "webpageUrl": {
-      "url": "https://github.com/thalha-a9"
+      "url": "https://github.com/thalha-a9",
+      "wellKnown": "https://github.com/thalha-a9/helix/blob/main/.well-known/funding-manifest-urls"
     }
   },
   "projects": [
@@ -17,10 +18,12 @@
       "name": "Helix",
       "description": "Helix checks a username across about 12,000 sites and re-checks every account it finds against made-up usernames before reporting it, so a site that says yes to any name cannot produce a false result. Every site is tested once a day against a real account and a made-up name, with the results on a public status page. Results are graded for how likely the accounts belong to one person and can be sealed with a fingerprint so anyone can verify later that nothing was edited. It also shows people their own footprint with a delete link for each account, and watches a username over time. Runs on the user's own machine: no account, no telemetry. Built for investigators, journalists and security researchers, and for ordinary people checking what is public about them.",
       "webpageUrl": {
-        "url": "https://github.com/thalha-a9/helix"
+        "url": "https://github.com/thalha-a9/helix",
+        "wellKnown": "https://github.com/thalha-a9/helix/blob/main/.well-known/funding-manifest-urls"
       },
       "repositoryUrl": {
-        "url": "https://github.com/thalha-a9/helix"
+        "url": "https://github.com/thalha-a9/helix",
+        "wellKnown": "https://github.com/thalha-a9/helix/blob/main/.well-known/funding-manifest-urls"
       },
       "licenses": ["spdx:MIT"],
       "tags": ["osint", "security", "privacy", "investigation", "journalism", "cli", "python", "fediverse"]
