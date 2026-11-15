@@ -383,7 +383,7 @@ async def run(args):
 
     # Username scan
     if username:
-        if args.permutations:
+        if args.permutations and not getattr(args, "json_out", False):   # --json never asks
             perms = [p for p in generate_permutations(username)
                      if not leftout.is_left_out(p, left_out_tokens)]
             print(f"  {C}[*]{RST} {len(perms)} permutations available")
@@ -977,7 +977,7 @@ async def run(args):
         email=email, email_results=email_results,
         pivot_data=pivot_data, phash_matches=phash_matches,
         relationships=relationships, breach_verdicts=breach_verdicts,
-        darkweb=darkweb,
+        darkweb=darkweb, left_out=len(left_out),
     )
     print(f"  {G}[+]{RST} {B}Graph{RST}    -> {gpath}")
 
@@ -1016,8 +1016,44 @@ async def run(args):
         if rec:
             _print_record(rec)
 
-    if not args.no_browser:
+    if not args.no_browser and not getattr(args, "json_out", False):
         webbrowser.open(f"file://{os.path.abspath(gpath)}")
+
+    return machine_report(username, email, results, email_results, left_out,
+                          getattr(args, "purpose", None))
+
+
+JSON_SCHEMA = "helix.cli.v1"
+
+
+def machine_report(username, email, results, email_results, left_out, purpose) -> dict:
+    """What --json prints: the confirmed accounts and the counts, nothing
+    else. One object, stable keys, plain values."""
+    def account(r):
+        return {"platform": r.get("platform", ""), "url": r.get("url", ""),
+                "category": r.get("category", ""), "source": r.get("source", ""),
+                # HIGH, MEDIUM or LOW: how strongly the account is tied to the
+                # other accounts found. LOW means the same name, nothing more.
+                "confidence": r.get("identity_confidence") or "LOW",
+                "evidence": list(r.get("evidence") or []),
+                "kind": r.get("target_type", "username")}
+    every = list(results) + list(email_results)
+    counts = evidence.summarise(every)
+    return {
+        "schema": JSON_SCHEMA,
+        "tool": {"name": "Helix", "version": __version__},
+        "username": username or "",
+        "email": email or "",
+        "purpose": evidence.one_line(purpose) or evidence.PURPOSE_NOT_STATED,
+        "summary": {"attempted": counts["attempted"], "answered": counts["answered"],
+                    "found": counts["found"], "unanswered": counts["unanswered"],
+                    "unanswered_by_reason": counts["unanswered_by_reason"],
+                    "left_out": len(left_out)},
+        "accounts": [account(r) for r in sorted(every, key=lambda x: str(x.get("platform", "")).lower())
+                     if r.get("found")],
+        "unconfirmed": [{"platform": r.get("platform", ""), "url": r.get("url", "")}
+                        for r in every if r.get("unconfirmed")],
+    }
 
 
 async def learn_site(args) -> int:
@@ -1042,6 +1078,33 @@ async def learn_site(args) -> int:
           f"in a pull request:{RST}")
     print(f"  {result.line()}\n")
     return 0
+
+
+def _run_for_a_program(args) -> int:
+    """--json: everything a person would read goes to stderr, and standard
+    output carries exactly one JSON object, written when the scan is over.
+    A scan that could not run still prints an object, with "error"."""
+    import json
+    out = sys.stdout
+    sys.stdout = sys.stderr
+    code, report = 0, None
+    try:
+        report = asyncio.run(run(args))
+    except SystemExit as e:
+        code = e.code if isinstance(e.code, int) else 1
+    except KeyboardInterrupt:
+        code = 130
+    finally:
+        sys.stdout = out
+    if not isinstance(report, dict):
+        why = {3: "the name is on the left-out list", 130: "interrupted"}.get(
+            code, "the scan did not run; the reason is on standard error")
+        report = {"schema": JSON_SCHEMA, "tool": {"name": "Helix", "version": __version__},
+                  "error": why, "exit_code": code or 1, "accounts": [], "unconfirmed": []}
+        code = code or 1
+    out.write(json.dumps(report, ensure_ascii=False) + "\n")
+    out.flush()
+    return code
 
 
 def _prog_name() -> str:
@@ -1181,6 +1244,12 @@ Operational security:
                    help="Write sealed evidence of this scan (witnessed tests, audits): UTC times, "
                         "the exact site database (with its SHA-256), per-site outcomes and a "
                         "fingerprint of the whole file, printed at the end for the video")
+    p.add_argument("--json", action="store_true", dest="json_out",
+                   help="For other programs: print one JSON object on standard output when the "
+                        "scan is over (the confirmed accounts with platform, url and confidence, "
+                        "and the counts) and send everything else to standard error. Never "
+                        "opens a browser and never asks a question. Files are still written to "
+                        "the results folder")
     p.add_argument("--serve", action="store_true",
                    help="Start a local web page (http://127.0.0.1:8765/) for people who do not use a "
                         "terminal, in English, Hindi, Spanish, Arabic, Portuguese and Russian, with a "
@@ -1270,6 +1339,9 @@ Operational security:
         from helix_osint import leftout
         print(leftout.token(args.left_out_token))
         sys.exit(0)
+
+    if args.json_out:
+        sys.exit(_run_for_a_program(args))
 
     try:
         asyncio.run(run(args))

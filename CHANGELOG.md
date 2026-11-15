@@ -1,5 +1,19 @@
 # Helix Changelog
 
+## v4.2.0 (2026-11-15)
+
+### Changes you may notice
+- **The graph grades accounts the way the web page and the reports do.** Its panel used to count how sure Helix was that a page was a profile ("High (OG verified)"), so two accounts the web page marked "Same person? LOW" showed as "High" in the graph. The panel, the filter, the legend and the hover text now show one thing: how strongly an account is tied to the others found (High, Medium, Low). A username match alone is Low. Graphs of the same scan will show fewer "High" accounts than before; the accounts found are the same.
+- **The graph's "Checked" count says when sites were left out**, for example "Checked (2 left out)" when the daily check has switched two sites off.
+- **The graph no longer shows a red "Errors" count.** It shows "No clear answer" in grey, counted like the command line counts it: sites that refused, timed out or could not be verified. The number can differ from the old one, which counted every result that carried an error text.
+
+### Added
+- `--json`, for running Helix from another program. Standard output carries exactly one JSON object, written when the scan is over (schema `helix.cli.v1`): the confirmed accounts with `platform`, `url`, `category`, `source`, `confidence` (HIGH, MEDIUM or LOW) and `evidence`, the unconfirmed ones, and the counts, including how many sites gave no clear answer and why. The banner, the progress bar and every message go to standard error. It never opens a browser and never asks a question (`--permutations` is skipped). A scan that cannot run (a name that is not a username, a name on the left-out list) still prints an object with `error` and `exit_code`.
+- A screenshot of the local web page (`--serve`) at the top of the README, from a real check of the author's own username.
+
+### Fixed
+- `--proxy socks5h://...` and `socks4a://...` were accepted and then failed on the first request, because the SOCKS library has no such scheme names. They now work: names were already resolved at the proxy, which is what the "h" and "a" ask for.
+
 ## v4.1.0 (2026-11-11)
 
 ### Changes you may notice

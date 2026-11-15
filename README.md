@@ -12,7 +12,7 @@
 ### Decode the digital DNA of any identity
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-4.1.0-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
+[![Version](https://img.shields.io/badge/Version-4.2.0-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
 [![License](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)](LICENSE)
 [![Platforms](https://img.shields.io/badge/Platforms-56%20builtin%20%7C%208%2C305%20with%20--all-a78bfa?style=flat-square)](https://github.com/thalha-a9/helix)
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-reproducible%20%7C%200%20false%20positives-00ff88?style=flat-square)](bench/README.md)
@@ -28,7 +28,7 @@ Then it shows which accounts belong to the same person, in an interactive graph 
 
 [**Quick Start**](#quick-start) | [**Features**](#what-makes-helix-different) | [**Modules**](#intelligence-modules) | [**Graph**](#the-graph) | [**Install**](#installation)
 
-<img src="docs/images/graph.png" width="900" alt="Helix graph of a real scan: the username in the middle, the accounts found around it, grouped by category">
+<img src="docs/images/serve.png" width="760" alt="The local Helix web page after a real check of the username thalha-a9: two accounts found, GitHub and Dev.to, each marked 'Same person? LOW'">
 
 </div>
 
@@ -102,6 +102,7 @@ the report is the expensive mistake.
 | `--watch` | **Watch a username over time**: each `--watch` scan adds a snapshot to a hash-chained history and says what is new, removed or changed since the last one. An account is called removed only when its site clearly says "no such user", never when the site did not answer. `--verify-watch DIR` re-checks the chain |
 | `--learn URL` | **Learn a new site** from its profile address (`"https://example.com/u/{username}"`): Helix works out the rule, proves it with the control probe and saves the site to your own list as one line. `--known NAME` gives it an account that exists; without it common names are tried. See [docs/LEARN.md](docs/LEARN.md) |
 | `--phone NUMBER` | **A phone number**, opt-in only and never part of `--all`. It needs `--purpose`. Shows what the number itself says (country, region, the carrier it was issued to, kind of line; worked out offline, needs `pip install helix-osint[phone]`), whether the accounts found for `-u` show it, and with `--breach` whether it is in known breaches (Have I Been Pwned, needs `HIBP_API_KEY`). Nothing is ever sent to the number: no sign-up, login or reset form is asked, and no messaging app is checked. Reports hide the middle digits unless `--show-number` is given |
+| `--json` | For other programs: prints one JSON object on standard output when the scan is over (schema `helix.cli.v1`: the confirmed accounts with `platform`, `url` and `confidence`, the unconfirmed ones, and the counts including sites that gave no clear answer) and sends everything a person would read to standard error. Never opens a browser, never asks a question. A scan that cannot run still prints an object, with `error` |
 | `--serve` | A local web page at `http://127.0.0.1:8765/` for people who do not use a terminal, with a small HTTP API. It listens on this computer only. English, Hindi, Spanish, Arabic, Portuguese and Russian; the five translations have not yet been checked by a native speaker of each |
 | `--include-off` | Also scan the sites the [daily site check](docs/SITE_CHECK.md) switched off (dead or broken on 3 checks in a row). They are left out by default and every scan says how many |
 | `--no-recover` | Skip the second attempt for sites that gave no clear answer (another rule for the same site, the same request after a pause, a browser's TLS fingerprint). Faster, but fewer sites answer |

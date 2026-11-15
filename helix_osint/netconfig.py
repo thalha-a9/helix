@@ -13,6 +13,7 @@ Usage:
 """
 
 import os
+import re
 from typing import Optional
 from urllib.parse import urlparse, urlunparse
 
@@ -250,7 +251,11 @@ def build_connector(**kwargs) -> aiohttp.BaseConnector:
     if _PROXY and is_socks():
         # rdns: hostnames are resolved by the proxy, never locally (no DNS leak).
         kwargs.setdefault("rdns", True)
-        return ProxyConnector.from_url(_PROXY, **kwargs)
+        # aiohttp-socks has no "socks5h" or "socks4a": with rdns the plain
+        # scheme already resolves names at the proxy, which is what the "h"
+        # and "a" ask for.
+        url = re.sub(r"^socks5h:", "socks5:", re.sub(r"^socks4a:", "socks4:", _PROXY, flags=re.I), flags=re.I)
+        return ProxyConnector.from_url(url, **kwargs)
     # aiohttp silently switches to aiodns when it is installed (maigret pulls it
     # in), and c-ares times out under thousands of concurrent lookups. The
     # system resolver plus a DNS cache holds up at full-database scale.

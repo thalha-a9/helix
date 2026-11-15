@@ -75,3 +75,58 @@ def test_username_and_email_are_escaped_in_the_graph_page(tmp_path):
     page = out.read_text()
     assert "<b>x</b>" not in page and "<i>@y.z" not in page
     assert "&lt;b&gt;x&lt;/b&gt;" in page
+
+
+# One meaning of confidence, and no red "Errors"
+
+def _graph(tmp_path, results):
+    path = tmp_path / "g.html"
+    generate_graph(username="janeroe", results=results, output_path=str(path))
+    return path.read_text(encoding="utf-8")
+
+
+def _acc(platform, **kw):
+    return {"platform": platform, "url": f"https://{platform.lower()}.example/janeroe", "category": "dev",
+            "color": "#fff", "found": True, "bio_links": {}, "source": "builtin", **kw}
+
+
+def test_the_graph_grades_accounts_like_the_web_page_and_the_report(tmp_path):
+    """Found on a real scan: the page showed "Same person? LOW" for two
+    accounts and the graph showed "High (OG verified) 2" for the same two.
+    The graph counted how sure Helix was of the page; everything else says
+    how strongly the account is tied to the others."""
+    import json
+    html = _graph(tmp_path, [
+        _acc("PageVerified", confidence="high", identity_confidence="LOW"),      # the page was verified, the person was not
+        _acc("Corroborated", confidence="medium", identity_confidence="HIGH"),
+        _acc("Partly", confidence="low", identity_confidence="MEDIUM"),
+        _acc("Ungraded", confidence="high"),
+    ])
+    assert "OG verified" not in html and "Same person?" in html
+    panel = html.split('<div class="sp-title">Same person?</div>', 1)[1].split("</div>\n    </div>", 1)[0]
+    counts = re.findall(r'</div>(High|Medium|Low)</div><span[^>]*>(\d+)</span>', panel)
+    assert counts == [("High", "1"), ("Medium", "1"), ("Low", "2")]
+    nodes = json.loads(re.search(r"const NODES\s*=\s*(\[.*?\]);", html, re.S).group(1))
+    grades = {n["label"]: n["confidence"] for n in nodes if n.get("type") == "platform"}
+    assert grades == {"PageVerified": "low", "Corroborated": "high", "Partly": "medium", "Ungraded": "low"}
+
+
+def test_sites_without_a_clear_answer_are_grey_not_red_errors(tmp_path):
+    html = _graph(tmp_path, [
+        _acc("Found", identity_confidence="LOW"),
+        {**_acc("Clean"), "found": False, "error": None, "status_code": 404},
+        {**_acc("Timeout"), "found": False, "error": "timeout"},
+        {**_acc("Refused"), "found": False, "error": None, "status_code": 403},
+    ])
+    assert ">Errors<" not in html
+    assert '<div class="stat-box grey"><div class="sv">2</div><div class="sl">No clear answer</div></div>' in html
+    assert ".stat-box.grey .sv{color:var(--dim);}" in html
+
+
+def test_the_checked_count_says_when_sites_were_left_out(tmp_path):
+    path = tmp_path / "g.html"
+    results = [_acc("Found", identity_confidence="LOW")] * 54
+    generate_graph(username="janeroe", results=results, output_path=str(path), left_out=2)
+    html = path.read_text(encoding="utf-8")
+    assert '>54</div><div class="sl">Checked (2 left out)</div>' in html
+    assert '<div class="sl">Checked</div>' in _graph(tmp_path, results)

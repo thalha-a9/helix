@@ -42,11 +42,19 @@ def _build_cross_links(found, node_id_by_platform, username):
 def generate_graph(username, results, output_path,
                    email=None, email_results=None,
                    pivot_data=None, phash_matches=None,
-                   relationships=None, breach_verdicts=None, darkweb=None):
+                   relationships=None, breach_verdicts=None, darkweb=None, left_out=0):
 
     found        = [r for r in results if r.get("found")]
     not_found    = [r for r in results if not r.get("found") and not r.get("error")]
-    errors       = [r for r in results if r.get("error")]
+    # Sites that gave no clear answer, counted as everywhere else in Helix.
+    from helix_osint.evidence import summarise as _summarise
+    unanswered_cnt = _summarise(results)["unanswered"]
+
+    def grade(r):
+        """One meaning of confidence everywhere: how strongly the account is
+        tied to the other accounts found (HIGH, MEDIUM, LOW). A username
+        match alone is LOW, also where the page itself was verified."""
+        return (r.get("identity_confidence") or "LOW").lower()
     email_found  = [r for r in (email_results or []) if r.get("found")]
 
     nodes=[]; links=[]; node_id_by_platform={}
@@ -85,7 +93,7 @@ def generate_graph(username, results, output_path,
     for r in found:
         nodes.append({"id":nid,"label":r["platform"],"type":"platform",
                       "category":r["category"],"color":r["color"],"url":r["url"],
-                      "size":12,"confidence":r.get("confidence","low"),
+                      "size":12,"confidence":grade(r),
                       "source":r.get("source","builtin"),"og_title":r.get("og_title",""),
                       "phash":bool(r.get("phash",""))})
         node_id_by_platform[r["platform"]]=nid
@@ -116,7 +124,7 @@ def generate_graph(username, results, output_path,
         for r in pd.get("found",[]):
             nodes.append({"id":nid,"label":r["platform"],"type":"platform",
                           "category":r["category"],"color":r["color"],"url":r["url"],
-                          "size":10,"confidence":r.get("confidence","low"),
+                          "size":10,"confidence":grade(r),
                           "source":"pivot","og_title":"","phash":False})
             links.append({"source":p_root_id,"target":nid,"type":"pivot_platform"})
             nid+=1
@@ -193,13 +201,16 @@ def generate_graph(username, results, output_path,
                  for r in not_found]
 
     ts=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    total=len(results); found_cnt=len(found); error_cnt=len(errors)
+    total=len(results); found_cnt=len(found)
+    # Sites the daily check switched off were not asked: say so next to the
+    # count, or 54 "checked" of a 56-site list reads like a mistake.
+    checked_label = f"Checked ({int(left_out)} left out)" if left_out else "Checked"
     xlink_cnt=len(cross_links); pivot_cnt=len(pivot_data or {})
     phash_cnt=len(phash_matches or [])
 
-    high_conf  = sum(1 for r in found if r.get("confidence")=="high")
-    med_conf   = sum(1 for r in found if r.get("confidence")=="medium")
-    low_conf   = sum(1 for r in found if r.get("confidence")=="low")
+    high_conf  = sum(1 for r in found if grade(r)=="high")
+    med_conf   = sum(1 for r in found if grade(r)=="medium")
+    low_conf   = sum(1 for r in found if grade(r)=="low")
 
     cat_breakdown = {}
     for r in found:
@@ -289,6 +300,7 @@ body{{background:var(--bg);color:var(--text);font-family:'Courier New',monospace
 .stat-box.amber .sv{{color:var(--accent2);}}
 .stat-box.purple .sv{{color:var(--accent3);}}
 .stat-box.red .sv{{color:var(--red);}}
+.stat-box.grey .sv{{color:var(--dim);}}
 
 .conf-row{{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:11px;}}
 .conf-dot{{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-right:8px;}}
@@ -427,15 +439,15 @@ svg#graph{{width:100%;height:100%;}}
       <div class="sp-title">Scan Summary</div>
       <div class="stat-grid">
         <div class="stat-box green"><div class="sv">{found_cnt}</div><div class="sl">Found</div></div>
-        <div class="stat-box"><div class="sv" style="color:var(--text)">{total}</div><div class="sl">Checked</div></div>
+        <div class="stat-box"><div class="sv" style="color:var(--text)">{total}</div><div class="sl">{checked_label}</div></div>
         <div class="stat-box amber"><div class="sv">{xlink_cnt}</div><div class="sl">Cross-links</div></div>
-        <div class="stat-box red"><div class="sv">{error_cnt}</div><div class="sl">Errors</div></div>
+        <div class="stat-box grey"><div class="sv">{unanswered_cnt}</div><div class="sl">No clear answer</div></div>
       </div>
     </div>
 
     <div class="sp-section">
-      <div class="sp-title">Confidence</div>
-      <div class="conf-row"><div class="conf-row-inner"><div class="conf-dot" style="background:var(--accent)"></div>High (OG verified)</div><span style="color:var(--accent)">{high_conf}</span></div>
+      <div class="sp-title">Same person?</div>
+      <div class="conf-row"><div class="conf-row-inner"><div class="conf-dot" style="background:var(--accent)"></div>High</div><span style="color:var(--accent)">{high_conf}</span></div>
       <div class="conf-row"><div class="conf-row-inner"><div class="conf-dot" style="background:#60a5fa"></div>Medium</div><span style="color:#60a5fa">{med_conf}</span></div>
       <div class="conf-row"><div class="conf-row-inner"><div class="conf-dot" style="background:var(--dim)"></div>Low</div><span style="color:var(--dim)">{low_conf}</span></div>
     </div>
@@ -466,8 +478,8 @@ svg#graph{{width:100%;height:100%;}}
     <svg id="graph"></svg>
 
     <div id="filterpanel">
-      <div class="fp-title">Filter by Confidence</div>
-      <label class="fp-row"><input type="checkbox" id="f-high" checked onchange="applyFilter()"> High (OG verified)</label>
+      <div class="fp-title">Filter: same person?</div>
+      <label class="fp-row"><input type="checkbox" id="f-high" checked onchange="applyFilter()"> High</label>
       <label class="fp-row"><input type="checkbox" id="f-med" checked onchange="applyFilter()"> Medium</label>
       <label class="fp-row"><input type="checkbox" id="f-low" checked onchange="applyFilter()"> Low</label>
     </div>
@@ -485,7 +497,7 @@ svg#graph{{width:100%;height:100%;}}
       <div class="leg-row"><div class="leg-dash" style="color:var(--accent2)"></div>Pivot / Email</div>
       <div class="leg-row"><div class="leg-dot" style="background:#ffffff;box-shadow:0 0 6px #fff"></div>Username root</div>
       {'<div class="leg-row"><div class="leg-dot" style="background:var(--accent2);box-shadow:0 0 6px var(--accent2)"></div>Email root</div>' if email else ''}
-      <div class="leg-row"><div class="leg-dot" style="border:1.5px solid var(--accent);background:transparent"></div>High confidence</div>
+      <div class="leg-row"><div class="leg-dot" style="border:1.5px solid var(--accent);background:transparent"></div>Same person: high</div>
       {'<div class="leg-row"><div class="leg-line" style="background:#fbbf24"></div>Declared relationship</div>' if relationships else ''}
       {'<div class="leg-row"><div class="leg-dot" style="background:#f87171"></div>Breach exposure (lead)</div>' if any(v.get("breaches") for v in (breach_verdicts or [])) else ''}
       {'<div class="leg-row"><div class="leg-dot" style="background:#a78bfa"></div>Dark-web lead</div>' if any(b.get("hits") for b in ((darkweb or {}).get("ahmia") or [])) else ''}
@@ -609,7 +621,7 @@ node.on("mouseover",(e,d)=>{{
   if(d.type==="target"||d.type==="category") return;
   document.getElementById("tt-name").textContent=d.label;
   const confEl=document.getElementById("tt-conf");
-  confEl.textContent=d.confidence?`confidence: ${{d.confidence}}`:'';
+  confEl.textContent=d.confidence?`same person? ${{d.confidence.toUpperCase()}}`:'';
   confEl.className=d.confidence==="high"?"tt-conf-high":d.confidence==="medium"?"tt-conf-med":"tt-conf-low";
   document.getElementById("tt-src").textContent=d.source?`source: ${{d.source}}`:'';
   document.getElementById("tt-og").textContent=d.og_title?`"${{d.og_title}}"`:'' ;
