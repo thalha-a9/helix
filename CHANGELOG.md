@@ -1,5 +1,17 @@
 # Helix Changelog
 
+## v4.3.0 (2026-11-16)
+
+### Added
+- More of Helix as a library (`helix_osint.api`), for programs that build on it:
+  - `scan_email()`: the email check the command line runs with `-e` (Gravatar, and holehe with `holehe=True`), with the same report shape and counting rules as `scan()`. Holehe modules that would send a password-recovery mail are never run.
+  - `is_left_out()` and `refresh_left_out()`: check a username or an email address against the left-out list before storing or scanning it.
+  - `record_attempt()` and `verify_evidence()`: a sealed record of any report, in the format of `docs/EVIDENCE_SPEC.md`, and the check that it was not changed.
+  - Reports now say `target_type` and, for usernames, how many made-up names checked each hit (`controls`).
+
+### Fixed
+- Stopping a scan part way (cancelling it from a program) left its site checks running in the background until each site answered. They now stop with the scan.
+
 ## v4.2.0 (2026-11-15)
 
 ### Changes you may notice

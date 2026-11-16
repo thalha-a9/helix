@@ -829,15 +829,23 @@ async def check_username(username: str, platforms: dict = None, progress_cb=None
     connector = netconfig.build_connector(limit=limit, force_close=True)
     async with netconfig.new_session(connector=connector) as session:
         tasks = [
-            check_platform(session, name, plat, username, semaphore, fast=fast,
-                           **({"capture": True} if capture else {}))
+            asyncio.ensure_future(check_platform(session, name, plat, username, semaphore,
+                                                 fast=fast, **({"capture": True} if capture else {})))
             for name, plat in plat_map.items()
         ]
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
-            results.append(result)
-            done += 1
-            if progress_cb: progress_cb(done, n)
+        try:
+            for coro in asyncio.as_completed(tasks):
+                result = await coro
+                results.append(result)
+                done += 1
+                if progress_cb: progress_cb(done, n)
+        except BaseException:
+            # Stopped part way (cancelled, or the caller's error): stop every
+            # site check too, so nothing keeps running after the scan is gone.
+            for t in tasks:
+                t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
         if fast:
             timed_out = sum(1 for r in results if r.get("error") == "timeout")
             if should_retry_timeouts(timed_out, n, limit, retry_timeouts):
