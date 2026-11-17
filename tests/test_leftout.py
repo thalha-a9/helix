@@ -113,3 +113,15 @@ def test_the_request_form_asks_for_a_token_never_a_name():
         pytest.skip("repository files, not in the source package")
     form = open(path, encoding="utf-8").read()
     assert "Do not write your username or address here" in form and "--left-out-token" in form
+
+
+def test_the_status_says_how_many_entries_and_whether_a_list_was_ever_downloaded(monkeypatch, tmp_path):
+    from helix_osint import api
+    st = api.left_out_status()
+    assert st["downloaded"] is False and st["saved_utc"] is None and st["last_attempt_utc"] is None
+    assert st["entries"] == st["shipped_entries"]
+    leftout._CACHE.write_text(json.dumps({"schema": leftout.SCHEMA,
+                                          "tokens": [leftout.token("janeroe"), leftout.token("x@y.z")]}))
+    st = api.left_out_status()
+    assert st["downloaded"] is True and st["saved_utc"]
+    assert st["entries"] == st["shipped_entries"] + 2

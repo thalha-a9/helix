@@ -75,3 +75,12 @@ async def refresh(timeout: float = 8.0, url: str = LIST_URL) -> bool:
 def is_left_out(identifier: str, tokens: Optional[Set[str]] = None) -> bool:
     tokens = load() if tokens is None else tokens
     return bool(tokens) and bool(normalise(identifier)) and token(identifier) in tokens
+
+
+def status() -> dict:
+    """How many entries are in force, from where, and how the last download went."""
+    from helix_osint.updates import read_json, status as _status
+    shipped = read_json(SHIPPED, _valid)
+    return {"entries": len(load()),
+            "shipped_entries": len(shipped["tokens"]) if shipped else 0,
+            **_status(_CACHE, _valid)}

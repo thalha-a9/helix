@@ -12,7 +12,7 @@
 ### Decode the digital DNA of any identity
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-4.3.0-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
+[![Version](https://img.shields.io/badge/Version-4.4.0-00ff88?style=flat-square)](https://github.com/thalha-a9/helix/releases)
 [![License](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)](LICENSE)
 [![Platforms](https://img.shields.io/badge/Platforms-56%20builtin%20%7C%208%2C305%20with%20--all-a78bfa?style=flat-square)](https://github.com/thalha-a9/helix)
 [![Benchmarks](https://img.shields.io/badge/Benchmarks-reproducible%20%7C%200%20false%20positives-00ff88?style=flat-square)](bench/README.md)
@@ -105,7 +105,8 @@ the report is the expensive mistake.
 | `--json` | For other programs: prints one JSON object on standard output when the scan is over (schema `helix.cli.v1`: the confirmed accounts with `platform`, `url` and `confidence`, the unconfirmed ones, and the counts including sites that gave no clear answer) and sends everything a person would read to standard error. Never opens a browser, never asks a question. A scan that cannot run still prints an object, with `error` |
 | `--serve` | A local web page at `http://127.0.0.1:8765/` for people who do not use a terminal, with a small HTTP API. It listens on this computer only. English, Hindi, Spanish, Arabic, Portuguese and Russian; the five translations have not yet been checked by a native speaker of each |
 | `--include-off` | Also scan the sites the [daily site check](docs/SITE_CHECK.md) switched off (dead or broken on 3 checks in a row). They are left out by default and every scan says how many |
-| `--no-recover` | Skip the second attempt for sites that gave no clear answer (another rule for the same site, the same request after a pause, a browser's TLS fingerprint). Faster, but fewer sites answer |
+| `--no-recover` | Skip the second attempt for sites that gave no clear answer (another rule for the same site, or the same request after a pause). Faster, but fewer sites answer |
+| `--as-browser` | **Browser mode**, off by default (needs `pip install "helix-osint[browser]"`). The few sites that read the TLS fingerprint (Instagram, Facebook, X, TikTok and others) are asked with Chrome's fingerprint and User-Agent, and a site that answered with a bot check gets one more try that way. Every other site still sees Helix's own name. The sealed record says when it was on |
 | `--left-out-token NAME` | Prints the token to send when you ask that a username or address is never looked up with Helix. See [docs/LEFT_OUT.md](docs/LEFT_OUT.md) |
 | `--maigret-engine` | Runs the installed **Maigret engine** (`pip install maigret`) as a lead source: every hit is re-fetched and verified by Helix before it is reported. `--maigret-top N` sets how many sites it checks (default 500) |
 | `--sherlock` | Loads Sherlock's database at runtime: **~440 platforms**, cached 24h locally |
@@ -183,7 +184,7 @@ pip install aiohttp
 
 **Optional extras**
 ```bash
-pip install curl-cffi        # WAF bypass for Twitter, Instagram, TikTok, Patreon
+pip install "helix-osint[browser]"  # browser mode for the fingerprint sites (--as-browser)
 pip install imagehash Pillow # Perceptual avatar hash matching (--phash)
 pip install holehe            # Deep email scanning 120+ platforms (--holehe)
                               #   Kali/Debian: if the build fails with "install_layout",
@@ -269,6 +270,15 @@ python helix.py --providers
 
 ## Operational Security
 
+**How Helix identifies itself.** Every request names Helix, its version and
+its homepage in the User-Agent (`Helix-OSINT/4.4.0 (+https://github.com/thalha-a9/helix)`).
+It does not rotate browser User-Agents: measured on 783 sites, its own name
+got as many clear answers. A few sites (Instagram, Facebook) answer a request
+that does not look like Chrome with a login wall that reads like "no such
+user", so by default Helix sends them nothing and counts them as no clear
+answer. `--as-browser` asks those sites, and only those, as Chrome; use it
+knowing that it means posing as a browser to them.
+
 > **By default every probe leaves from your real IP.** A scan opens dozens of
 > near-simultaneous connections to the same username across many platforms:
 > a distinctive, easily-logged pattern. A subject who monitors their own
@@ -349,7 +359,7 @@ helix/
 |-- helix_osint/                     # The one package that is installed
 |   |-- cli.py                       # CLI entry point + orchestrator (helix-osint, python -m helix_osint)
 |   |-- api.py                       # The scan as a library: helix_osint.api.scan
-|   |-- checker.py                   # Async engine (aiohttp + optional curl_cffi)
+|   |-- checker.py                   # Async engine (aiohttp)
 |   |-- platforms.py                 # 56 platform definitions with OG/API detection
 |   |-- verifier.py                  # Local heuristic false-positive engine
 |   |-- graph.py                     # D3.js relational graph generator
@@ -407,7 +417,7 @@ Helix uses the right detection method per platform instead of naive HTTP 200 che
 | Lichess | `lichess.org/api/user/{u}` | Official public API |
 | GitHub | `og:title` parsed + validated against known error strings | Server-side rendered, reliable |
 | Medium | `og:title` rejects homepage redirect string | Catches "Where good ideas find you" |
-| Twitter/X | not-found text + the page must name the user (`curl_cffi`) | Skipped gracefully without curl_cffi |
+| Twitter/X | not-found text + the page must name the user | Often a login wall: then counted as no clear answer |
 | Instagram | profile `og:title` "Name (@user)" | Logged out, anything else is a wall |
 | TikTok | embedded user record `"uniqueId":"user"` | Unknown names get statusCode 10221 |
 | Keybase | public lookup API | Pages lost og:title; the API also gives cryptographic proofs |

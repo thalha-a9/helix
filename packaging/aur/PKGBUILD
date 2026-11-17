@@ -11,7 +11,7 @@ license=('MIT')
 depends=('python' 'python-aiohttp')
 makedepends=('python-build' 'python-installer' 'python-setuptools' 'python-wheel')
 optdepends=('python-aiohttp-socks: --tor and socks5:// proxies'
-            'python-curl_cffi: TLS impersonation for X, Instagram and TikTok'
+            'python-curl_cffi: browser mode (--as-browser)'
             'python-imagehash: avatar matching (--phash)'
             'python-pillow: avatar matching (--phash)'
             'holehe: email account check (--holehe)'

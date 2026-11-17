@@ -45,7 +45,7 @@ from helix_osint.verifier import run_local_verifier
 SCHEMA = "helix.scan.v1"
 
 __all__ = ["SCHEMA", "LeftOut", "__version__", "scan", "scan_sync", "scan_email",
-           "scan_email_sync", "is_left_out", "refresh_left_out", "record_attempt",
+           "scan_email_sync", "is_left_out", "refresh_left_out", "left_out_status", "record_attempt",
            "verify_evidence"]
 
 
@@ -66,12 +66,16 @@ def _clean(results: list) -> list:
 async def scan(username: str, sources: Union[str, Iterable[str]] = "builtin", nsfw: bool = False,
                controls: int = DEFAULT_CONTROLS, concurrency: Optional[int] = None,
                include_off: bool = False, purpose: str = "", recover: bool = True,
-               platforms: Optional[Dict[str, dict]] = None, progress_cb=None) -> Dict:
+               platforms: Optional[Dict[str, dict]] = None, progress_cb=None,
+               as_browser: bool = False) -> Dict:
     """
     Scan one username. `sources` is "builtin", "all", or any of "wmn",
     "sherlock", "maigret", "fediverse" (a list or a comma string).
     `platforms` scans exactly that site map instead. Raises ValueError for a
     name that is not a username and LeftOut for a name on the left-out list.
+    `as_browser=True` is browser mode (needs `pip install "helix-osint[browser]"`,
+    else RuntimeError): the sites that read the TLS fingerprint are asked as
+    Chrome; every other site sees Helix's own name.
     """
     username = str(username or "").strip().lstrip("@")
     ok, why = validate_username(username)
@@ -100,7 +104,8 @@ async def scan(username: str, sources: Union[str, Iterable[str]] = "builtin", ns
     started, t0 = evidence.utc_now(), time.time()
     controls = max(DEFAULT_CONTROLS, int(controls or 0))
     raw = await check_username(username, platforms=platform_map, progress_cb=progress_cb,
-                               concurrency=concurrency, recover=recover, controls=controls)
+                               concurrency=concurrency, recover=recover, controls=controls,
+                               as_browser=as_browser)
     annotate_locations(raw)
     annotate_relations(raw)
     results, _purged = run_local_verifier(_clean(raw), username)
@@ -110,6 +115,7 @@ async def scan(username: str, sources: Union[str, Iterable[str]] = "builtin", ns
         "target_type": "username",
         "username": username,
         "controls": controls,
+        "as_browser": bool(as_browser),
         "purpose": evidence.one_line(purpose) or evidence.PURPOSE_NOT_STATED,
         "started_utc": started,
         "finished_utc": evidence.utc_now(),
@@ -198,6 +204,13 @@ def is_left_out(identifier: str) -> bool:
     return leftout.is_left_out(identifier)
 
 
+def left_out_status() -> Dict:
+    """The left-out list in force: `entries` (shipped and downloaded together),
+    `shipped_entries`, `downloaded` (a good copy is on disk), `saved_utc`,
+    `last_attempt_utc` and `last_attempt_ok` (None when never tried)."""
+    return leftout.status()
+
+
 def _sites_of(report: Dict) -> Dict[str, dict]:
     return {r["platform"]: {"url": r.get("url", ""), "source": r.get("source", "")}
             for r in report.get("results", []) if r.get("platform")}
@@ -223,7 +236,8 @@ def record_attempt(report: Dict, collector: str = "", command: Optional[List[str
         argv=command or ["helix_osint.api", "scan_email" if target_type == "email" else "scan"],
         concurrency=0, control=target_type == "username",
         controls=report.get("controls") if target_type == "username" else None,
-        sites_file="sites.json", purpose=report.get("purpose", ""), collector=collector)
+        sites_file="sites.json", purpose=report.get("purpose", ""), collector=collector,
+        as_browser=bool(report.get("as_browser")))
     return record, sites
 
 

@@ -20,9 +20,10 @@ from urllib.parse import quote
 import aiohttp
 
 from helix_osint import netconfig
+from helix_osint.checker import USER_AGENT
 
 _HEADERS = {
-    "User-Agent": "Helix-OSINT/3.0 (security research)",
+    "User-Agent": USER_AGENT,
     "Accept":     "application/json",
 }
 _TIMEOUT = aiohttp.ClientTimeout(total=15)

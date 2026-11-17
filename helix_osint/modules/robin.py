@@ -29,11 +29,12 @@ from urllib.parse import parse_qs, urlencode, urlparse
 import aiohttp
 
 from helix_osint import netconfig
+from helix_osint.checker import USER_AGENT
 
 AHMIA_HOME   = "https://ahmia.fi/"
 AHMIA_SEARCH = "https://ahmia.fi/search/"
 TIMEOUT      = aiohttp.ClientTimeout(total=30, connect=10)
-HEADERS      = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
+HEADERS      = {"User-Agent": USER_AGENT,
                 "Accept": "text/html,application/xhtml+xml"}
 MAX_HITS_PER_TERM = 20
 

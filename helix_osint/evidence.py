@@ -54,7 +54,8 @@ COUNTING_RULES = {
     "second_attempt": "sites that gave no clear answer at first and a clear one when asked "
                       "again, counted by how: 'retry' the same request, 'fallback' another "
                       "rule for the same site (WebFinger on a fediverse server), 'tls' the "
-                      "same request with a browser's TLS fingerprint. A hit found this way "
+                      "same request with a browser's TLS fingerprint (browser mode only, "
+                      "attempt.as_browser). A hit found this way "
                       "went through the same control probe, read by the same rule",
 }
 
@@ -65,6 +66,7 @@ _REASONS = (
     ("connection_error: invalid HTTPS certificate", "invalid HTTPS certificate"),
     ("connection_error", "connection error"),
     ("waf_blocked", "bot-check page"),
+    ("no browser fingerprint", "answers only a faked browser fingerprint (not sent)"),
     ("requires curl_cffi", "needs curl_cffi (not installed)"),
     ("unverifiable: platform also reports", "control probe: site finds impossible usernames"),
     ("unverifiable: no clear", "control probe: impossible username got no clear answer"),
@@ -176,7 +178,7 @@ def build(*, username: str, results: List[dict], platform_map: Dict[str, dict],
           concurrency: int, control: bool, sites_file: str, pages: Optional[Dict] = None,
           target_type: str = "username", controls: Optional[int] = None,
           switched_off: Optional[Dict] = None, purpose: str = "",
-          collector: str = "") -> Dict:
+          collector: str = "", as_browser: bool = False) -> Dict:
     """The evidence record, with `fingerprint` = SHA-256 of everything else.
 
     For an email scan `username` holds the address and target_type is "email";
@@ -205,6 +207,7 @@ def build(*, username: str, results: List[dict], platform_map: Dict[str, dict],
             **({"controls": controls} if controls else {}),
             "purpose": one_line(purpose) or PURPOSE_NOT_STATED,
             **({"collector": one_line(collector)} if one_line(collector) else {}),
+            **({"as_browser": True} if as_browser else {}),
         },
         "environment": {
             "python": _platform.python_version(),

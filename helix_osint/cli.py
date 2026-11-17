@@ -18,7 +18,7 @@ def _check_deps():
 
 from helix_osint              import netconfig, __version__
 from helix_osint.checker      import (check_username, check_email, validate_username, validate_email,
-                                HAS_CURL_CFFI, MAX_CONCURRENCY, DEFAULT_CONTROLS)
+                                MAX_CONCURRENCY, DEFAULT_CONTROLS)
 from helix_osint.location     import annotate_locations, flag_conflicts, describe_subject_location, resolve_countries
 from helix_osint.confidence   import score_identity
 from helix_osint.relationships import (annotate_relations, build_relationships, edge_line,
@@ -53,7 +53,6 @@ BANNER = f"""{C}{B}
 def banner():
     print(BANNER)
     feats = []
-    feats.append(f"{G}curl_cffi{RST}"   if HAS_CURL_CFFI else f"{DIM}aiohttp{RST}")
     feats.append(f"{G}pHash{RST}"       if HAS_PHASH    else f"{DIM}pHash[pip install imagehash Pillow]{RST}")
     feats.append(f"{G}local verifier{RST}")
     print(f"  {DIM}Engine:{RST} {' | '.join(feats)}\n")
@@ -286,6 +285,12 @@ async def run(args):
     if email:
         ok, msg = validate_email(email)
         if not ok: print(f"{R}[!] {msg}{RST}\n"); sys.exit(1)
+    if getattr(args, "as_browser", False):
+        from helix_osint.checker import BROWSER_MISSING, HAS_CURL_CFFI
+        if not HAS_CURL_CFFI:
+            print(f"{R}[!] --as-browser: {BROWSER_MISSING}{RST}\n"); sys.exit(2)
+        print(f"  {Y}[!]{RST} {DIM}Browser mode: sites that read the TLS fingerprint are asked as "
+              f"Chrome. Every other site sees Helix's own name. The record says so.{RST}")
 
     # People who asked to be left out are not looked up, whatever the options.
     from helix_osint import leftout
@@ -421,6 +426,7 @@ async def run(args):
                                            controls=max(DEFAULT_CONTROLS, getattr(args, "controls", None) or 0),
                                            capture=getattr(args, "save_pages", False),
                                            recover=not getattr(args, "no_recover", False),
+                                           as_browser=getattr(args, "as_browser", False),
                                            recover_cb=lambda k: print(
                                                f"\n  {DIM}Asking {k} site(s) again that gave no "
                                                f"clear answer...{RST}", end="", flush=True),
@@ -484,6 +490,7 @@ async def run(args):
                 control=not args.no_control, pages=pages,
                 purpose=getattr(args, "purpose", None) or "",
                 collector=getattr(args, "collector", None) or "",
+                as_browser=getattr(args, "as_browser", False),
                 switched_off=({"count": len(left_out),
                                "list_updated_utc": off_list.get("updated_utc", "")}
                               if left_out else None),
@@ -569,13 +576,10 @@ async def run(args):
                 print(f"  {DIM}      Different names under one username usually mean different "
                       f"people: check before using any of them.{RST}")
         elapsed  = time.time()-prog.start
-        skipped  = sum(1 for r in results if "curl_cffi" in (r.get("error") or ""))
 
         print(f"\n  {B}{'-'*54}{RST}")
         print(f"  {G}{B}Found {len(found_u)}/{len(results)}{RST}  "
               f"{C}Cross-links {xlinks}{RST}  {DIM}Time {elapsed:.1f}s{RST}")
-        if skipped:
-            print(f"  {Y}[!]{RST} {DIM}{skipped} WAF platforms skipped: pip install curl-cffi{RST}")
         gap = unanswered_line(results)
         if gap:
             print(f"  {Y}[!]{RST} {DIM}{gap}{RST}")
@@ -1175,6 +1179,10 @@ Operational security:
     g.add_argument("--include-off",     action="store_true",  dest="include_off",
         help="Also scan the sites the daily site check switched off (dead or broken on "
              "3 checks in a row). They are left out by default and the scan says how many")
+    g.add_argument("--as-browser",      action="store_true",  dest="as_browser",
+        help="Browser mode (needs pip install \"helix-osint[browser]\"): the few sites that read "
+             "the TLS fingerprint (Instagram, Facebook, X, TikTok and others) are asked with "
+             "Chrome's fingerprint and User-Agent. Off by default: Helix names itself")
     g.add_argument("--no-recover",      action="store_true",  dest="no_recover",
         help="Skip the second attempt for sites that gave no clear answer (rate limits, "
              "bot checks, server errors). Faster, but fewer sites answer")

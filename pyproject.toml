@@ -35,7 +35,6 @@ dependencies = ["aiohttp>=3.9.0,<4.0.0"]
 [project.optional-dependencies]
 socks = ["aiohttp-socks>=0.8.4"]
 dev   = ["pytest>=8", "pytest-asyncio>=0.23", "aiohttp-socks>=0.8.4", "phonenumbers>=8.13"]
-tls   = ["curl-cffi>=0.6.2"]
 # --phash decodes pictures from strangers' accounts: Pillow 13 fixes 20 decoder
 # vulnerabilities but needs Python 3.11+, so older Pythons get the best they can.
 phash = ["imagehash>=4.3.1", "Pillow>=13.0.0; python_version >= '3.11'",
@@ -44,6 +43,7 @@ email = ["holehe>=1.4.4", "httpx[socks]"]
 ai    = ["anthropic>=0.25.0", "openai>=1.0.0"]
 pdf   = ["weasyprint>=60.0"]
 phone = ["phonenumbers>=8.13"]
+browser = ["curl-cffi>=0.6.2"]
 full  = ["curl-cffi>=0.6.2", "imagehash>=4.3.1", "Pillow>=13.0.0; python_version >= '3.11'",
          "Pillow>=11.3.0; python_version < '3.11'", "holehe>=1.4.4",
          "httpx[socks]", "anthropic>=0.25.0", "openai>=1.0.0", "weasyprint>=60.0",

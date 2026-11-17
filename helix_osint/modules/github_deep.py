@@ -9,13 +9,14 @@ from datetime import datetime, timezone
 from collections import Counter
 from typing import Dict, List, Optional, Set
 from helix_osint import netconfig
+from helix_osint.checker import USER_AGENT
 
 API = "https://api.github.com"
 
 
 def _gh_headers() -> Dict:
     h = {"Accept": "application/vnd.github.v3+json",
-         "User-Agent": "Helix-OSINT/3.0 (security research)"}
+         "User-Agent": USER_AGENT}
     token = os.environ.get("GITHUB_TOKEN","")
     if token:
         h["Authorization"] = f"token {token}"

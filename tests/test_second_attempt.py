@@ -203,7 +203,7 @@ def test_what_stood_in_the_way(result, kind):
 async def test_dead_hosts_bad_certificates_and_timeouts_are_not_asked_again(monkeypatch):
     calls = []
     errors = {"Dns": DNS_ERROR, "Cert": CERT_ERROR, "Slow": "timeout",
-              "Tls": "requires curl_cffi (pip install curl-cffi)",
+              "Tls": ck.NO_FINGERPRINT, "OldTls": "requires curl_cffi (pip install curl-cffi)",
               "Soft": "soft404_body: page body indicates user not found"}
 
     async def fake_check(session, name, plat, username, sem, fast=False):

@@ -3,4 +3,4 @@
 The version lives here only: pyproject.toml, the CLI banner, --version and
 every report read it from this line.
 """
-__version__ = "4.3.0"
+__version__ = "4.4.0"

@@ -12,6 +12,7 @@ import json
 import os
 import socket
 import threading
+import time
 
 import pytest
 
@@ -107,7 +108,7 @@ def _free_port():
     ({"found": False, "error": "502, message='Bad Gateway', url='http://user:pw@127.0.0.1:8080'"},
      "unknown", "502, message='Bad Gateway', url='http://***@127.0.0.1:8080'"),
     ({"found": False, "error": "requires curl_cffi (pip install curl-cffi)"},
-     "unknown", "requires curl_cffi (pip install curl-cffi)"),
+     "unknown", "requires curl_cffi (pip install curl-cffi)"),    ({"found": False, "error": ck.NO_FINGERPRINT}, "unknown", ck.NO_FINGERPRINT),
 ])
 def test_each_answer_to_a_made_up_name_has_a_state(result, state, why):
     assert health.classify(result) == (state, why)
@@ -418,3 +419,48 @@ async def test_a_fediverse_server_is_proven_with_an_account_it_names_itself(base
     got = {o["name"]: o["state"] for o in seen.values()}
     assert got == {"with.example": "proven", "silent.example": "answers", "Forum": "answers"}
     assert sorted(asked) == ["silent.example", "with.example"]       # only servers without a listed account
+
+
+# A failed download never stands in for a list
+
+@pytest.mark.asyncio
+async def test_a_failed_first_download_leaves_no_list_and_is_tried_again_within_the_hour(base, monkeypatch):
+    from helix_osint import updates
+    cache = health._CACHE_OFF
+    assert await health.refresh_switched_off(url=base + "/missing.json") is False
+    assert not cache.exists()                                   # no empty stand-in
+    st = updates.status(cache, health._valid_off)
+    assert st["downloaded"] is False and st["saved_utc"] is None
+    assert st["last_attempt_ok"] is False and st["last_attempt_utc"]
+
+    # Within the hour: not asked again.
+    assert await health.refresh_switched_off(url=base + "/off.json") is False
+    assert Handler.hits.count("/off.json") == 0
+
+    # An hour later: asked again, and a good list is saved.
+    monkeypatch.setattr(updates, "RETRY", 0)
+    Handler.off_list = off_list("fresh.example/{username}")
+    assert await health.refresh_switched_off(url=base + "/off.json") is True
+    st = updates.status(cache, health._valid_off)
+    assert st["downloaded"] is True and st["saved_utc"] and st["last_attempt_ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_an_empty_stand_in_left_by_an_older_version_does_not_block_a_download(base):
+    health._CACHE_OFF.write_text("{}")                          # what 4.3.0 and earlier wrote
+    Handler.off_list = off_list("fresh.example/{username}")
+    assert await health.refresh_switched_off(url=base + "/off.json") is True
+    assert list(health.load_switched_off()["sites"]) == ["fresh.example/{username}"]
+
+
+@pytest.mark.asyncio
+async def test_a_failure_after_a_good_download_keeps_the_good_copy(base, monkeypatch):
+    from helix_osint import updates
+    Handler.off_list = off_list("kept.example/{username}")
+    assert await health.refresh_switched_off(url=base + "/off.json") is True
+    old = time.time() - updates.DAY - 10
+    os.utime(health._CACHE_OFF, (old, old))                     # a day later
+    monkeypatch.setattr(updates, "RETRY", 0)
+    assert await health.refresh_switched_off(url=base + "/missing.json") is False
+    assert list(health.load_switched_off()["sites"]) == ["kept.example/{username}"]
+    assert updates.status(health._CACHE_OFF, health._valid_off)["last_attempt_ok"] is False

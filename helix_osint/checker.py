@@ -16,27 +16,39 @@ from helix_osint import netconfig
 from helix_osint.evidence import _no_answer
 from helix_osint.platform_schema import fallback_defs
 
+from helix_osint import __version__ as _VERSION
+
 try:
     from curl_cffi.requests import AsyncSession as CurlSession
     HAS_CURL_CFFI = True
 except ImportError:
     HAS_CURL_CFFI = False
 
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
-]
+# By default Helix names itself in every request and does not pose as a
+# browser. Measured on 783 sites, its own name got as many clear answers as
+# rotating browser User-Agents did.
+USER_AGENT = f"Helix-OSINT/{_VERSION} (+https://github.com/thalha-a9/helix)"
+NO_FINGERPRINT = "no browser fingerprint (Helix does not fake one)"
+BROWSER_MISSING = 'browser mode needs curl_cffi: pip install "helix-osint[browser]"'
 
-def _headers(platform: Optional[dict] = None) -> dict:
-    """Request headers: a browser's, then any the site's definition lists
-    (an app id or an accept type its lookup needs)."""
+# Browser mode (--as-browser, opt-in, needs curl_cffi): only the sites whose
+# definition reads the TLS fingerprint (tls_impersonate) are asked with
+# Chrome's fingerprint and a matching Chrome User-Agent, and a site that
+# answered the first request with a bot check gets one more try that way.
+# Every other site still sees Helix's own name. The sealed record says when
+# browser mode was on.
+BROWSER_IMPERSONATE = "chrome120"
+BROWSER_USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+
+def _headers(platform: Optional[dict] = None, browser: bool = False) -> dict:
+    """Request headers: Helix's own (a browser's in browser mode, for the
+    fingerprint sites only), then any the site's definition lists (an app id
+    or an accept type its lookup needs)."""
     headers = {
-        "User-Agent":      random.choice(USER_AGENTS),
-        "Accept-Language": random.choice(["en-US,en;q=0.9", "en-GB,en;q=0.9"]),
+        "User-Agent":      BROWSER_USER_AGENT if browser else USER_AGENT,
+        "Accept-Language": "en-US,en;q=0.9",
         "Accept":          "text/html,application/xhtml+xml,*/*;q=0.8",
         "DNT": "1",
     }
@@ -237,9 +249,11 @@ async def check_platform(session, name: str, platform: dict,
         "detection_method": platform.get("method", ""),
     }
 
-    # Skip WAF-only platforms when curl_cffi unavailable
-    if platform.get("requires_tls") and not HAS_CURL_CFFI:
-        result["error"] = "requires curl_cffi (pip install curl-cffi)"
+    # A site that answers only a browser's TLS fingerprint gets no request
+    # unless browser mode is on: it counts as no clear answer, with the reason.
+    as_browser = bool(platform.get("_as_browser")) and HAS_CURL_CFFI
+    if platform.get("requires_tls") and not as_browser:
+        result["error"] = NO_FINGERPRINT
         return result
 
     async with semaphore:
@@ -249,30 +263,33 @@ async def check_platform(session, name: str, platform: dict,
         timeout = FAST_TIMEOUT if fast else TIMEOUT
         for attempt in range(retries + 1):
             try:
-                if HAS_CURL_CFFI and platform.get("tls_impersonate"):
-                    async with CurlSession(impersonate="chrome120") as curl:
-                        r   = await curl.get(probe_url, headers=_headers(platform), timeout=timeout.total,
-                                             allow_redirects=True, **netconfig.curl_kwargs())
-                        await _apply(result, platform, username, r.status_code, r.text, str(r.url), probe_url)
+                if as_browser and platform.get("tls_impersonate"):
+                    async with CurlSession(impersonate=BROWSER_IMPERSONATE) as curl:
+                        r = await curl.get(probe_url, headers=_headers(platform, browser=True),
+                                           timeout=timeout.total, allow_redirects=True,
+                                           **netconfig.curl_kwargs())
+                        await _apply(result, platform, username, r.status_code, r.text,
+                                     str(r.url), probe_url)
                         if capture and result["found"]:
                             result["_capture"] = _snap(r.status_code, probe_url, str(r.url),
                                                        r.headers, r.content)
-                else:
-                    # Increase read_bufsize to handle large headers (fixes Twitter 8190-byte error)
-                    async with session.get(
-                        probe_url, headers=_headers(platform), timeout=timeout,
-                        allow_redirects=True, ssl=True,
-                        read_bufsize=2**16, **netconfig.request_kwargs(),
-                    ) as r:
-                        raw_bytes = await netconfig.read_body(r, _MAX_BODY_BYTES)
-                        text = raw_bytes.decode("utf-8", errors="ignore")
-                        await _apply(result, platform, username, r.status, text, str(r.url), probe_url)
-                        wait = _retry_after(r.headers)
-                        if wait is not None:
-                            result["_retry_after"] = wait
-                        if capture and result["found"]:
-                            result["_capture"] = _snap(r.status, probe_url, str(r.url),
-                                                       r.headers, raw_bytes)
+                    result["status_code"] = result.get("status_code")
+                    break
+                # Increase read_bufsize to handle large headers (fixes Twitter 8190-byte error)
+                async with session.get(
+                    probe_url, headers=_headers(platform), timeout=timeout,
+                    allow_redirects=True, ssl=True,
+                    read_bufsize=2**16, **netconfig.request_kwargs(),
+                ) as r:
+                    raw_bytes = await netconfig.read_body(r, _MAX_BODY_BYTES)
+                    text = raw_bytes.decode("utf-8", errors="ignore")
+                    await _apply(result, platform, username, r.status, text, str(r.url), probe_url)
+                    wait = _retry_after(r.headers)
+                    if wait is not None:
+                        result["_retry_after"] = wait
+                    if capture and result["found"]:
+                        result["_capture"] = _snap(r.status, probe_url, str(r.url),
+                                                   r.headers, raw_bytes)
                 result["status_code"] = result.get("status_code")
                 break
 
@@ -734,7 +751,7 @@ def unanswered_kind(r: dict) -> str:
 # certificate stay that way, timeouts have their own retry rule above, and
 # the last two are verdicts, not failures.
 _NO_SECOND_ATTEMPT = ("dns", "certificate", "timeout")
-_FINAL_ERRORS = ("requires curl_cffi", "soft404_body")
+_FINAL_ERRORS = ("no browser fingerprint", "requires curl_cffi", "soft404_body")
 
 
 async def _recover(session, results: list, plat_map: dict, username: str,
@@ -746,8 +763,8 @@ async def _recover(session, results: list, plat_map: dict, username: str,
          (`fallbacks`: WebFinger on a fediverse server whose API is limited);
       2. the same request again, after the pause a rate limit or server
          error calls for;
-      3. the same request with a browser's TLS fingerprint, when curl_cffi
-         is installed and the site answered with a bot check or a refusal.
+      3. in browser mode only, the same request with a browser's TLS
+         fingerprint, when the site answered with a bot check or a refusal.
 
     A result is replaced only by a clear answer. Hits found here go through
     the control probe like any other, read by the rule that found them: the
@@ -785,7 +802,7 @@ async def _recover(session, results: list, plat_map: dict, username: str,
         r = await check_platform(session, name, pdef, username, sem, fast=True, **kw)
         if not unanswered_kind(r):
             return r, "retry", None
-        if (HAS_CURL_CFFI and not pdef.get("tls_impersonate")
+        if (pdef.get("_as_browser") and HAS_CURL_CFFI and not pdef.get("tls_impersonate")
                 and unanswered_kind(r) in ("botcheck", "refused")):
             as_browser = {**pdef, "tls_impersonate": True}
             r = await check_platform(session, name, as_browser, username, sem, fast=True, **kw)
@@ -808,7 +825,7 @@ async def check_username(username: str, platforms: dict = None, progress_cb=None
                          control: bool = True, concurrency: Optional[int] = None,
                          retry_cb=None, retry_timeouts: Optional[bool] = None,
                          capture: bool = False, controls: int = DEFAULT_CONTROLS,
-                         recover: bool = True, recover_cb=None) -> list:
+                         recover: bool = True, recover_cb=None, as_browser: bool = False) -> list:
     """
     Check one username on every platform. Large maps run a fast single-attempt
     sweep, then (see should_retry_timeouts; retry_timeouts=True/False forces
@@ -817,7 +834,11 @@ async def check_username(username: str, platforms: dict = None, progress_cb=None
     recover=False skips it, recover_cb(count) is called first), then the
     control probe verifies every hit.
     """
+    if as_browser and not HAS_CURL_CFFI:
+        raise RuntimeError(BROWSER_MISSING)
     plat_map  = platforms or PLATFORMS
+    if as_browser:
+        plat_map = {k: {**v, "_as_browser": True} for k, v in plat_map.items()}
     n         = len(plat_map)
     limit     = _dynamic_concurrency(n, concurrency)
     calm      = min(limit, CALM_CONCURRENCY)

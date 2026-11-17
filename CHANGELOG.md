@@ -1,5 +1,21 @@
 # Helix Changelog
 
+## v4.4.0 (2026-11-17)
+
+### Changes you may notice
+- **Helix names itself in every request.** The User-Agent is now `Helix-OSINT/<version> (+https://github.com/thalha-a9/helix)` instead of a browser's, picked at random. Measured on 783 sites, its own name got as many clear answers (603 against 598) and found the same accounts.
+- **No faked browser fingerprint by default.** Before, with curl_cffi installed (and in the Docker image), a few sites were asked with Chrome's TLS fingerprint, and sites that answered with a bot check were asked again that way. That is now browser mode, off unless you ask for it. By default Instagram and Facebook, which answer anything that does not look like Chrome with a login wall that reads like "no such user", get no request and count as no clear answer ("no browser fingerprint").
+- The `tls` extra is now called `browser`: `pip install "helix-osint[browser]"`.
+
+### Added
+- `--as-browser` (and `as_browser=True` in `helix_osint.api.scan`): browser mode. Only the sites that read the TLS fingerprint (Facebook, Instagram, LinkedIn, Patreon, Threads, TikTok, X) are asked with Chrome's fingerprint and a matching User-Agent, and a site that answered with a bot check gets one more try that way. Every other site still sees Helix's own name. The sealed record says when it was on (`attempt.as_browser`). Without curl_cffi it refuses to start rather than run without it.
+
+### Fixed
+- When the first download of the left-out list or the switched-off list failed (for example a server starting without network), Helix saved an empty stand-in and did not try again for a day, so for that day only the lists shipped with the package applied. A failed download now saves nothing and is tried again after an hour. A good copy is still asked for once a day, and a failure never replaces it.
+
+### Added
+- `helix_osint.api.left_out_status()`: how many entries the left-out list has, whether a copy was ever downloaded, when it was saved, and when a download was last tried and how it went.
+
 ## v4.3.0 (2026-11-16)
 
 ### Added

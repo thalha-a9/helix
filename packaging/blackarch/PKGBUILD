@@ -12,7 +12,7 @@ url='https://github.com/thalha-a9/helix'
 license=('MIT')
 depends=('python' 'python-aiohttp')
 optdepends=('python-aiohttp-socks: --tor and socks5:// proxies'
-            'python-curl_cffi: TLS impersonation for X, Instagram and TikTok'
+            'python-curl_cffi: browser mode (--as-browser)'
             'python-imagehash: avatar matching (--phash)'
             'python-pillow: avatar matching (--phash)'
             'holehe: email account check (--holehe)'

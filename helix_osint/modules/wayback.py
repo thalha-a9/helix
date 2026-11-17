@@ -26,13 +26,14 @@ from urllib.parse import urlsplit, urlunsplit
 import aiohttp
 
 from helix_osint import netconfig
+from helix_osint.checker import USER_AGENT
 
 CDX_API    = "https://web.archive.org/cdx/search/cdx"
 WB_BASE    = "https://web.archive.org/web"
 _PRIORITY  = {"social", "dev", "forum", "other"}   # looked up first
 LIMIT      = 25                                    # profiles per scan: Archive.org is slow and rate limits
 _OLD_HOSTS = {"x.com": "twitter.com"}
-_HEADERS   = {"User-Agent": "Mozilla/5.0 (compatible; Helix-OSINT/3.0)"}
+_HEADERS   = {"User-Agent": USER_AGENT}
 _TIMEOUT   = aiohttp.ClientTimeout(total=30)
 
 _EMAIL     = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
